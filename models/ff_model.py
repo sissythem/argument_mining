@@ -7,12 +7,13 @@ class FeedForward(torch.nn.Module):
     app_logger = None
     num_labels = 0
 
-    def __init__(self, properties, logger, device_name, num_labels, input_size=768):
+    def __init__(self, properties, logger, device_name, num_labels, input_size=768, softmax_dim=2):
         super(FeedForward, self).__init__()
         self.properties = properties
         self.app_logger = logger
         self.device_name = device_name
         self.input_size = input_size
+        self.softmax_dim = softmax_dim
         self.ff = torch.nn.Linear(self.input_size, num_labels).to(device_name)
 
     def forward(self, x):
@@ -20,7 +21,7 @@ class FeedForward(torch.nn.Module):
         activation_function = self._get_activation_function()
         res = activation_function(hidden)
         output = f.dropout(res)
-        output = f.softmax(output, dim=2)
+        output = f.softmax(output, dim=self.softmax_dim)
         return output
 
     def _get_activation_function(self):
