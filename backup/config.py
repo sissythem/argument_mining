@@ -16,12 +16,12 @@ import yaml
 class AppConfig:
     properties_file = "properties.yaml"
     example_properties = "example_properties.yaml"
-    documents_pickle = "documents.pickle"
-    pickle_sentences_filename = "sentences.pickle"
-    pickle_segments_filename = "segments.pickle"
-    relations_pickle_file = "relations.pickle"
-    stances_pickle_file = "stances.pickle"
-    pickle_relations_labels = "relations_labels.pickle"
+    documents_pickle = "documents.pkl"
+    pickle_sentences_filename = "sentences.pkl"
+    pickle_segments_filename = "segments.pkl"
+    relations_pickle_file = "relations.pkl"
+    stances_pickle_file = "stances.pkl"
+    pickle_relations_labels = "relations_labels.pkl"
     log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
 
     def __init__(self, app_path):

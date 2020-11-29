@@ -7,8 +7,10 @@ import torch
 from ellogon import tokeniser
 from transformers import BertTokenizer
 
+
 def tokenize_sentences(text):
     return tokeniser.tokenise_no_punc(text)
+
 
 class Document:
 
@@ -318,7 +320,7 @@ class DataPreprocessor:
         other_label = self.properties["preprocessing"]["other_label"]
         all_segments, stance_segments, relations, stances = self._collect_data(documents=documents,
                                                                                other_label=other_label)
-        relation_data, relation_labels, relation_initial_data, rel_lbls_dict = (1,1,1,1)
+        relation_data, relation_labels, relation_initial_data, rel_lbls_dict = (1, 1, 1, 1)
         # relation_data, relation_labels, relation_initial_data, rel_lbls_dict = self._collect_relations(
         #     segments=all_segments,
         #     relations=relations,

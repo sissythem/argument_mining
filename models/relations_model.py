@@ -2,10 +2,8 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as f
 import torch.utils.data as torch_data
-from sklearn.metrics import accuracy_score
-from transformers import BertForSequenceClassification, BertModel
-
-import utils
+from transformers import BertModel
+from models.ff_model import FeedForward
 
 
 class RelationsDataset(torch_data.Dataset):
@@ -37,15 +35,12 @@ class RelationsClassifier(pl.LightningModule):
         self.total_data = datasets["total_data"]
         self.total_labels = datasets["total_labels"]
 
-        print("This is memory-hoggish for no reason -- TODO fix")
-        self.train_data = utils.convert_ndarray_to_tensor(datasets["train_data"], device_name=self.device_name)
-        self.train_labels = utils.convert_ndarray_to_tensor(datasets["train_labels"], device_name=self.device_name)
-        self.test_data = utils.convert_ndarray_to_tensor(datasets["test_data"], device_name=self.device_name)
-        self.test_labels = utils.convert_ndarray_to_tensor(datasets["test_labels"], device_name=self.device_name)
-        self.validation_data = utils.convert_ndarray_to_tensor(datasets["validation_data"],
-                                                               device_name=self.device_name)
-        self.validation_labels = utils.convert_ndarray_to_tensor(datasets["validation_labels"],
-                                                                 device_name=self.device_name)
+        self.train_data = torch.from_numpy(datasets["train_data"]).to(self.device_name)
+        self.train_labels = torch.from_numpy(datasets["train_labels"]).to(self.device_name)
+        self.test_data = torch.from_numpy(datasets["test_data"]).to(self.device_name)
+        self.test_labels = torch.from_numpy(datasets["test_labels"]).to(self.device_name)
+        self.validation_data = torch.from_numpy(datasets["validation_data"]).to(self.device_name)
+        self.validation_labels = torch.from_numpy(datasets["validation_labels"]).to(self.device_name)
 
         self.validation_output = None
         self.validation_accuracies = []
@@ -53,9 +48,6 @@ class RelationsClassifier(pl.LightningModule):
         self.test_output = []
         self.test_accuracies = []
         self.test_accuracy = 0.0
-
-        # self.bert_model = BertForSequenceClassification.from_pretrained('nlpaueb/bert-base-greek-uncased-v1',
-        #                                                                 num_labels=self.num_labels).to(self.device_name)
 
         self.bert_model = BertModel.from_pretrained('nlpaueb/bert-base-greek-uncased-v1').to(self.device_name)
         self.doc_embedding = "pooler"
@@ -76,7 +68,6 @@ class RelationsClassifier(pl.LightningModule):
             # all_hidden_states = some_func(bert_output[2])
             print(f"Undefined doc-embedding acquisition type: {self.doc_embedding}")
             exit(1)
-
 
         self.ff = FeedForward(properties=self.properties, logger=self.app_logger, device_name=self.device_name,
                               num_labels=self.num_labels)
@@ -100,8 +91,8 @@ class RelationsClassifier(pl.LightningModule):
         # in lightning, forward defines the prediction/inference actions
         self.app_logger.debug("Start forward")
         self.app_logger.debug("Start BERT training")
-        in1 = tokens[:,0,:]
-        in2 = tokens[:,1,:]
+        in1 = tokens[:, 0, :]
+        in2 = tokens[:, 1, :]
         out1 = self.bert_model(input_ids=in1, output_hidden_states=True)
         out2 = self.bert_model(input_ids=in2, output_hidden_states=True)
         doc1 = out1[self.bert_output_idx]
@@ -112,7 +103,6 @@ class RelationsClassifier(pl.LightningModule):
         self.app_logger.debug("Start FF training")
         ff_output = self.ff.forward(embeddings)
         return ff_output
-
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -125,7 +115,7 @@ class RelationsClassifier(pl.LightningModule):
         preds = torch.argmax(output, dim=1)
         self.test_output.append(preds)
 
-        accuracy, num_correct = utils.get_accuracy_numcorrect(output, y)
+        accuracy, num_correct = self.get_accuracy_numcorrect(output, y)
         batch_dictionary = {
             # REQUIRED: It ie required for us to return "loss"
             "loss": loss,
@@ -137,7 +127,6 @@ class RelationsClassifier(pl.LightningModule):
             "accuracy": accuracy
         }
         return batch_dictionary
-
 
     def training_step(self, batch, batch_idx):
         # training_step defined the train loop. It is independent of forward
@@ -155,7 +144,7 @@ class RelationsClassifier(pl.LightningModule):
         self.app_logger.debug("Training step loss: {}".format(loss))
         logs = {"train_loss": loss}
 
-        accuracy, num_correct = utils.get_accuracy_numcorrect(output, y)
+        accuracy, num_correct = self.get_accuracy_numcorrect(output, y)
 
         total = y.shape[0]
         batch_dictionary = {
@@ -190,41 +179,15 @@ class RelationsClassifier(pl.LightningModule):
             loss = f.cross_entropy(input=logits, target=true_labels)
         return loss
 
-
-
-
-class FeedForward(torch.nn.Module):
-    properties = None
-    app_logger = None
-    num_labels = 0
-
-    def __init__(self, properties, logger, device_name, num_labels):
-        super(FeedForward, self).__init__()
-        self.properties = properties
-        self.app_logger = logger
-        self.device_name = device_name
-        self.input_size = 768
-        self.ff = torch.nn.Linear(self.input_size, num_labels).to(device_name)
-
-    def forward(self, x):
-        hidden = self.ff(x)
-        activation_function = self._get_activation_function()
-        res = activation_function(hidden)
-        output = f.dropout(res)
-        output = f.softmax(output, dim=1)
-        return output
-
-    def _get_activation_function(self):
-        activation_func_name = self.properties["model"]["activation_function"]
-        if activation_func_name == "relu":
-            act_function = f.relu
-        elif activation_func_name == "sigmoid":
-            act_function = torch.sigmoid
-        elif activation_func_name == "tanh":
-            act_function = torch.tanh
-        elif activation_func_name == "leaky_relu":
-            act_function = f.leaky_relu
-        else:
-            # ReLU activations by default
-            act_function = f.relu
-        return act_function
+    @staticmethod
+    def get_accuracy_numcorrect(preds, y, is_proba=True):
+        if is_proba:
+            # NOTE: this is applicable only for single-label classification
+            # for multiclass, you have to use a threshold, e.g. thresh=0.5:
+            # predictions = (output > thresh)
+            # and modify the code below for multiclass stats and metrics
+            preds = torch.argmax(preds, dim=1)
+        correct_boolean = (y == preds)
+        accuracy = correct_boolean.float().mean().cpu()
+        num_correct = correct_boolean.sum().cpu()
+        return accuracy, num_correct
