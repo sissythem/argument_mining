@@ -15,7 +15,7 @@ class AduClassifier(pl.LightningModule):
         super(AduClassifier, self).__init__()
         self.app_logger = app_config.app_logger
         self.properties = app_config.properties
-        self.device_name = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.device_name = "cuda:1" if torch.cuda.is_available() else "cpu"
         self.encoded_labels = encoded_labels
         self.num_labels = len(encoded_labels.keys())
 
