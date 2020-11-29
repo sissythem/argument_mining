@@ -31,10 +31,10 @@ class ArgumentMiningTrainer:
         else:
             self.train_data, self.test_data, self.train_labels, self.test_labels = data, data, labels, labels
         self.folds = []
+        self.classifiers = []
+        self.trainers = []
         if val:
             k_fold = KFold(n_splits=self.num_folds)
-            self.classifiers = []
-            self.trainers = []
             for train_index, test_index in k_fold.split(self.train_data, self.train_labels):
                 x_train_fold = self.train_data[train_index]
                 y_train_fold = self.train_labels[train_index]
