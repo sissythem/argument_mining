@@ -35,12 +35,12 @@ class RelationsClassifier(pl.LightningModule):
         self.total_data = datasets["total_data"]
         self.total_labels = datasets["total_labels"]
 
-        self.train_data = torch.from_numpy(datasets["train_data"]).to(self.device_name)
-        self.train_labels = torch.from_numpy(datasets["train_labels"]).to(self.device_name)
-        self.test_data = torch.from_numpy(datasets["test_data"]).to(self.device_name)
-        self.test_labels = torch.from_numpy(datasets["test_labels"]).to(self.device_name)
-        self.validation_data = torch.from_numpy(datasets["validation_data"]).to(self.device_name)
-        self.validation_labels = torch.from_numpy(datasets["validation_labels"]).to(self.device_name)
+        self.train_data = torch.from_numpy(datasets["train_data"])
+        self.train_labels = torch.from_numpy(datasets["train_labels"])
+        self.test_data = torch.from_numpy(datasets["test_data"])
+        self.test_labels = torch.from_numpy(datasets["test_labels"])
+        self.validation_data = torch.from_numpy(datasets["validation_data"])
+        self.validation_labels = torch.from_numpy(datasets["validation_labels"])
 
         self.validation_output = None
         self.validation_accuracies = []
@@ -91,8 +91,8 @@ class RelationsClassifier(pl.LightningModule):
         # in lightning, forward defines the prediction/inference actions
         self.app_logger.debug("Start forward")
         self.app_logger.debug("Start BERT training")
-        in1 = tokens[:, 0, :]
-        in2 = tokens[:, 1, :]
+        in1 = tokens[:, 0, :].to(self.device_name)
+        in2 = tokens[:, 1, :].to(self.device_name)
         out1 = self.bert_model(input_ids=in1, output_hidden_states=True)
         out2 = self.bert_model(input_ids=in2, output_hidden_states=True)
         doc1 = out1[self.bert_output_idx]
