@@ -9,12 +9,11 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, ProgressBar
 from pytorch_lightning.loggers import TensorBoardLogger
 from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
-from sklearn.model_selection import StratifiedShuffleSplit
 
 from adu_model import AduClassifier
-from relations_model import RelationsClassifier
 from config import AppConfig
 from data import DataLoader, DataPreprocessor
+from relations_model import RelationsClassifier
 
 
 def adu_classification(app_config, sentences, labels, lbl_dict):
@@ -30,11 +29,6 @@ def adu_classification(app_config, sentences, labels, lbl_dict):
     if not skip_test:
         train_data, test_data, train_labels, test_labels = train_test_split(tokens, labels, test_size=test_size,
                                                                             random_state=0)
-
-        # splitter = StratifiedShuffleSplit(n_splits=1, test_size=test_size)
-        # train_ix ,test_ix = splitter.split(tokens, labels)
-        # train_data, train_labels = (tokens[train_ix], labels[train_ix])
-        # test_data, test_labels = (tokens[test_ix], labels[test_ix])
 
     elif skip_test and skip_validation:
         train_data, test_data, train_labels, test_labels = sentences, sentences, labels, labels
@@ -120,11 +114,6 @@ def relations_classification(app_config, data, kind="relation"):
     if not skip_test:
         train_data, test_data, train_labels, test_labels = train_test_split(tokens, labels, test_size=test_size,
                                                                             random_state=0)
-        # splitter = StratifiedShuffleSplit(n_splits=1, test_size=test_size)
-        # train_ix ,test_ix = splitter.split(tokens, labels)
-        # train_data, train_labels = (tokens[train_ix], labels[train_ix])
-        # test_data, test_labels = (tokens[test_ix], labels[test_ix])
-
     elif skip_test and skip_validation:
         train_data, test_data, train_labels, test_labels = data, data, labels, labels
     else:
@@ -189,7 +178,7 @@ def relations_classification(app_config, data, kind="relation"):
 
 
 def main():
-    app_path = join(getcwd(), "app") if getcwd().endswith("argument_mining") else getcwd()
+    app_path = join(getcwd(), "backup") if getcwd().endswith("argument_mining") else getcwd()
     app_config = AppConfig(app_path=app_path)
     app_config.configure()
     logger = app_config.app_logger
@@ -213,8 +202,8 @@ def main():
         # relations_classification(app_config=app_config, data=all_data["stance"])
 
         # adu classification on new data
-        cl_path = "/home/sthemeli/Έγγραφα/argument-mining/app/output/classifiers_data_2020-11-26 18:20:03.371906"
-        rel_path = "/home/sthemeli/Έγγραφα/argument-mining/app/output/relation_classifiers_data_2020-11-29 14:09:14.873379.relational"
+        cl_path = "/home/sthemeli/Έγγραφα/argument-mining/backup/output/classifiers_data_2020-11-26 18:20:03.371906"
+        rel_path = "/home/sthemeli/Έγγραφα/argument-mining/backup/output/relation_classifiers_data_2020-11-29 14:09:14.873379.relational"
         build_output([d.content for d in documents], cl_path, rel_path)
 
 

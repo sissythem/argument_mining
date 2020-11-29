@@ -7,8 +7,6 @@ from sklearn.metrics import accuracy_score
 from torchcrf import CRF
 from transformers import BertForTokenClassification
 
-import utils
-
 
 class AduClassifier(pl.LightningModule):
 
@@ -23,14 +21,12 @@ class AduClassifier(pl.LightningModule):
         self.total_data = datasets["total_data"]
         self.total_labels = datasets["total_labels"]
 
-        self.train_data = utils.convert_ndarray_to_tensor(datasets["train_data"], device_name=self.device_name)
-        self.train_labels = utils.convert_ndarray_to_tensor(datasets["train_labels"], device_name=self.device_name)
-        self.test_data = utils.convert_ndarray_to_tensor(datasets["test_data"], device_name=self.device_name)
-        self.test_labels = utils.convert_ndarray_to_tensor(datasets["test_labels"], device_name=self.device_name)
-        self.validation_data = utils.convert_ndarray_to_tensor(datasets["validation_data"],
-                                                               device_name=self.device_name)
-        self.validation_labels = utils.convert_ndarray_to_tensor(datasets["validation_labels"],
-                                                                 device_name=self.device_name)
+        self.train_data = torch.from_numpy(datasets["train_data"]).to(self.device_name)
+        self.train_labels = torch.from_numpy(datasets["train_labels"]).to(self.device_name)
+        self.test_data = torch.from_numpy(datasets["test_data"]).to(self.device_name)
+        self.test_labels = torch.from_numpy(datasets["test_labels"]).to(self.device_name)
+        self.validation_data = torch.from_numpy(datasets["validation_data"]).to(self.device_name)
+        self.validation_labels = torch.from_numpy(datasets["validation_labels"]).to(self.device_name)
 
         self.validation_output = None
         self.validation_accuracies = []
