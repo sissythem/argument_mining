@@ -1,0 +1,9 @@
+.idea/
+.vscode/
+venv/
+app/output/
+app/__pycache__/
+lightning_logs/
+__pycache__/
+app/resources/properties.yaml
+app/resources/*.pickle

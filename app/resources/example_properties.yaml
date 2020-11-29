@@ -1,0 +1,23 @@
+config:
+  email:
+    sender: "skthemeli@gmail.com"
+    receiver: "skthemeli@gmail.com"
+    password: "password"
+  data:
+    filename: "kasteli.json"
+preprocessing:
+  repl_char: "="
+  other_label: "O"
+  pad_token: 0
+  max_len: 512
+model:
+  optimizer: Adam # options: Adam, SGD
+  learning_rate: 0.0001
+  loss: "cross_entropy"
+  activation_function: "relu"
+  dropout: 0.5
+  batch_size: 100
+  epochs: 50
+validation:
+  test_size: 0.2
+  folds: 10
