@@ -70,7 +70,7 @@ class RelationsClassifier(pl.LightningModule):
             exit(1)
 
         self.ff = FeedForward(properties=self.properties, logger=self.app_logger, device_name=self.device_name,
-                              num_labels=self.num_labels)
+                              num_labels=self.num_labels, softmax_dim=1)
 
     def train_dataloader(self):
         self.app_logger.debug("Creating train DataLoader")

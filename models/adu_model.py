@@ -39,7 +39,7 @@ class AduClassifier(pl.LightningModule):
         self.bert_model = BertForTokenClassification.from_pretrained('nlpaueb/bert-base-greek-uncased-v1',
                                                                      num_labels=self.num_labels).to(self.device_name)
         self.ff = FeedForward(properties=self.properties, logger=self.app_logger, device_name=self.device_name,
-                              num_labels=self.num_labels)
+                              num_labels=self.num_labels, softmax_dim=2)
         self.crf = CRFLayer(properties=self.properties, logger=self.app_logger, num_labels=self.num_labels,
                             device_name=self.device_name, encoded_labels=encoded_labels)
 
