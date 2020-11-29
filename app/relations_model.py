@@ -36,6 +36,7 @@ class RelationsClassifier(pl.LightningModule):
 
         self.total_data = datasets["total_data"]
         self.total_labels = datasets["total_labels"]
+
         print("This is memory-hoggish for no reason -- TODO fix")
         self.train_data = utils.convert_ndarray_to_tensor(datasets["train_data"], device_name=self.device_name)
         self.train_labels = utils.convert_ndarray_to_tensor(datasets["train_labels"], device_name=self.device_name)
@@ -55,7 +56,28 @@ class RelationsClassifier(pl.LightningModule):
 
         # self.bert_model = BertForSequenceClassification.from_pretrained('nlpaueb/bert-base-greek-uncased-v1',
         #                                                                 num_labels=self.num_labels).to(self.device_name)
+
         self.bert_model = BertModel.from_pretrained('nlpaueb/bert-base-greek-uncased-v1').to(self.device_name)
+        self.doc_embedding = "pooler"
+        # get doc representation from the bert encoder output
+        # candidates:
+        if self.doc_embedding == "pooler":
+            # the pooler output, meant to be used for seq. classification
+            # https://huggingface.co/transformers/model_doc/bert.html#bertmodel
+            # pooled_output = bert_output[1]
+            self.bert_output_idx = 1
+        elif self.doc_embedding == "last_hidden":
+            # last hidden state of the model
+            # last_hidden = bert_output[0]
+            self.bert_output_idx = 0
+        else:
+            # alternatively, you can use a combination of the last hidden states
+            # e.g.: https://github.com/huggingface/transformers/issues/1328
+            # all_hidden_states = some_func(bert_output[2])
+            print(f"Undefined doc-embedding acquisition type: {self.doc_embedding}")
+            exit(1)
+
+
         self.ff = FeedForward(properties=self.properties, logger=self.app_logger, device_name=self.device_name,
                               num_labels=self.num_labels)
 
@@ -74,23 +96,19 @@ class RelationsClassifier(pl.LightningModule):
         test_dataset = RelationsDataset(data=self.test_data, labels=self.test_labels)
         return torch_data.DataLoader(test_dataset, batch_size=self.properties["model"]["batch_size"])
 
-    def forward(self, tokens, labels):
+    def forward(self, tokens, labels=None):
         # in lightning, forward defines the prediction/inference actions
         self.app_logger.debug("Start forward")
         self.app_logger.debug("Start BERT training")
-        bert_output = self.bert_model(input_ids=tokens, output_hidden_states=True)
-        # candidates:
-        # last hidden state of the model
-        last_hidden = bert_output[0]
-        # the pooler output, meant to be used for seq. classification
-        # https://huggingface.co/transformers/model_doc/bert.html#bertmodel
-        pooled_output = bert_output[1]
-        # alternatively, you can use a combination of the last hidden states
-        # e.g.: https://github.com/huggingface/transformers/issues/1328
-        # all_hidden_states = some_func(bert_output[2])
+        in1 = tokens[:,0,:]
+        in2 = tokens[:,1,:]
+        out1 = self.bert_model(input_ids=in1, output_hidden_states=True)
+        out2 = self.bert_model(input_ids=in2, output_hidden_states=True)
+        doc1 = out1[self.bert_output_idx]
+        doc2 = out2[self.bert_output_idx]
+        embeddings = torch.mean(torch.stack([doc1, doc2]), dim=0)
 
-        embeddings = pooled_output
-        self.app_logger.debug("Bert output shape: {}".format(last_hidden.shape))
+        self.app_logger.debug("Bert output shape: {}".format(embeddings.shape))
         self.app_logger.debug("Start FF training")
         ff_output = self.ff.forward(embeddings)
         return ff_output
