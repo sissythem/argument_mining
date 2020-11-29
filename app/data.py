@@ -509,7 +509,7 @@ class DataPreprocessor:
                     pass
                 self.app_logger.debug("Averaging segments: {} and {}".format(arg1.text, arg2.text))
                 self.app_logger.debug("Segments relation: {}".format(label))
-                input_data = (arg1.tokens + arg2.tokens) / 2
+                input_data = (arg1.tokens, arg2.tokens)
                 initial_data.append((arg1, arg2, label))
                 data.append(input_data)
                 labels.append(label)

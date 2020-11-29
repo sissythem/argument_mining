@@ -107,7 +107,8 @@ def relations_classification(app_config, data, kind="relation"):
     test_size = properties["validation"]["test_size"]
     folds = properties["validation"]["folds"]
     skip_test = True if test_size == 0.0 else False
-    tokens = np.asarray([d.numpy().flatten() for d in input_data])
+
+    tokens = np.asarray([(d[0].numpy().flatten(), d[1].numpy().flatten()) for d in input_data])
     labels = np.asarray(labels, dtype=np.int64)
     if "sampling" in properties:
         smpl = properties["sampling"]
@@ -182,7 +183,7 @@ def relations_classification(app_config, data, kind="relation"):
             classifier.test_accuracy = np.mean(classifier.test_accuracies)
         timestamp = datetime.now()
         models_file = "{}_classifiers_data_{}".format(kind, timestamp)
-        with open(join(app_config.output_path, models_file + ".relational"), "wb") as f:
+        with open(join(app_config.output_path, models_file), "wb") as f:
             pickle.dump(classifiers, f)
         return classifiers
 
@@ -211,8 +212,11 @@ def main():
         # relations_classification(app_config=app_config, data=all_data["relation"])
         # relations_classification(app_config=app_config, data=all_data["stance"])
 
+        # adu classification on new data
         cl_path = "/home/sthemeli/Έγγραφα/argument-mining/app/output/classifiers_data_2020-11-26 18:20:03.371906"
-        build_output([d.content for d in documents], cl_path)
+        rel_path = "/home/sthemeli/Έγγραφα/argument-mining/app/output/relation_classifiers_data_2020-11-29 14:09:14.873379.relational"
+        build_output([d.content for d in documents], cl_path, rel_path)
+
 
     except(Exception, BaseException) as e:
         logger.error("Error occurred: {}".format(traceback.format_exc()))
@@ -224,21 +228,21 @@ def select_best_classifier(classifiers):
     return c[-1]
 
 
-def detect_segments(preds, labels_dict):
+def detect_segments(preds, sentences, labels_dict):
     lbls = sorted(list(labels_dict.keys()))
     # starting segment labels
-    start_lbls = [l for l in lbls if l.startswith("B")
+    start_lbls = [l for l in lbls if l.startswith("B")]
 
-    for d, doc_preds in enumerate(preds):
-        for s, sent_preds in enumerate(doc_preds):
-            # TODO
-            # how do we handle cases of predicted tokens that make no sense?
-            # e.g. B-majorclaim, I-premise
-            pass
+    # for d, doc_preds in enumerate(preds):
+    #     for s, sent_preds in enumerate(doc_preds):
+    #         # TODO
+    #         # how do we handle cases of predicted tokens that make no sense?
+    #         # e.g. B-majorclaim, I-premise
+    #         pass
             
 from transformers import BertTokenizer
 
-def build_output(texts, adu_training_output):
+def build_output(texts, adu_training_output, rel_training_output):
     import data, pickle, torch
     with open(adu_training_output, "rb") as f:
         print("Loading outputs from", f.name)
@@ -250,27 +254,44 @@ def build_output(texts, adu_training_output):
     seqlen = clf.properties["preprocessing"]["max_len"]
     pad_token = clf.properties["preprocessing"]["pad_token"]
     tok = BertTokenizer.from_pretrained('nlpaueb/bert-base-greek-uncased-v1')
+    tokens = []
 
     # token classification
     print("Doing token classification")
     preds = []
-    for text in texts:
+    for t, text in enumerate(texts):
         preds.append([])
+        tokens.append([])
         sentences = data.tokenize_sentences(text)
         for s, sentence in enumerate(sentences):
             if len(sentence) > seqlen:
                 print(f"(!!!) Sentence length #{s}:  {len(sentence)} but max len is {seqlen}")
-            tokens = tok(sentence, is_split_into_words=True, add_special_tokens=True, padding="max_length", truncation=True, max_length=seqlen)["input_ids"]
-            tokens = torch.LongTensor(tokens).unsqueeze(0).to(clf.device)
-            predictions = clf.forward(tokens)
+            toks = tok(sentence, is_split_into_words=True, add_special_tokens=True, padding="max_length", truncation=True, max_length=seqlen)["input_ids"]
+            toks = torch.LongTensor(toks).unsqueeze(0).to(clf.device)
+            predictions = clf.forward(toks)
             preds[-1].append(predictions)
+            tokens[-1].append(toks)
     breakpoint()
-    segments = detect_segments(preds, clf.encoded_labels)
+    segments = detect_segments(preds, sentences, clf.encoded_labels)
     with open("tok_classif.pkl", "wb") as f:
-        pickle.dump((preds, clf), f)
-    print()
+        pickle.dump((preds, clf, segments), f)
+    
+
+    with open(rel_training_output, "rb") as f:
+        print("Loading relational outputs from", f.name)
+        rel_cl = pickle.load(f)
+
+    rel_clf = select_best_classifier(rel_cl)
+
+    import itertools
+    segments = tokens #### TESTING
+    relations = []
+    for stup in itertools.combinations(segments, 2):
+        relation_preds = rel_cl.forward(stup)
+        relations.append(relation_preds)
+        
+
 
 
 if __name__ == '__main__':
     main()
-    # build_output(cl_path)
