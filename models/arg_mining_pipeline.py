@@ -62,7 +62,7 @@ class ArgumentMining:
                 all_tokens.append(tokens)
                 all_predictions.append(predictions)
             segments, adus, new_tokens = self._get_segments(sentences=sentences, predictions=all_predictions,
-                                                            tokens=all_tokens)
+                                                            all_tokens=all_tokens)
 
             relations, stances = [], []
             for stup in itertools.combinations(new_tokens, 2):
@@ -134,8 +134,7 @@ class ArgumentMining:
             with open(self.app_config.out_file_path, "w") as f:
                 f.write(json.dumps(doc, indent=4, sort_keys=False))
 
-    def _get_segments(self, sentences, tokens, predictions):
-        sentences, tokens = self._unify_sentences_list(sentences, tokens)
+    def _get_segments(self, sentences, all_tokens, predictions):
         segments = []
         adus = []
         segment_tokens = []
@@ -143,29 +142,39 @@ class ArgumentMining:
         lbls_txt = [self.int_to_adu_lbls[lbl] for lbl in lbls]
         start_lbls = [lbl for lbl in lbls_txt if lbl.startswith("B")]
         idx = 0
-        while idx < len(predictions):
-            pred = predictions[idx]
-            predicted_label = self.int_to_adu_lbls[pred]
-            if predicted_label in start_lbls:
-                toks = []
-                adu_label = predicted_label.replace("B-", "")
-                adus.append(adu_label)
-                segment_text = sentences[idx]
-                toks.append(tokens[idx])
-                next_correct = "I-{}".format(adu_label)
-                lbl = next_correct
-                while lbl == next_correct:
+        for i, prediction in predictions:
+            prediction = prediction[0]
+            sentence = sentences[i]
+            tokens = all_tokens[i]
+            try:
+                tokens = tokens.to("cpu")
+            except(BaseException, Exception):
+                pass
+            tokens = tokens.numpy()
+            tokens = list(tokens.reshape((tokens.shape[1],)))
+            while idx < len(predictions):
+                pred = prediction[idx]
+                predicted_label = self.int_to_adu_lbls[pred]
+                if predicted_label in start_lbls:
+                    toks = []
+                    adu_label = predicted_label.replace("B-", "")
+                    adus.append(adu_label)
+                    segment_text = sentence[idx]
+                    toks.append(tokens[idx])
+                    next_correct = "I-{}".format(adu_label)
+                    lbl = next_correct
+                    while lbl == next_correct:
+                        idx += 1
+                        if idx >= len(predictions):
+                            break
+                        next_pred = predictions[idx]
+                        lbl = self.int_to_adu_lbls[next_pred]
+                        if lbl != next_correct:
+                            break
+                        segment_text += sentences[idx]
+                    segments.append(segment_text)
+                    segment_tokens.append(toks)
                     idx += 1
-                    if idx >= len(predictions):
-                        break
-                    next_pred = predictions[idx]
-                    lbl = self.int_to_adu_lbls[next_pred]
-                    if lbl != next_correct:
-                        break
-                    segment_text += sentences[idx]
-                segments.append(segment_text)
-                segment_tokens.append(toks)
-                idx += 1
         return segments, adus, segment_tokens
 
     def _get_relations(self, preds, kind="relations"):
@@ -181,18 +190,6 @@ class ArgumentMining:
             relation = self.int_to_relations[pred] if kind == "relations" else self.int_to_stance[pred]
             relations.append((arg1, arg2, relation))
         return relations
-
-    @staticmethod
-    def _unify_sentences_list(sentences, all_tokens):
-        new_sentences = []
-        new_tokens = []
-        for sentence in sentences:
-            for word in sentence:
-                new_sentences.append(word)
-        for tokens in all_tokens:
-            for t in tokens:
-                new_tokens.append(t)
-        return new_sentences, new_tokens
 
     @staticmethod
     def select_best_classifier(classifiers):
