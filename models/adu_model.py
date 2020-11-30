@@ -22,12 +22,12 @@ class AduClassifier(pl.LightningModule):
         self.total_data = datasets["total_data"]
         self.total_labels = datasets["total_labels"]
 
-        self.train_data = torch.from_numpy(datasets["train_data"]).to(self.device_name)
-        self.train_labels = torch.from_numpy(datasets["train_labels"]).to(self.device_name)
-        self.test_data = torch.from_numpy(datasets["test_data"]).to(self.device_name)
-        self.test_labels = torch.from_numpy(datasets["test_labels"]).to(self.device_name)
-        self.validation_data = torch.from_numpy(datasets["validation_data"]).to(self.device_name)
-        self.validation_labels = torch.from_numpy(datasets["validation_labels"]).to(self.device_name)
+        self.train_data = torch.from_numpy(datasets["train_data"])
+        self.train_labels = torch.from_numpy(datasets["train_labels"])
+        self.test_data = torch.from_numpy(datasets["test_data"])
+        self.test_labels = torch.from_numpy(datasets["test_labels"])
+        self.validation_data = torch.from_numpy(datasets["validation_data"])
+        self.validation_labels = torch.from_numpy(datasets["validation_labels"])
 
         self.validation_output = None
         self.validation_accuracies = []
@@ -60,6 +60,9 @@ class AduClassifier(pl.LightningModule):
 
     def forward(self, tokens, labels=None):
         self.app_logger.debug("Start forward")
+        tokens = tokens.to(self.device_name)
+        if labels:
+            labels = labels.to(self.device_name)
         bert_output = self.bert_model(input_ids=tokens, output_hidden_states=True)
         logits = bert_output[0]
         self.app_logger.debug("Bert output shape: {}".format(logits.shape))
