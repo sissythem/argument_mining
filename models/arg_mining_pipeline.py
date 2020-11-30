@@ -33,13 +33,13 @@ class ArgumentMining:
         self.int_to_stance = {0: "other", 1: "for", 2: "against"}
 
     def load(self, adu_model_file_path, relations_model_file_path, stance_model_file_path):
-        with open(adu_model_file_path, "rb") as f:
+        with open(join(self.app_config.output_path, adu_model_file_path), "rb") as f:
             print("Loading outputs from", f.name)
             self.adu_classifiers = pickle.load(f)
-        with open(relations_model_file_path, "rb") as f:
+        with open(join(self.app_config.output_path, relations_model_file_path), "rb") as f:
             print("Loading outputs from", f.name)
             self.relation_classifiers = pickle.load(f)
-        with open(stance_model_file_path, "rb") as f:
+        with open(join(self.app_config.output_path, stance_model_file_path), "rb") as f:
             print("Loading outputs from", f.name)
             self.stance_classifiers = pickle.load(f)
         self.best_adu_classifier = self.select_best_classifier(self.adu_classifiers).to(self.device_name)
