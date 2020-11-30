@@ -122,7 +122,7 @@ class ArgumentMining:
                             "arg2": arg2_id
                         }
                         doc["annotations"]["Stance"].append(stance_dict)
-            with open(self.app_config.out_files_path, "w") as f:
+            with open(join(self.app_config.out_files_path, document.document_id + ".json"), "w") as f:
                 f.write(json.dumps(doc, indent=4, sort_keys=False))
 
     @staticmethod
