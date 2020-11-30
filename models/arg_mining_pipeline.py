@@ -7,6 +7,8 @@ import torch
 from ellogon import tokeniser
 from transformers import BertTokenizer
 
+from base import utils
+
 
 class ArgumentMining:
 
@@ -71,6 +73,10 @@ class ArgumentMining:
                     idx2 = new_tokens.index(stup[1])
                     segment1 = segments[idx1]
                     segment2 = segments[idx2]
+                    max_len = self.app_config.properties["preprocessing"]["max_len"]
+                    pad_token = self.app_config.properties["preprocessing"]["pad_token"]
+                    arg1 = utils.wrap_and_pad_tokens(inputs=stup[0], prefix=102, suffix=102, seq_len=max_len,
+                                                     padding=pad_token)
                     relation_preds = self.best_relation_classifier.forward(stup)
                     stance_preds = self.best_stance_classifier.forward(stup)
                     relations.append(((segment1, segment2), relation_preds))
@@ -162,7 +168,8 @@ class ArgumentMining:
             tokens = tokens.numpy()
             tokens = list(tokens.reshape((tokens.shape[1],)))
             tokens, prediction = self._remove_padding(tokens=tokens, predictions=prediction,
-                                                      pad_token=self.app_config.properties["pad_token"])
+                                                      pad_token=self.app_config.properties["preprocessing"][
+                                                          "pad_token"])
             while idx < len(prediction):
                 pred = prediction[idx]
                 predicted_label = self.int_to_adu_lbls[pred]
