@@ -103,9 +103,9 @@ class ArgumentMining:
                     "ends": str(document.content.index(segment) + len(segment)),
                     "segment": segment
                 }
-                doc["ADUs"].append(seg)
+                doc["annotations"]["ADUs"].append(seg)
             counter = 1
-            segments = doc["ADUs"]
+            segments = doc["annotations"]["ADUs"]
             for relation in relations:
                 arg1 = relation[0]
                 arg2 = relation[1]
@@ -117,7 +117,7 @@ class ArgumentMining:
                     "arg1": arg1_id,
                     "arg2": arg2_id
                 }
-                doc["Relations"].append(rel_dict)
+                doc["annotations"]["Relations"].append(rel_dict)
             counter = 1
             for s in stances:
                 arg1 = s[0]
@@ -130,7 +130,7 @@ class ArgumentMining:
                     "arg1": arg1_id,
                     "arg2": arg2_id
                 }
-                doc["Stance"].append(stance_dict)
+                doc["annotations"]["Stance"].append(stance_dict)
             with open(self.app_config.out_file_path, "w") as f:
                 f.write(json.dumps(doc, indent=4, sort_keys=False))
 
