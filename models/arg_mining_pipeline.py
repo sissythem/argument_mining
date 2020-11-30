@@ -34,13 +34,13 @@ class ArgumentMining:
 
     def load(self, adu_model_file_path, relations_model_file_path, stance_model_file_path):
         with open(join(self.app_config.output_path, adu_model_file_path), "rb") as f:
-            print("Loading outputs from", f.name)
+            self.app_logger.debug("Loading ADU classifiers from", f.name)
             self.adu_classifiers = pickle.load(f)
         with open(join(self.app_config.output_path, relations_model_file_path), "rb") as f:
-            print("Loading outputs from", f.name)
+            self.app_logger.debug("Loading relation classifiers from", f.name)
             self.relation_classifiers = pickle.load(f)
         with open(join(self.app_config.output_path, stance_model_file_path), "rb") as f:
-            print("Loading outputs from", f.name)
+            self.app_logger.debug("Loading stance classifiers from", f.name)
             self.stance_classifiers = pickle.load(f)
         self.best_adu_classifier = self.select_best_classifier(self.adu_classifiers).to(self.device_name)
         self.best_relation_classifier = self.select_best_classifier(self.relation_classifiers).to(self.device_name)
@@ -54,7 +54,7 @@ class ArgumentMining:
             all_predictions = []
             for s, sentence in enumerate(sentences):
                 if len(sentence) > self.max_len:
-                    print(f"(!!!) Sentence length #{s}:  {len(sentence)} but max len is {self.max_len}")
+                    self.app_logger.warning(f"(!!!) Sentence length #{s}:{len(sentence)} but max len is {self.max_len}")
                 tokens = self.tokenizer(sentence, is_split_into_words=True, add_special_tokens=True,
                                         padding="max_length", truncation=True, max_length=self.max_len)["input_ids"]
                 tokens = torch.LongTensor(tokens).unsqueeze(0).to(self.device_name)
@@ -135,6 +135,7 @@ class ArgumentMining:
                 f.write(json.dumps(doc, indent=4, sort_keys=False))
 
     def _get_segments(self, sentences, all_tokens, predictions):
+        self.app_logger.debug("Getting ADUs from predicted sequences")
         segments = []
         adus = []
         segment_tokens = []
@@ -146,6 +147,8 @@ class ArgumentMining:
             prediction = prediction[0]
             sentence = sentences[i]
             tokens = all_tokens[i]
+            self.app_logger.debug("Checking sentence: {}".format(sentence))
+            self.app_logger.debug("Predictions are: {}".format(prediction))
             try:
                 tokens = tokens.to("cpu")
             except(BaseException, Exception):
@@ -158,6 +161,7 @@ class ArgumentMining:
                 if predicted_label in start_lbls:
                     toks = []
                     adu_label = predicted_label.replace("B-", "")
+                    self.app_logger.debug("Predicted label: {}".format(adu_label))
                     adus.append(adu_label)
                     segment_text = sentence[idx]
                     toks.append(tokens[idx])
@@ -172,18 +176,21 @@ class ArgumentMining:
                         if lbl != next_correct:
                             break
                         segment_text += sentences[idx]
+                    self.app_logger.debug("Final segment text: {}".format(segment_text))
                     segments.append(segment_text)
                     segment_tokens.append(toks)
                     idx += 1
         return segments, adus, segment_tokens
 
     def _get_relations(self, preds, kind="relations"):
+        self.app_logger.debug("Getting predicted relations")
         relations = []
         other_int = self.relations_to_int["other"] if kind == "relations" else self.stance_to_int["other"]
         for pred in preds:
             args = pred[0]
             pred = pred[1]
             if pred == other_int:
+                self.app_logger("No relation detected. Continuing...")
                 continue
             arg1 = args[0]
             arg2 = args[1]
