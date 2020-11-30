@@ -49,6 +49,7 @@ class ArgumentMining:
     def predict(self, documents):
         self.app_logger.info("Doing token classification")
         for d, document in enumerate(documents):
+            doc = self._get_initial_doc(document)
             sentences = tokeniser.tokenise_no_punc(document.content)
             all_tokens = []
             all_predictions = []
@@ -63,76 +64,81 @@ class ArgumentMining:
                 all_predictions.append(predictions)
             segments, adus, new_tokens = self._get_segments(sentences=sentences, predictions=all_predictions,
                                                             all_tokens=all_tokens)
-
-            relations, stances = [], []
-            for stup in itertools.combinations(new_tokens, 2):
-                idx1 = new_tokens.index(stup[0])
-                idx2 = new_tokens.index(stup[1])
-                segment1 = segments[idx1]
-                segment2 = segments[idx2]
-                relation_preds = self.best_relation_classifier.forward(stup)
-                stance_preds = self.best_stance_classifier.forward(stup)
-                relations.append(((segment1, segment2), relation_preds))
-                stances.append(((segment1, segment2), stance_preds))
-            relations = self._get_relations(preds=relations)
-            stances = self._get_relations(preds=stances, kind="stance")
-            doc = {
-                "id": document.document_id,
-                "link": "",
-                "description": "",
-                "date": "",
-                "tags": [],
-                "document_link": "",
-                "publishedAt": "",
-                "crawledAt": "",
-                "domain": "",
-                "netloc": "",
-                "content": document.content,
-                "annotations": {
-                    "ADUs": [],
-                    "Relations": [],
-                    "Stance": []
-                }
-            }
-            counter = 1
-            for idx, segment in enumerate(segments):
-                seg = {
-                    "id": "T{}".format(counter),
-                    "type": adus[idx],
-                    "starts": str(document.content.index(segment)),
-                    "ends": str(document.content.index(segment) + len(segment)),
-                    "segment": segment
-                }
-                doc["annotations"]["ADUs"].append(seg)
-            counter = 1
-            segments = doc["annotations"]["ADUs"]
-            for relation in relations:
-                arg1 = relation[0]
-                arg2 = relation[1]
-                rel = relation[2]
-                arg1_id, arg2_id = self._find_args_in_relation(segments, arg1, arg2)
-                rel_dict = {
-                    "id": "R{}".format(counter),
-                    "type": rel,
-                    "arg1": arg1_id,
-                    "arg2": arg2_id
-                }
-                doc["annotations"]["Relations"].append(rel_dict)
-            counter = 1
-            for s in stances:
-                arg1 = s[0]
-                arg2 = s[1]
-                rel = s[2]
-                arg1_id, arg2_id = self._find_args_in_relation(segments, arg1, arg2)
-                stance_dict = {
-                    "id": "A{}".format(counter),
-                    "type": rel,
-                    "arg1": arg1_id,
-                    "arg2": arg2_id
-                }
-                doc["annotations"]["Stance"].append(stance_dict)
+            if new_tokens:
+                relations, stances = [], []
+                for stup in itertools.combinations(new_tokens, 2):
+                    idx1 = new_tokens.index(stup[0])
+                    idx2 = new_tokens.index(stup[1])
+                    segment1 = segments[idx1]
+                    segment2 = segments[idx2]
+                    relation_preds = self.best_relation_classifier.forward(stup)
+                    stance_preds = self.best_stance_classifier.forward(stup)
+                    relations.append(((segment1, segment2), relation_preds))
+                    stances.append(((segment1, segment2), stance_preds))
+                relations = self._get_relations(preds=relations)
+                stances = self._get_relations(preds=stances, kind="stance")
+                counter = 1
+                for idx, segment in enumerate(segments):
+                    seg = {
+                        "id": "T{}".format(counter),
+                        "type": adus[idx],
+                        "starts": str(document.content.index(segment)),
+                        "ends": str(document.content.index(segment) + len(segment)),
+                        "segment": segment
+                    }
+                    doc["annotations"]["ADUs"].append(seg)
+                if relations:
+                    counter = 1
+                    segments = doc["annotations"]["ADUs"]
+                    for relation in relations:
+                        arg1 = relation[0]
+                        arg2 = relation[1]
+                        rel = relation[2]
+                        arg1_id, arg2_id = self._find_args_in_relation(segments, arg1, arg2)
+                        rel_dict = {
+                            "id": "R{}".format(counter),
+                            "type": rel,
+                            "arg1": arg1_id,
+                            "arg2": arg2_id
+                        }
+                        doc["annotations"]["Relations"].append(rel_dict)
+                if stances:
+                    counter = 1
+                    for s in stances:
+                        arg1 = s[0]
+                        arg2 = s[1]
+                        rel = s[2]
+                        arg1_id, arg2_id = self._find_args_in_relation(segments, arg1, arg2)
+                        stance_dict = {
+                            "id": "A{}".format(counter),
+                            "type": rel,
+                            "arg1": arg1_id,
+                            "arg2": arg2_id
+                        }
+                        doc["annotations"]["Stance"].append(stance_dict)
             with open(self.app_config.out_file_path, "w") as f:
                 f.write(json.dumps(doc, indent=4, sort_keys=False))
+
+    @staticmethod
+    def _get_initial_doc(document):
+        return {
+            "id": document.document_id,
+            "link": "",
+            "description": "",
+            "date": "",
+            "tags": [],
+            "document_link": "",
+            "publishedAt": "",
+            "crawledAt": "",
+            "domain": "",
+            "netloc": "",
+            "content": document.content,
+            "annotations": {
+                "ADUs": [],
+                "Relations": [],
+                "Stance": []
+            }
+        }
 
     def _get_segments(self, sentences, all_tokens, predictions):
         self.app_logger.debug("Getting ADUs from predicted sequences")
