@@ -142,8 +142,8 @@ class ArgumentMining:
         lbls = sorted(list(self.int_to_adu_lbls.keys()))
         lbls_txt = [self.int_to_adu_lbls[lbl] for lbl in lbls]
         start_lbls = [lbl for lbl in lbls_txt if lbl.startswith("B")]
-        idx = 0
         for i, prediction in enumerate(predictions):
+            idx = 0
             prediction = prediction[0]
             sentence = sentences[i]
             tokens = all_tokens[i]
@@ -155,7 +155,7 @@ class ArgumentMining:
                 pass
             tokens = tokens.numpy()
             tokens = list(tokens.reshape((tokens.shape[1],)))
-            while idx < len(predictions):
+            while idx < len(prediction):
                 pred = prediction[idx]
                 predicted_label = self.int_to_adu_lbls[pred]
                 if predicted_label in start_lbls:
@@ -169,18 +169,28 @@ class ArgumentMining:
                     lbl = next_correct
                     while lbl == next_correct:
                         idx += 1
-                        if idx >= len(predictions):
+                        if idx >= len(prediction):
                             break
-                        next_pred = predictions[idx]
+                        next_pred = prediction[idx]
                         lbl = self.int_to_adu_lbls[next_pred]
                         if lbl != next_correct:
                             break
-                        segment_text += sentences[idx]
+                        segment_text += sentence[idx]
+                        toks.append(tokens[idx])
                     self.app_logger.debug("Final segment text: {}".format(segment_text))
                     segments.append(segment_text)
                     segment_tokens.append(toks)
                 idx += 1
         return segments, adus, segment_tokens
+
+    @staticmethod
+    def _remove_padding(tokens, predictions, pad_token=0):
+        new_tokens, new_predictions = [], []
+        for idx, token in enumerate(tokens):
+            if (token != pad_token) and (token != 101) and (token != 102):
+                new_tokens.append(token)
+                new_predictions.append(predictions[idx])
+        return new_tokens, new_predictions
 
     def _get_relations(self, preds, kind="relations"):
         self.app_logger.debug("Getting predicted relations")
