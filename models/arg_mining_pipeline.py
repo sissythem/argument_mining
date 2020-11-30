@@ -34,13 +34,13 @@ class ArgumentMining:
 
     def load(self, adu_model_file_path, relations_model_file_path, stance_model_file_path):
         with open(join(self.app_config.output_path, adu_model_file_path), "rb") as f:
-            self.app_logger.debug("Loading ADU classifiers from", f.name)
+            self.app_logger.debug("Loading ADU classifiers from {}".format(f.name))
             self.adu_classifiers = pickle.load(f)
         with open(join(self.app_config.output_path, relations_model_file_path), "rb") as f:
-            self.app_logger.debug("Loading relation classifiers from", f.name)
+            self.app_logger.debug("Loading relation classifiers from {}".format(f.name))
             self.relation_classifiers = pickle.load(f)
         with open(join(self.app_config.output_path, stance_model_file_path), "rb") as f:
-            self.app_logger.debug("Loading stance classifiers from", f.name)
+            self.app_logger.debug("Loading stance classifiers from {}".format(f.name))
             self.stance_classifiers = pickle.load(f)
         self.best_adu_classifier = self.select_best_classifier(self.adu_classifiers).to(self.device_name)
         self.best_relation_classifier = self.select_best_classifier(self.relation_classifiers).to(self.device_name)
