@@ -142,7 +142,7 @@ class ArgumentMining:
         lbls_txt = [self.int_to_adu_lbls[lbl] for lbl in lbls]
         start_lbls = [lbl for lbl in lbls_txt if lbl.startswith("B")]
         idx = 0
-        for i, prediction in predictions:
+        for i, prediction in enumerate(predictions):
             prediction = prediction[0]
             sentence = sentences[i]
             tokens = all_tokens[i]
