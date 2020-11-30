@@ -61,7 +61,7 @@ class AduClassifier(pl.LightningModule):
     def forward(self, tokens, labels=None):
         self.app_logger.debug("Start forward")
         tokens = tokens.to(self.device_name)
-        if labels:
+        if labels is not None:
             labels = labels.to(self.device_name)
         bert_output = self.bert_model(input_ids=tokens, output_hidden_states=True)
         logits = bert_output[0]
