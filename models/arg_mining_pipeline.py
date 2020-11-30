@@ -116,7 +116,7 @@ class ArgumentMining:
                             "arg2": arg2_id
                         }
                         doc["annotations"]["Stance"].append(stance_dict)
-            with open(self.app_config.out_file_path, "w") as f:
+            with open(self.app_config.out_files_path, "w") as f:
                 f.write(json.dumps(doc, indent=4, sort_keys=False))
 
     @staticmethod
@@ -161,6 +161,8 @@ class ArgumentMining:
                 pass
             tokens = tokens.numpy()
             tokens = list(tokens.reshape((tokens.shape[1],)))
+            tokens, prediction = self._remove_padding(tokens=tokens, predictions=prediction,
+                                                      pad_token=self.app_config.properties["pad_token"])
             while idx < len(prediction):
                 pred = prediction[idx]
                 predicted_label = self.int_to_adu_lbls[pred]
