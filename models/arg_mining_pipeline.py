@@ -179,7 +179,7 @@ class ArgumentMining:
                     self.app_logger.debug("Final segment text: {}".format(segment_text))
                     segments.append(segment_text)
                     segment_tokens.append(toks)
-                    idx += 1
+                idx += 1
         return segments, adus, segment_tokens
 
     def _get_relations(self, preds, kind="relations"):
