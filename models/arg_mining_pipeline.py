@@ -49,7 +49,7 @@ class ArgumentMining:
     def predict(self, documents):
         self.app_logger.info("Doing token classification")
         for d, document in enumerate(documents):
-            sentences = tokeniser.tokenise_no_punc(document.text)
+            sentences = tokeniser.tokenise_no_punc(document.content)
             all_tokens = []
             all_predictions = []
             for s, sentence in enumerate(sentences):
@@ -140,7 +140,8 @@ class ArgumentMining:
         adus = []
         segment_tokens = []
         lbls = sorted(list(self.int_to_adu_lbls.keys()))
-        start_lbls = [lbl for lbl in lbls if lbl.startswith("B")]
+        lbls_txt = [self.int_to_adu_lbls[lbl] for lbl in lbls]
+        start_lbls = [lbl for lbl in lbls_txt if lbl.startswith("B")]
         idx = 0
         while idx < len(predictions):
             pred = predictions[idx]
