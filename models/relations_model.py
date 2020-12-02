@@ -98,7 +98,7 @@ class RelationsClassifier(pl.LightningModule):
         in1 = tokens[:, 0, :]
         in2 = tokens[:, 1, :]
         inputs = []
-        for i in range(in1.shape[1]):
+        for i in range(in1.shape[0]):
             input1 = in1[i, :].numpy()
             input2 = in2[i, :].numpy()
             input1 = input1[input1 != 0]
