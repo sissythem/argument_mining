@@ -1,5 +1,10 @@
 # Argument Mining
 
+## Install Ellogon from SVN
+
+1) https://www.ellogon.org/index.php/support/installing-ellogon/install-ellogon-from-svn
+2) sudo apt install tcllib
+
 ## Install ellogon
 
 1) https://www.ellogon.org/index.php/support/installing-ellogon/install-ellogon-from-svn
