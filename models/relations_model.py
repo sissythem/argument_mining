@@ -131,7 +131,6 @@ class RelationsClassifier(pl.LightningModule):
         # save output of testing
         preds = torch.argmax(output, dim=1)
         self.test_output.append(preds)
-        y = y.to("cpu")
         accuracy, num_correct = self.get_accuracy_numcorrect(output, y)
         self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log('test_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -149,7 +148,6 @@ class RelationsClassifier(pl.LightningModule):
         output = self.forward(tokens=x, labels=y)
         loss = self.loss_function(logits=output, true_labels=y)
         self.app_logger.debug("Training step loss: {}".format(loss))
-        y = y.to("cpu")
         accuracy, num_correct = self.get_accuracy_numcorrect(output, y)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log('test_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
