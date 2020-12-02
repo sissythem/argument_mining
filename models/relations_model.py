@@ -94,8 +94,8 @@ class RelationsClassifier(pl.LightningModule):
         self.app_logger.debug("Start BERT training")
         seq_len = self.properties["preprocessing"]["max_len"]
         pad_token = self.properties["preprocessing"]["pad_token"]
-        in1 = tokens[:, 0, :].to(self.device_name)
-        in2 = tokens[:, 1, :].to(self.device_name)
+        in1 = tokens[:, 0, :]
+        in2 = tokens[:, 1, :]
         inputs = []
         for i in range(self.properties["model"]["batch_size"]):
             input1 = in1[i, :].numpy()
@@ -107,7 +107,7 @@ class RelationsClassifier(pl.LightningModule):
             input_tokens = utils.wrap_and_pad_tokens(inputs=input_tokens, prefix=101, suffix=102, seq_len=seq_len,
                                                      padding=pad_token)
             inputs.append(input_tokens)
-        inputs = torch.LongTensor(inputs)
+        inputs = torch.LongTensor(inputs).to(self.device_name)
         output = self.bert_model(input_ids=inputs, output_hidden_states=True)
         embeddings = output[self.bert_output_idx]
 
