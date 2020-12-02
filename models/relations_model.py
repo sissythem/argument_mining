@@ -4,6 +4,7 @@ import torch.nn.functional as f
 import torch.utils.data as torch_data
 from transformers import BertModel
 from models.ff_model import FeedForward
+from base import utils
 
 
 class RelationsDataset(torch_data.Dataset):
@@ -91,13 +92,24 @@ class RelationsClassifier(pl.LightningModule):
         # in lightning, forward defines the prediction/inference actions
         self.app_logger.debug("Start forward")
         self.app_logger.debug("Start BERT training")
+        seq_len = self.properties["preprocessing"]["max_len"]
+        pad_token = self.properties["preprocessing"]["pad_token"]
         in1 = tokens[:, 0, :].to(self.device_name)
         in2 = tokens[:, 1, :].to(self.device_name)
-        out1 = self.bert_model(input_ids=in1, output_hidden_states=True)
-        out2 = self.bert_model(input_ids=in2, output_hidden_states=True)
-        doc1 = out1[self.bert_output_idx]
-        doc2 = out2[self.bert_output_idx]
-        embeddings = torch.mean(torch.stack([doc1, doc2]), dim=0)
+        inputs = []
+        for i in range(self.properties["model"]["batch_size"]):
+            input1 = in1[i, :].numpy()
+            input2 = in2[i, :].numpy()
+            input1 = torch.LongTensor(input1[input1 != 0 and input1 != 101 and input1 != 102])
+            input2 = torch.LongTensor(input2[input2 != 0 and input2 != 101 and input2 != 102])
+            input_tokens = torch.cat((input1, input2), 1)
+
+            input_tokens = utils.wrap_and_pad_tokens(inputs=input_tokens, prefix=101, suffix=102, seq_len=seq_len,
+                                                     padding=pad_token)
+            inputs.append(input_tokens)
+        inputs = torch.LongTensor(inputs)
+        output = self.bert_model(input_ids=inputs, output_hidden_states=True)
+        embeddings = output[self.bert_output_idx]
 
         self.app_logger.debug("Bert output shape: {}".format(embeddings.shape))
         self.app_logger.debug("Start FF training")

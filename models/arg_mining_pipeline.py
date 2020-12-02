@@ -1,4 +1,3 @@
-import itertools
 import json
 import pickle
 from os.path import join
