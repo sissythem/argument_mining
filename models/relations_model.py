@@ -1,3 +1,4 @@
+import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as f
@@ -100,8 +101,14 @@ class RelationsClassifier(pl.LightningModule):
         for i in range(self.properties["model"]["batch_size"]):
             input1 = in1[i, :].numpy()
             input2 = in2[i, :].numpy()
-            input1 = torch.LongTensor(input1[input1 != 0 and input1 != 101 and input1 != 102])
-            input2 = torch.LongTensor(input2[input2 != 0 and input2 != 101 and input2 != 102])
+            input1 = input1[input1 != 0]
+            input1 = input1[input1 != 101]
+            input1 = input1[input1 != 102]
+            input2 = input2[input2 != 0]
+            input2 = input2[input2 != 101]
+            input2 = input2[input2 != 102]
+            input1 = torch.LongTensor(input1)
+            input2 = torch.LongTensor(input2)
             input_tokens = torch.cat((input1, input2), 1)
 
             input_tokens = utils.wrap_and_pad_tokens(inputs=input_tokens, prefix=101, suffix=102, seq_len=seq_len,
@@ -118,58 +125,33 @@ class RelationsClassifier(pl.LightningModule):
 
     def test_step(self, batch, batch_idx):
         x, y = batch
-        x = x.squeeze().to(self.device_name)
-        y = y.squeeze().to(self.device_name)
+        x = x.squeeze()
+        y = y.squeeze()
         output = self.forward(tokens=x, labels=y)
         loss = self.loss_function(output, y)
-
         # save output of testing
         preds = torch.argmax(output, dim=1)
         self.test_output.append(preds)
-
         accuracy, num_correct = self.get_accuracy_numcorrect(output, y)
-        batch_dictionary = {
-            # REQUIRED: It ie required for us to return "loss"
-            "loss": loss,
-            # optional for batch logging purposes
-            "log": {"test_loss": loss},
-            # info to be used at epoch end
-            "correct": num_correct,
-            "total": len(y),
-            "accuracy": accuracy
-        }
-        return batch_dictionary
+        self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
     def training_step(self, batch, batch_idx):
         # training_step defined the train loop. It is independent of forward
         x, y = batch
-        x = x.squeeze().to(self.device_name)
-        y = y.squeeze().to(self.device_name)
+        x = x.squeeze()
+        y = y.squeeze()
         if len(x.shape) == 1:
             x = x.reshape(1, x.shape[0])
         self.app_logger.debug("Batch idx: {}".format(batch_idx))
         self.app_logger.debug("Input shape: {}".format(x.shape))
         self.app_logger.debug("Labels shape: {}".format(y.shape))
-
         output = self.forward(tokens=x, labels=y)
         loss = self.loss_function(logits=output, true_labels=y)
         self.app_logger.debug("Training step loss: {}".format(loss))
-        logs = {"train_loss": loss}
-
         accuracy, num_correct = self.get_accuracy_numcorrect(output, y)
-
-        total = y.shape[0]
-        batch_dictionary = {
-            # REQUIRED: It ie required for us to return "loss"
-            "loss": loss,
-            # optional for batch logging purposes
-            "log": logs,
-            # info to be used at epoch end
-            "correct": num_correct,
-            "total": total,
-            "accuracy": accuracy
-        }
-        return batch_dictionary
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
 
     def configure_optimizers(self):
         optimizer_name = self.properties["model"]["optimizer"]
