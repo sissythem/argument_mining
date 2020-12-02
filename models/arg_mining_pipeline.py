@@ -66,21 +66,38 @@ class ArgumentMining:
                 all_predictions.append(predictions)
             segments, adus, new_tokens = self._get_segments(sentences=sentences, predictions=all_predictions,
                                                             all_tokens=all_tokens)
+            major_claims, major_claims_tokens, claims, claims_tokens, premises, premises_tokens = self._split_segments(
+                segments=segments, adus=adus, segment_tokens=new_tokens)
             if new_tokens:
+                max_len = self.app_config.properties["preprocessing"]["max_len"]
+                pad_token = self.app_config.properties["preprocessing"]["pad_token"]
+                cls_id = self.tokenizer.cls_token_id
+                sep_id = self.tokenizer.sep_token_id
                 relations, stances = [], []
-                for stup in itertools.combinations(new_tokens, 2):
-                    idx1 = new_tokens.index(stup[0])
-                    idx2 = new_tokens.index(stup[1])
-                    segment1 = segments[idx1]
-                    segment2 = segments[idx2]
-                    max_len = self.app_config.properties["preprocessing"]["max_len"]
-                    pad_token = self.app_config.properties["preprocessing"]["pad_token"]
-                    arg1 = utils.wrap_and_pad_tokens(inputs=stup[0], prefix=102, suffix=102, seq_len=max_len,
-                                                     padding=pad_token)
-                    relation_preds = self.best_relation_classifier.forward(stup)
-                    stance_preds = self.best_stance_classifier.forward(stup)
-                    relations.append(((segment1, segment2), relation_preds))
-                    stances.append(((segment1, segment2), stance_preds))
+                for i in range(len(major_claims)):
+                    for j in range(len(claims)):
+                        arg1, arg1_txt, arg2, arg2_txt = self._get_relation_args(idx1=i, idx2=j,
+                                                                                 token1=major_claims_tokens,
+                                                                                 tokens2=claims_tokens,
+                                                                                 text1=major_claims,
+                                                                                 text2=claims, cls_id=cls_id,
+                                                                                 sep_id=sep_id, max_len=max_len,
+                                                                                 pad_token=pad_token)
+                        relation_preds = self.best_relation_classifier.forward((arg1, arg2))
+                        stance_preds = self.best_stance_classifier.forward((arg1, arg2))
+                        relations.append(((arg1_txt, arg2_txt), relation_preds))
+                        stances.append(((arg1_txt, arg2_txt), stance_preds))
+                for i in range(len(claims)):
+                    for j in range(len(premises)):
+                        arg1, arg1_txt, arg2, arg2_txt = self._get_relation_args(idx1=i, idx2=j,
+                                                                                 token1=claims_tokens,
+                                                                                 tokens2=premises_tokens,
+                                                                                 text1=claims,
+                                                                                 text2=premises, cls_id=cls_id,
+                                                                                 sep_id=sep_id, max_len=max_len,
+                                                                                 pad_token=pad_token)
+                        relation_preds = self.best_relation_classifier.forward((arg1, arg2))
+                        relations.append(((arg1_txt, arg2_txt), relation_preds))
                 relations = self._get_relations(preds=relations)
                 stances = self._get_relations(preds=stances, kind="stance")
                 counter = 1
@@ -198,6 +215,33 @@ class ArgumentMining:
                     segment_tokens.append(toks)
                 idx += 1
         return segments, adus, segment_tokens
+
+    @staticmethod
+    def _split_segments(segments, adus, segment_tokens):
+        major_claims, major_claims_tokens = [], []
+        claims, claims_tokens = [], []
+        premises, premises_tokens = [], []
+        for i, adu in adus:
+            if "major" in adu:
+                major_claims.append(segments[i])
+                major_claims_tokens.append(segment_tokens[i])
+            elif adu == "claim":
+                claims.append(segments[i])
+                claims_tokens.append(segment_tokens[i])
+            else:
+                premises.append(segments[i])
+                premises_tokens.append(segment_tokens[i])
+        return major_claims, major_claims_tokens, claims, claims_tokens, premises, premises_tokens
+
+    @staticmethod
+    def _get_relation_args(idx1, idx2, token1, tokens2, text1, text2, cls_id, sep_id, max_len, pad_token):
+        arg1 = token1[idx1]
+        arg2 = tokens2[idx2]
+        arg1_txt = text1[idx1]
+        arg2_txt = text2[idx2]
+        arg1 = utils.wrap_and_pad_tokens(inputs=arg1, prefix=cls_id, suffix=sep_id, seq_len=max_len, padding=pad_token)
+        arg2 = utils.wrap_and_pad_tokens(inputs=arg2, prefix=cls_id, suffix=sep_id, seq_len=max_len, padding=pad_token)
+        return arg1, arg1_txt, arg2, arg2_txt
 
     @staticmethod
     def _remove_padding(tokens, predictions, pad_token=0):

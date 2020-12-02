@@ -25,17 +25,35 @@ class DataPreprocessor:
 
     def preprocess(self, documents):
         other_label = self.properties["preprocessing"]["other_label"]
-        all_segments, stance_segments, relations, stances = self._collect_data(documents=documents,
-                                                                               other_label=other_label)
-        relation_data, relation_labels, relation_initial_data, rel_lbls_dict = self._collect_relations(
-            segments=all_segments,
-            relations=relations,
-            pickle_file=self.relations_file)
-        pickle_file = self.stances_file
-        stance_data, stance_labels, stance_initial_data, lbls_dict = self._collect_relations(segments=stance_segments,
-                                                                                             relations=stances,
-                                                                                             pickle_file=pickle_file,
-                                                                                             kind="stance")
+        major_claims, claims, premises, relations, stances = self._collect_data(documents=documents,
+                                                                                other_label=other_label)
+        if exists(join(self.resources_folder, self.relations_file)):
+            with open(join(self.resources_folder, self.relations_file), "rb") as f:
+                relation_data, relation_labels, relation_initial_data, rel_lbls_dict = pickle.load(f)
+        else:
+            mc_data, mc_labels, mc_initial_data, rel_lbls_dict = self._collect_relations(segments1=major_claims,
+                                                                                         segments2=claims,
+                                                                                         relations=relations)
+            cp_data, cp_labels, cp_initial_data, rel_lbls_dict = self._collect_relations(segments1=claims,
+                                                                                         segments2=premises,
+                                                                                         relations=relations)
+            relation_data = mc_data + cp_data
+            relation_labels = mc_labels + cp_labels
+            relation_initial_data = mc_initial_data + cp_initial_data
+            with open(join(self.resources_folder, self.relations_file), "wb") as f:
+                pickle.dump((relation_data, relation_labels, relation_initial_data, rel_lbls_dict), f)
+
+        if exists(join(self.resources_folder, self.stances_file)):
+            with open(join(self.resources_folder, self.stances_file), "rb") as f:
+                stance_data, stance_labels, stance_initial_data, lbls_dict = pickle.load(f)
+        else:
+            stance_data, stance_labels, stance_initial_data, lbls_dict = self._collect_relations(segments1=major_claims,
+                                                                                                 segments2=claims,
+                                                                                                 relations=stances,
+                                                                                                 kind="stance")
+            with open(join(self.resources_folder, self.stances_file), "wb") as f:
+                pickle.dump((stance_data, stance_labels, stance_initial_data, lbls_dict), f)
+
         return {
             "relation": {
                 "data": relation_data,
@@ -52,10 +70,11 @@ class DataPreprocessor:
         }
 
     def _collect_data(self, documents, other_label="O"):
-        all_segments, stance_segments, relations, stances = [], [], {}, {}
+        relations, stances = {}, {}
+        major_claims, claims, premises = [], [], []
         if exists(join(self.resources_folder, self.segments_pickle_file)):
             with open(join(self.resources_folder, self.segments_pickle_file), "rb") as f:
-                all_segments, stance_segments, relations, stances = pickle.load(f)
+                major_claims, claims, premises, relations, stances = pickle.load(f)
         else:
             self.app_logger.debug("Processing documents to collect ADUs from all segments & their relations/stance")
             for document in documents:
@@ -79,11 +98,12 @@ class DataPreprocessor:
                         segment.tokens = self._tokenize_sentence(segment)
                         segment.tokens = self._add_padding(segment.tokens)
                         self.app_logger.debug("Encoded data: {}".format(segment.tokens))
-                        if "claim" in segment.arg_type:
-                            self.app_logger.debug(
-                                "Segment is added in the stance list. arg type: {}".format(segment.arg_type))
-                            stance_segments.append(segment)
-                    all_segments.append(segment)
+                        if "major" in segment.arg_type:
+                            major_claims.append(segment)
+                        elif "claim" in segment.arg_type:
+                            claims.append(segment)
+                        else:
+                            premises.append(segment)
                 self.app_logger.debug("Processing relations for document {}".format(document.document_id))
                 for relation in document.relations:
                     arg1 = relation.arg1
@@ -100,8 +120,8 @@ class DataPreprocessor:
                     self.app_logger.debug("Stance type : {}".format(s.relation_type))
                     stances[(arg1.segment_id, arg2.segment_id)] = s.relation_type
             with open(join(self.resources_folder, self.segments_pickle_file), "wb") as f:
-                pickle.dump((all_segments, stance_segments, relations, stances), f)
-        return all_segments, stance_segments, relations, stances
+                pickle.dump((major_claims, claims, premises, relations, stances), f)
+        return major_claims, claims, premises, relations, stances
 
     def _tokenize_sentence(self, segment):
         tokens = []
@@ -125,21 +145,19 @@ class DataPreprocessor:
             tokens = torch.cat([tokens, padding], dim=1)
         return tokens
 
-    def _collect_relations(self, segments, relations, pickle_file, kind="relation"):
+    def _collect_relations(self, segments1, segments2, relations, kind="relation"):
         encoded_labels = (self.relations_to_int, self.int_to_relations) if kind == "relation" else \
             (self.stance_to_int, self.int_to_stance)
         self.app_logger.debug("Collecting relations")
-        if exists(join(self.resources_folder, pickle_file)):
-            with open(join(self.resources_folder, pickle_file), "rb") as f:
-                return pickle.load(f)
-        array_size = len(segments)
+        array_size1 = len(segments1)
+        array_size2 = len(segments2)
         data, labels, initial_data = [], [], []
-        for i in range(array_size):
-            for j in range(array_size):
+        for i in range(array_size1):
+            for j in range(array_size2):
                 if i == j:
                     continue
-                arg1 = segments[i]
-                arg2 = segments[j]
+                arg1 = segments1[i]
+                arg2 = segments2[j]
                 label = self.relations_to_int["other"] if kind == "relation" else self.stance_to_int["other"]
                 try:
                     relation = relations[(arg1.segment_id, arg2.segment_id)]
@@ -147,12 +165,9 @@ class DataPreprocessor:
                         self.stance_to_int[relation]
                 except(KeyError, Exception):
                     pass
-                self.app_logger.debug("Averaging segments: {} and {}".format(arg1.text, arg2.text))
                 self.app_logger.debug("Segments relation: {}".format(label))
                 input_data = (arg1.tokens, arg2.tokens)
                 initial_data.append((arg1, arg2, label))
                 data.append(input_data)
                 labels.append(label)
-        with open(join(self.resources_folder, pickle_file), "wb") as f:
-            pickle.dump((data, labels, initial_data, encoded_labels), f)
         return data, labels, initial_data, encoded_labels
