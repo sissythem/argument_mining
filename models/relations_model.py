@@ -112,6 +112,7 @@ class RelationsClassifier(pl.LightningModule):
             input_tokens = list(input_tokens.numpy())
             input_tokens = utils.wrap_and_pad_tokens(inputs=input_tokens, prefix=101, suffix=102, seq_len=seq_len,
                                                      padding=pad_token)
+            input_tokens = torch.LongTensor(input_tokens)
             inputs.append(input_tokens)
         inputs = torch.LongTensor(inputs).to(self.device_name)
         output = self.bert_model(input_ids=inputs, output_hidden_states=True)
@@ -125,12 +126,13 @@ class RelationsClassifier(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y = batch
         x = x.squeeze()
-        y = y.squeeze()
+        y = y.squeeze().to(self.device_name)
         output = self.forward(tokens=x, labels=y)
         loss = self.loss_function(output, y)
         # save output of testing
         preds = torch.argmax(output, dim=1)
         self.test_output.append(preds)
+        y = y.to("cpu")
         accuracy, num_correct = self.get_accuracy_numcorrect(output, y)
         self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log('test_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -139,7 +141,7 @@ class RelationsClassifier(pl.LightningModule):
         # training_step defined the train loop. It is independent of forward
         x, y = batch
         x = x.squeeze()
-        y = y.squeeze()
+        y = y.squeeze().to(self.device_name)
         if len(x.shape) == 1:
             x = x.reshape(1, x.shape[0])
         self.app_logger.debug("Batch idx: {}".format(batch_idx))
@@ -148,6 +150,7 @@ class RelationsClassifier(pl.LightningModule):
         output = self.forward(tokens=x, labels=y)
         loss = self.loss_function(logits=output, true_labels=y)
         self.app_logger.debug("Training step loss: {}".format(loss))
+        y = y.to("cpu")
         accuracy, num_correct = self.get_accuracy_numcorrect(output, y)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log('test_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
