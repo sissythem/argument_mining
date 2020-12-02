@@ -112,7 +112,6 @@ class RelationsClassifier(pl.LightningModule):
             input_tokens = list(input_tokens.numpy())
             input_tokens = utils.wrap_and_pad_tokens(inputs=input_tokens, prefix=101, suffix=102, seq_len=seq_len,
                                                      padding=pad_token)
-            input_tokens = torch.LongTensor(input_tokens)
             inputs.append(input_tokens)
         inputs = torch.LongTensor(inputs).to(self.device_name)
         output = self.bert_model(input_ids=inputs, output_hidden_states=True)
