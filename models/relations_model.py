@@ -103,7 +103,6 @@ class RelationsClassifier(pl.LightningModule):
             input2 = in2[i, :].numpy()
             input1 = input1[input1 != 0]
             input1 = input1[input1 != 101]
-            input1 = input1[input1 != 102]
             input2 = input2[input2 != 0]
             input2 = input2[input2 != 101]
             input2 = input2[input2 != 102]
