@@ -109,7 +109,7 @@ class RelationsClassifier(pl.LightningModule):
             input1 = torch.LongTensor(input1)
             input2 = torch.LongTensor(input2)
             input_tokens = torch.cat((input1, input2), 0)
-
+            input_tokens = list(input_tokens.numpy())
             input_tokens = utils.wrap_and_pad_tokens(inputs=input_tokens, prefix=101, suffix=102, seq_len=seq_len,
                                                      padding=pad_token)
             inputs.append(input_tokens)
