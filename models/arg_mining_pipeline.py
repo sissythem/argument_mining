@@ -22,7 +22,7 @@ class ArgumentMining:
         self.best_adu_classifier = None
         self.best_relation_classifier = None
         self.best_stance_classifier = None
-        self.device_name = "cuda:1" if torch.cuda.is_available() else "cpu"
+        self.device_name = app_config.device_name
         self.max_len = self.properties["preprocessing"]["max_len"]
         self.pad_token = self.properties["preprocessing"]["pad_token"]
         self.tokenizer = BertTokenizer.from_pretrained('nlpaueb/bert-base-greek-uncased-v1')

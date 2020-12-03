@@ -30,7 +30,7 @@ class RelationsClassifier(pl.LightningModule):
         super(RelationsClassifier, self).__init__()
         self.app_logger = app_config.app_logger
         self.properties = app_config.properties
-        self.device_name = "cuda:1" if torch.cuda.is_available() else "cpu"
+        self.device_name = app_config.device_name
         self.encoded_labels = encoded_labels
         self.num_labels = len(encoded_labels[0].keys())
 
