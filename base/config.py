@@ -7,9 +7,9 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from os import mkdir
+from os import mkdir, environ
 from os.path import exists, join
-
+import torch
 import yaml
 
 
@@ -33,6 +33,15 @@ class AppConfig:
         self.properties = {}
         self.data_file = ""
         self.app_logger = None
+        if torch.cuda.is_available():
+            devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
+            if type(devices) == str:
+                devices = devices.split(",")
+                self.device_name = "cuda:{]".format(devices[0].strip())
+            else:
+                self.device_name = "cuda:{}".format(devices)
+        else:
+            self.device_name = "cpu"
 
     def configure(self):
         # logging
