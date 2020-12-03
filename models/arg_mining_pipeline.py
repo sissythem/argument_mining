@@ -1,3 +1,4 @@
+import hashlib
 import json
 import pickle
 from os.path import join
@@ -138,14 +139,16 @@ class ArgumentMining:
                             "arg2": arg2_id
                         }
                         doc["annotations"]["Stance"].append(stance_dict)
-            filename = "document{}.json".format(document.document_id)
+            name = document.name.replace(".txt", "")
+            filename = "{}.json".format(name)
             with open(join(self.app_config.out_files_path, filename), "w") as f:
                 f.write(json.dumps(doc, indent=4, sort_keys=False))
 
     @staticmethod
     def _get_initial_doc(document):
+        hash_id = hashlib.md5(document.name.encode())
         return {
-            "id": document.document_id,
+            "id": hash_id.hexdigest(),
             "link": "",
             "description": "",
             "date": "",
