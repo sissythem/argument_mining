@@ -37,7 +37,7 @@ class AppConfig:
             devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
             if type(devices) == str:
                 devices = devices.split(",")
-                self.device_name = "cuda:{]".format(devices[0].strip())
+                self.device_name = "cuda:{}".format(devices[0].strip())
             else:
                 self.device_name = "cuda:{}".format(devices)
         else:
