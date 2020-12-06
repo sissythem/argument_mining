@@ -71,8 +71,8 @@ def main():
         documents = load_documents(logger=logger, app_config=app_config)
         if "train" in tasks:
             sentences, labels, lbl_dict = adu_preprocessing(documents=documents, logger=logger, app_config=app_config)
-            adu_model_file = adu_training(sentences=sentences, labels=labels, lbl_dict=lbl_dict, app_config=app_config)
-            app_config.send_email(body="Finished ADU model training")
+            # adu_model_file = adu_training(sentences=sentences, labels=labels, lbl_dict=lbl_dict, app_config=app_config)
+            # app_config.send_email(body="Finished ADU model training")
             logger.info("Preprocessing relations data")
             rel_sentences, rel_labels, rel_lbl_dict = relations_preprocessing(documents=documents,
                                                                               app_config=app_config)
@@ -80,12 +80,12 @@ def main():
             stance_sentences, stance_lbls, stance_lbl_dict = relations_preprocessing(documents=documents,
                                                                                      app_config=app_config,
                                                                                      kind="stance")
-            relations_model_file = relations_training(app_config=app_config, data=rel_sentences, labels=rel_labels,
-                                                      lbl_dict=rel_lbl_dict)
-            app_config.send_email(body="Finished relations model training")
+            # relations_model_file = relations_training(app_config=app_config, data=rel_sentences, labels=rel_labels,
+            #                                          lbl_dict=rel_lbl_dict)
+            # app_config.send_email(body="Finished relations model training")
             stance_model_file = relations_training(app_config=app_config, data=stance_sentences, labels=stance_lbls,
                                                    lbl_dict=stance_lbl_dict)
-            app_config.send_email(body="Finished stance model training")
+            # app_config.send_email(body="Finished stance model training")
         if "exec" in tasks:
             arg_mining = ArgumentMining(app_config=app_config)
             arg_mining.load(adu_model_file_path=adu_model_file, relations_model_file_path=relations_model_file,
