@@ -89,6 +89,7 @@ class AduClassifier(pl.LightningModule):
         self.app_logger.debug("Labels shape: {}".format(y.shape))
         output = self.forward(tokens=x, labels=y)
         loss = output["loss"]
+        logs = {"train_loss": loss}
         self.app_logger.debug("Training step loss: {}".format(loss))
         output = output["sequence_of_tags"]
         y = y.flatten()
@@ -99,6 +100,19 @@ class AduClassifier(pl.LightningModule):
         accuracy = accuracy_score(y_true=y_true, y_pred=y_pred)
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log("train_accuracy", accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        correct = (y_true == y_pred).sum()
+        total = y.shape[0]
+        batch_dictionary = {
+            # REQUIRED: It ie required for us to return "loss"
+            "loss": loss,
+            # optional for batch logging purposes
+            "log": logs,
+            # info to be used at epoch end
+            "correct": correct,
+            "total": total,
+            "accuracy": accuracy
+        }
+        return batch_dictionary
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
@@ -107,6 +121,7 @@ class AduClassifier(pl.LightningModule):
         output = self.forward(tokens=x, labels=y)
         self.validation_output = output["sequence_of_tags"]
         loss = output["loss"]
+        logs = {"val_loss": loss}
         self.app_logger.debug("Validation step loss: {}".format(loss))
         y = y.flatten()
         y_true = y.to("cpu")
@@ -117,6 +132,19 @@ class AduClassifier(pl.LightningModule):
         self.validation_accuracies.append(accuracy)
         self.log("val_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log("val_accuracy", accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        correct = (y_true == y_pred).sum()
+        total = y.shape[0]
+        batch_dictionary = {
+            # REQUIRED: It ie required for us to return "loss"
+            "loss": loss,
+            # optional for batch logging purposes
+            "log": logs,
+            # info to be used at epoch end
+            "correct": correct,
+            "total": total,
+            "accuracy": accuracy
+        }
+        return batch_dictionary
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -125,6 +153,7 @@ class AduClassifier(pl.LightningModule):
         output = self.forward(tokens=x, labels=y)
         predictions = output["sequence_of_tags"]
         loss = output["loss"]
+        logs = {"test_loss": loss}
         self.app_logger.debug("Test step loss: {}".format(loss))
         y = y.flatten()
         y_true = y.to("cpu")
@@ -137,6 +166,19 @@ class AduClassifier(pl.LightningModule):
         self.test_output.append(y_pred)
         self.log("test_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log("test_accuracy", accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        correct = (y_true == y_pred).sum()
+        total = y.shape[0]
+        batch_dictionary = {
+            # REQUIRED: It ie required for us to return "loss"
+            "loss": loss,
+            # optional for batch logging purposes
+            "log": logs,
+            # info to be used at epoch end
+            "correct": correct,
+            "total": total,
+            "accuracy": accuracy
+        }
+        return batch_dictionary
 
     def loss_function(self, logits, true_labels):
         loss_function_name = self.properties["model"]["loss"]
