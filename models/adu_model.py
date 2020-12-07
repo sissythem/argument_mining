@@ -46,17 +46,18 @@ class AduClassifier(pl.LightningModule):
     def train_dataloader(self):
         self.app_logger.debug("Creating train DataLoader")
         train_dataset = ArgumentMiningDataset(data=self.train_data, labels=self.train_labels)
-        return torch_data.DataLoader(train_dataset, batch_size=self.properties["model"]["batch_size"])
+        return torch_data.DataLoader(train_dataset, shuffle=True, batch_size=self.properties["model"]["batch_size"])
 
     def val_dataloader(self):
         self.app_logger.debug("Creating validation DataLoader")
         validation_dataset = ArgumentMiningDataset(data=self.validation_data, labels=self.validation_labels)
-        return torch_data.DataLoader(validation_dataset, batch_size=self.properties["model"]["batch_size"])
+        return torch_data.DataLoader(validation_dataset, shuffle=True,
+                                     batch_size=self.properties["model"]["batch_size"])
 
     def test_dataloader(self):
         self.app_logger.debug("Creating test DataLoader")
         test_dataset = ArgumentMiningDataset(data=self.test_data, labels=self.test_labels)
-        return torch_data.DataLoader(test_dataset, batch_size=self.properties["model"]["batch_size"])
+        return torch_data.DataLoader(test_dataset, shuffle=True, batch_size=self.properties["model"]["batch_size"])
 
     def forward(self, tokens, labels=None):
         self.app_logger.debug("Start forward")
