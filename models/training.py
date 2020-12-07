@@ -44,7 +44,8 @@ class ArgumentMiningTrainer:
                         "validation_labels": y_validation_fold}
                 self.folds.append(fold)
         else:
-            fold = {"train_data": self.train_data, "train_labels": self.train_labels, "validation_data": self.train_data,
+            fold = {"train_data": self.train_data, "train_labels": self.train_labels,
+                    "validation_data": self.train_data,
                     "validation_labels": self.train_labels}
             self.folds.append(fold)
 
@@ -80,7 +81,8 @@ class ArgumentMiningTrainer:
             path = join(self.app_config.tensorboard_path, self.app_config.run)
             tb_logger = TensorBoardLogger(path, name="argument_mining")
             trainer = Trainer(max_epochs=epochs, min_epochs=1, checkpoint_callback=True, logger=tb_logger,
-                              callbacks=[EarlyStopping(monitor="train_loss"), ProgressBar(), checkpoint_callback])
+                              callbacks=[EarlyStopping(monitor="train_loss", patience=100), ProgressBar(),
+                                         checkpoint_callback])
             trainer.fit(classifier)
             classifier.mean_validation_accuracy = np.mean(classifier.validation_accuracies)
             self.classifiers.append(classifier)
