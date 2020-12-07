@@ -61,7 +61,7 @@ class DataPreprocessor:
         all_labels = list(set(labels))
         int_labels = {}
         for idx, label in enumerate(all_labels):
-            int_labels[label] = idx
+            int_labels[label] = idx + 1
         return int_labels
 
     def _transform_labels(self, documents):

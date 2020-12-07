@@ -231,7 +231,6 @@ class CRFLayer(torch.nn.Module):
     def forward(self, logits, labels, mask):
         log_likelihood = self.crf.forward(emissions=logits, tags=labels, mask=mask)
         sequence_of_tags = self.crf.decode(logits)
-        self.app_logger.debug("CRF sequence output: {}".format(sequence_of_tags))
         loss = -1 * log_likelihood  # Log likelihood is not normalized (It is not divided by the batch size).
         return {"loss": loss, "sequence_of_tags": sequence_of_tags}
 

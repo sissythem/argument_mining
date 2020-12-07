@@ -29,6 +29,8 @@ class DataLoader:
         documents = content["data"]["documents"]
         docs = []
         for doc in documents:
+            if doc["id"] == 204:
+                continue
             document = self._create_document(doc)
             docs.append(document)
         with open(join(self.resources_folder, self.pickle_file), "wb") as f:
