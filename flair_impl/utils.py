@@ -50,6 +50,7 @@ def get_base_path(path, hidden_size, rnn_layers, use_crf, optimizer, learning_ra
 def get_properties():
     # TODO load properties from file
     return {
+        "do_prep": False,
         "hidden_size": 256,
         "rnn_layers": 2,
         "use_crf": True,

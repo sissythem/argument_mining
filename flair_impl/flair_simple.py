@@ -1,10 +1,13 @@
+import hashlib
+import json
 import random
 from os.path import join
 from typing import List
 
 import flair
 import torch
-from flair.data import Corpus
+from ellogon import tokeniser
+from flair.data import Corpus, Sentence
 from flair.datasets import ColumnCorpus
 from flair.embeddings import TokenEmbeddings, BertEmbeddings, StackedEmbeddings
 from flair.models import SequenceTagger
@@ -40,23 +43,12 @@ def train(base_path, embeddings, tag_dictionary, tag_type, corpus, hidden_size, 
                   monitor_test=True)
 
 
-def main():
-
+def adu_train(properties, data_folder, base_path):
     random.seed(2020)
-    properties = utils.get_properties()
-    curr_dir = utils.get_curr_path()
     flair.device = torch.device(utils.configure_device())
-
-    data_folder = join(curr_dir, "resources")
 
     # define columns
     columns = {0: 'text', 1: 'ner'}
-    path = join(curr_dir, "output")
-    base_path = utils.get_base_path(path=path, hidden_size=properties["hidden_size"],
-                                    rnn_layers=properties["rnn_layers"],
-                                    use_crf=properties["use_crf"], optimizer=Adam,
-                                    learning_rate=properties["learning_rate"],
-                                    mini_batch_size=properties["mini_batch_size"])
 
     # 1. get the corpus
     corpus: Corpus = ColumnCorpus(data_folder, columns,
@@ -85,5 +77,87 @@ def main():
           train_with_dev=False, shuffle=False, save_final_model=True)
 
 
-if __name__ == '__main__':
-    main()
+def predict(model_path, input_file_path, out_dir):
+    # load the model you trained
+    model = SequenceTagger.load(model_path)
+    with open(input_file_path, "r") as f:
+        data = json.load(f)
+    data = data["data"]["documents"]
+    if data:
+        for document in data:
+            segment_counter = 0
+            initial_json = _get_initial_doc(document)
+            sentences = tokeniser.tokenise(document["text"])
+            for sentence in sentences:
+                sentence = Sentence(" ".join(sentence))
+                model.predict(sentence)
+                segment_text, segment_type = _get_args_from_sentence(sentence)
+                if segment_text and segment_type:
+                    segment_counter += 1
+                    seg = {
+                        "id": "T{}".format(segment_counter),
+                        "type": segment_type,
+                        "starts": str(document["text"].index(segment_text)),
+                        "ends": str(document["text"].index(segment_text) + len(segment_text)),
+                        "segment": segment_text
+                    }
+                    initial_json["annotations"]["ADUs"].append(seg)
+            file_path = join(out_dir, document["name"])
+            with open(file_path, "w") as f:
+                json.dump(initial_json, f)
+
+
+def _get_args_from_sentence(sentence: Sentence):
+    tagged_string = sentence.to_tagged_string()
+    tagged_string_split = tagged_string.split()
+    words, labels = [], []
+    for tok in tagged_string_split:
+        if tok.startswith("<"):
+            tok = tok.replace("<", "")
+            tok = tok.replace(">", "")
+            labels.append(tok)
+        else:
+            words.append(tok)
+    idx = 0
+    segment_text, segment_type = "", ""
+    while idx < len(labels):
+        label = labels[idx]
+        if label.startswith("B-"):
+            segment_type = label.replace("B-", "")
+            segment_text = words[idx]
+            next_correct_label = "I-{}".format(segment_type)
+            idx += 1
+            if idx > len(labels):
+                break
+            next_label = labels[idx]
+            while next_label == next_correct_label:
+                segment_text += " {}".format(words[idx])
+                idx += 1
+                if idx > len(labels):
+                    break
+                next_label = labels[idx]
+        else:
+            idx += 1
+    return segment_text, segment_type
+
+
+def _get_initial_doc(document):
+    hash_id = hashlib.md5(document["name"].encode())
+    return {
+        "id": hash_id.hexdigest(),
+        "link": "",
+        "description": "",
+        "date": "",
+        "tags": [],
+        "document_link": "",
+        "publishedAt": "",
+        "crawledAt": "",
+        "domain": "",
+        "netloc": "",
+        "content": document["text"],
+        "annotations": {
+            "ADUs": [],
+            "Relations": [],
+            "Stance": []
+        }
+    }
