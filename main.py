@@ -92,7 +92,7 @@ def main():
                             stance_model_file_path=stance_model_file)
             arg_mining.predict(documents=documents)
             app_config.send_email(body="Finished predicting input documents")
-    except(Exception, BaseException) as e:
+    except(Exception, BaseException):
         logger.error("Error occurred: {}".format(traceback.format_exc()))
         app_config.send_email(body="An error occurred during the run!{}".format(traceback.format_exc()))
 

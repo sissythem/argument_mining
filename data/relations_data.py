@@ -3,6 +3,7 @@ from os.path import join, exists
 
 import torch
 from transformers import BertTokenizer
+from base import utils
 
 
 class DataPreprocessor:
@@ -96,7 +97,7 @@ class DataPreprocessor:
                         segment.sentences = tokens
                         segment.sentences_labels = labels
                         segment.tokens = self._tokenize_sentence(segment)
-                        segment.tokens = self._add_padding(segment.tokens)
+                        segment.tokens, _ = utils.add_padding(segment.tokens)
                         self.app_logger.debug("Encoded data: {}".format(segment.tokens))
                         if "major" in segment.arg_type:
                             major_claims.append(segment)
@@ -133,16 +134,6 @@ class DataPreprocessor:
         tokens.insert(0, cls)
         tokens.insert(len(tokens), sep)
         tokens = torch.LongTensor([tokens])
-        return tokens
-
-    @staticmethod
-    def _add_padding(tokens, max_len=512, pad_token=0):
-        diff = max_len - tokens.shape[-1]
-        if diff < 0:
-            tokens = tokens[:, :max_len]
-        else:
-            padding = torch.ones((1, diff), dtype=torch.long) * pad_token
-            tokens = torch.cat([tokens, padding], dim=1)
         return tokens
 
     def _collect_relations(self, segments1, segments2, relations, kind="relation"):
