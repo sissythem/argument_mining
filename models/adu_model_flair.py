@@ -20,6 +20,7 @@ class AduModel:
     def __init__(self, app_config):
         random.seed(2020)
         self.app_config = app_config
+        self.app_logger = app_config.app_logger
         self.properties = self.app_config.properties
         self.resources_path = self.app_config.resources_path
         self.dev_file = self.app_config.dev_csv
@@ -40,13 +41,15 @@ class AduModel:
                                       train_file=self.train_file,
                                       test_file=self.test_file,
                                       dev_file=self.dev_file)
-
+        self.app_logger.info("Corpus created")
+        self.app_logger.info("First training sentence: {}".format(corpus.train[0]))
         # 2. what tag do we want to predict?
         tag_type = 'ner'
 
         # 3. make the tag dictionary from the corpus
         tag_dictionary = corpus.make_tag_dictionary(tag_type=tag_type)
-        print(tag_dictionary.idx2item)
+        self.app_logger.info("Tag dictionary created")
+        self.app_logger.debug(tag_dictionary.idx2item)
 
         # 4. initialize embeddings
         embedding_types: List[TokenEmbeddings] = [
@@ -62,14 +65,20 @@ class AduModel:
         data = self._load_eval_doc()
         if data:
             for document in data:
+                self.app_logger.debug(
+                    "Processing document with id: {} and name: {}".format(document["id"], document["name"]))
                 segment_counter = 0
                 initial_json = utils.get_initial_json(name=document["name"], text=document["text"])
                 sentences = tokeniser.tokenise(document["text"])
                 for sentence in sentences:
+                    self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
                     sentence = Sentence(" ".join(sentence))
                     self.model.predict(sentence)
+                    self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
                     segment_text, segment_type = self._get_args_from_sentence(sentence)
                     if segment_text and segment_type:
+                        self.app_logger("Segment text: {}".format(segment_text))
+                        self.app_logger("Segment type: {}".format(segment_type))
                         segment_counter += 1
                         seg = {
                             "id": "T{}".format(segment_counter),
@@ -80,11 +89,11 @@ class AduModel:
                         }
                         initial_json["annotations"]["ADUs"].append(seg)
                 file_path = join(self.app_config.out_files_path, document["name"])
+                self.app_logger.debug("Writing output to json file")
                 with open(file_path, "w") as f:
                     json.dump(initial_json, f)
 
-    @staticmethod
-    def _get_args_from_sentence(sentence: Sentence):
+    def _get_args_from_sentence(self, sentence: Sentence):
         tagged_string = sentence.to_tagged_string()
         tagged_string_split = tagged_string.split()
         words, labels = [], []
@@ -95,22 +104,26 @@ class AduModel:
                 labels.append(tok)
             else:
                 words.append(tok)
+        self.app_logger.debug("Words and labels for current sentence: {}".format(words, labels))
+        self.app_logger.debug("Extracting ADU from sentence...")
         idx = 0
         segment_text, segment_type = "", ""
         while idx < len(labels):
             label = labels[idx]
+            self.app_logger.debug("Current label: {}".format(label))
             if label.startswith("B-"):
                 segment_type = label.replace("B-", "")
+                self.app_logger.debug("Found ADU with type: {}".format(segment_type))
                 segment_text = words[idx]
                 next_correct_label = "I-{}".format(segment_type)
                 idx += 1
-                if idx > len(labels):
+                if idx >= len(labels):
                     break
                 next_label = labels[idx]
                 while next_label == next_correct_label:
                     segment_text += " {}".format(words[idx])
                     idx += 1
-                    if idx > len(labels):
+                    if idx >= len(labels):
                         break
                     next_label = labels[idx]
             else:
@@ -119,6 +132,7 @@ class AduModel:
 
     def load(self):
         model_path = join(self.base_path, self.model_file)
+        self.app_logger.info("Loading ADU model from path: {}".format(model_path))
         self.model = SequenceTagger.load(model_path)
 
     def _train(self, embeddings, tag_dictionary, tag_type, corpus, train_with_dev=False, shuffle=False,
@@ -143,7 +157,8 @@ class AduModel:
         mini_batch_size = properties["mini_batch_size"]
         max_epochs = properties["max_epochs"]
         num_workers = properties["num_workers"]
-
+        self.app_logger.debug("Starting training with ModelTrainer")
+        self.app_logger.debug("Model configuration properties: {}".format(self.properties["adu_model"]))
         # 7. start training
         trainer.train(self.base_path,
                       patience=patience,
@@ -168,7 +183,9 @@ class AduModel:
         return optimizer
 
     def _load_eval_doc(self):
+        self.app_logger.info("Loading data from json file")
         filepath = join(self.resources_path, self.eval_file)
         with open(filepath, "r") as f:
             data = json.load(f)
+        self.app_logger.info("Data are loaded!")
         return data["data"]["documents"]
