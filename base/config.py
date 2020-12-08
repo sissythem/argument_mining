@@ -151,7 +151,7 @@ class FlairConfig(Config):
                                              learning_rate=properties["learning_rate"],
                                              mini_batch_size=properties["mini_batch_size"])
 
-        config = self.properties["config"]
+        config = self.properties["config"]["data"]
         self.eval_doc = config["eval_doc"]
         self.train_csv = config["train_csv"]
         self.dev_csv = config["dev_csv"]
