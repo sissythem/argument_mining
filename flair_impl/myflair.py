@@ -19,7 +19,7 @@ from ax import optimize
 from flair.data import Corpus, Sentence
 from flair.datasets import ColumnCorpus
 from flair.embeddings import TokenEmbeddings, BertEmbeddings, FlairEmbeddings, StackedEmbeddings, DocumentEmbeddings, \
-    WordEmbeddings, PooledFlairEmbeddings
+    WordEmbeddings, PooledFlairEmbeddings, TransformerWordEmbeddings
 from sklearn.metrics import classification_report
 from torch.optim.sgd import SGD
 from torch.optim.adam import Adam
@@ -248,7 +248,7 @@ embedding_types: List[TokenEmbeddings] = [
     # OpenAIGPTEmbeddings(),
     # Models in /home/petasis/.local/lib/python3.7/site-packages/pytorch_pretrained_bert/modeling.py
     # BertEmbeddings('bert-large-uncased'),
-    BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1'),
+    TransformerWordEmbeddings('nlpaueb/bert-base-greek-uncased-v1'),
     # SiameseEmbeddings(sentence_folder),
 ]
 
