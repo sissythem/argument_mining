@@ -14,8 +14,8 @@ from torch.optim.adam import Adam
 
 
 def train(base_path, embeddings, tag_dictionary, tag_type, corpus, hidden_size, mini_batch_size, num_workers,
-          optimizer=Adam, learning_rate=0.01, rnn_layers=1, max_epochs=150, train_with_dev=False, use_crf=True,
-          shuffle=False, save_final_model=True):
+          optimizer=Adam, learning_rate=0.01, rnn_layers=1, max_epochs=150, use_crf=True, train_with_dev=False,
+          shuffle=False, save_final_model=True, patience=50, use_tensorboard=True):
     # 5. initialize sequence tagger
     tagger: SequenceTagger = SequenceTagger(hidden_size=hidden_size,
                                             embeddings=embeddings,
@@ -24,10 +24,11 @@ def train(base_path, embeddings, tag_dictionary, tag_type, corpus, hidden_size, 
                                             use_crf=use_crf,
                                             rnn_layers=rnn_layers)
     # 6. initialize trainer
-    trainer: ModelTrainer = ModelTrainer(tagger, corpus, optimizer=optimizer)
+    trainer: ModelTrainer = ModelTrainer(tagger, corpus, use_tensorboard=use_tensorboard, optimizer=optimizer)
 
     # 7. start training
     trainer.train(base_path,
+                  patience=patience,
                   learning_rate=learning_rate,
                   mini_batch_size=mini_batch_size,
                   max_epochs=max_epochs,
