@@ -69,7 +69,7 @@ class AduModel:
                     "Processing document with id: {} and name: {}".format(document["id"], document["name"]))
                 segment_counter = 0
                 initial_json = utils.get_initial_json(name=document["name"], text=document["text"])
-                sentences = tokeniser.tokenise(document["text"])
+                sentences = tokeniser.tokenise_no_punc(document["text"])
                 for sentence in sentences:
                     self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
                     sentence = Sentence(" ".join(sentence).strip())
