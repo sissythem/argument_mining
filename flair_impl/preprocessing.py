@@ -8,7 +8,7 @@ import pandas as pd
 
 def preprocess():
     curr_dir = Path(getcwd())
-    curr_dir = str(curr_dir) if str(curr_dir).endswith("argument_mining") else str(curr_dir.parent)
+    curr_dir = str(curr_dir) if str(curr_dir).endswith("mining") else str(curr_dir.parent)
     resources = join(curr_dir, "resources")
     documents_path = join(resources, "documents.pkl")
     with open(documents_path, "rb") as f:
