@@ -6,7 +6,7 @@ import pandas as pd
 from flair_impl import utils
 
 
-def preprocess():
+def preprocess_adus():
     curr_dir = utils.get_curr_path()
     resources = join(curr_dir, "resources")
     documents_path = join(resources, "documents.pkl")
@@ -36,3 +36,7 @@ def preprocess():
     out_file_path = join(resources, "train.csv")
     df.to_csv(out_file_path, sep='\t', index=False)
     print("Dataframe saved!")
+
+
+def preprocess_relations():
+    pass
