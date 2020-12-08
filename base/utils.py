@@ -31,4 +31,4 @@ def remove_padding(tokens, predictions, pad_token=0):
         if (token != pad_token) and (token != 101) and (token != 102):
             new_tokens.append(token)
             new_predictions.append(predictions[idx])
-    return new_tokens, new_predictions
+    return torch.stack(new_tokens), torch.stack(new_predictions)
