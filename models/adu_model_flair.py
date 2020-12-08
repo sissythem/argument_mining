@@ -102,8 +102,8 @@ class AduModel:
                         initial_json["annotations"]["ADUs"].append(seg)
                 file_path = join(self.app_config.out_files_path, document["name"])
                 self.app_logger.debug("Writing output to json file")
-                with open(file_path, "w") as f:
-                    json.dump(initial_json, f)
+                with open(file_path, "w", encoding='utf8') as f:
+                    f.write(json.dumps(initial_json, indent=4, sort_keys=False, ensure_ascii=False))
 
     def _get_args_from_sentence(self, sentence: Sentence):
         tagged_string = sentence.to_tagged_string()
