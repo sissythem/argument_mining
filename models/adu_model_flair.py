@@ -72,7 +72,7 @@ class AduModel:
                 sentences = tokeniser.tokenise(document["text"])
                 for sentence in sentences:
                     self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
-                    sentence = Sentence(" ".join(sentence))
+                    sentence = Sentence(" ".join(sentence).strip())
                     self.model.predict(sentence)
                     self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
                     segment_text, segment_type = self._get_args_from_sentence(sentence)
