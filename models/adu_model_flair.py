@@ -72,6 +72,7 @@ class AduModel:
                 sentences = tokeniser.tokenise_no_punc(document["text"])
                 for sentence in sentences:
                     self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
+                    sentence = list(sentence)
                     sentence = Sentence(" ".join(sentence).strip())
                     self.model.predict(sentence)
                     self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
