@@ -58,7 +58,6 @@ def relations_training(app_config, data, labels, lbl_dict):
 def main():
     app_path = join(getcwd()) if getcwd().endswith("argument_mining") else getcwd()
     app_config = AppConfig(app_path=app_path)
-    app_config.configure()
     logger = app_config.app_logger
     tasks = app_config.properties["tasks"]
     try:

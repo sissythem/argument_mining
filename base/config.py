@@ -31,8 +31,9 @@ class Config:
         self.app_logger = None
         self.device_name = ""
         self.data_file = None
+        self._configure()
 
-    def configure(self):
+    def _configure(self):
         # logging
         self.app_logger = self._config_logger()
         self.app_logger.info("Run id: {}".format(self.run))

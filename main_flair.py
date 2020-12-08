@@ -10,7 +10,6 @@ def main():
     random.seed(2020)
     curr_dir = utils.get_curr_path()
     app_config = FlairConfig(app_path=curr_dir)
-    app_config.configure()
     properties = app_config.properties
     do_prep = properties["do_prep"]
     if do_prep:
