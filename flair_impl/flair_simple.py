@@ -68,7 +68,7 @@ def main():
         "num_workers": 8
     }
     curr_dir = Path(getcwd())
-    curr_dir = str(curr_dir) if str(curr_dir).endswith("argument_mining") else str(curr_dir.parent)
+    curr_dir = str(curr_dir) if str(curr_dir).endswith("mining") else str(curr_dir.parent)
     data_folder = join(curr_dir, "resources")
 
     # define columns
