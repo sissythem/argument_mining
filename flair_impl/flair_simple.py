@@ -42,7 +42,7 @@ def train(base_path, embeddings, tag_dictionary, tag_type, corpus, hidden_size, 
 def get_base_path(path, hidden_size, rnn_layers, use_crf, optimizer, learning_rate, mini_batch_size):
     # Create a base path:
     embedding_names = 'bert-greek'
-    base_path = path + '-' + '-'.join([
+    base_path = 'model-' + '-'.join([
         str(embedding_names),
         'hs=' + str(hidden_size),
         'hl=' + str(rnn_layers),
@@ -51,6 +51,7 @@ def get_base_path(path, hidden_size, rnn_layers, use_crf, optimizer, learning_ra
         'lr=' + str(learning_rate),
         'bs=' + str(mini_batch_size)
     ])
+    base_path = join(path, base_path)
     try:
         # os.mkdir(base_path, 0o755)
         os.makedirs(base_path)
