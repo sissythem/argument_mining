@@ -25,6 +25,10 @@ def main():
     if do_prep:
         prep.preprocess_adus()
     fl.adu_train(properties=properties, data_folder=data_folder, base_path=base_path)
+    model_path = join(base_path, "best-model.pt")
+    input_file_path = join(data_folder, "kasteli.json")
+    out_dir = join(output_path, "output_files")
+    fl.predict(model_path=model_path, input_file_path=input_file_path, out_dir=out_dir)
 
 
 if __name__ == '__main__':
