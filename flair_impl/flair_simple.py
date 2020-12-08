@@ -1,10 +1,12 @@
 import random
 import os
-from os import getcwd
+from os import getcwd, environ
 from os.path import join
 from pathlib import Path
 from typing import List
 
+import flair
+import torch
 from flair.data import Corpus
 from flair.datasets import ColumnCorpus
 from flair.embeddings import TokenEmbeddings, TransformerWordEmbeddings, StackedEmbeddings
@@ -110,4 +112,14 @@ def main():
 
 if __name__ == '__main__':
     random.seed(2020)
+    if torch.cuda.is_available():
+        devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
+        if type(devices) == str:
+            devices = devices.split(",")
+            device_name = "cuda:{}".format(devices[0].strip())
+        else:
+            device_name = "cuda:{}".format(devices)
+    else:
+        device_name = "cpu"
+    flair.device = torch.device(device_name)
     main()
