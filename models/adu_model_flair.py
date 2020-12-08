@@ -29,7 +29,7 @@ class AduModel:
         self.base_path = self.app_config.base_path
         self.model_file = "best-model.pt"
         self.model = None
-        flair.device = torch.device(utils.configure_device())
+        flair.device = torch.device(app_config.device_name)
 
     def train(self):
         # define columns
