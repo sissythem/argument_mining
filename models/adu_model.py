@@ -74,9 +74,9 @@ class AduClassifier(pl.LightningModule):
         self.app_logger.debug("FF output shape: {}".format(ff_output.shape))
         mask = tokens != self.properties["preprocessing"]["pad_token"]
         if labels is not None:
-            output = self.crf.forward(logits=ff_output, labels=labels, mask=mask)
+            output = self.crf.forward(in_tokens=tokens, in_logits=ff_output, in_labels=labels, in_mask=mask)
         else:
-            output = self.crf.decode(ff_output, mask=mask)
+            output = self.crf.decode(tokens, ff_output, mask=mask)
         return output
 
     def training_step(self, batch, batch_idx):
@@ -232,19 +232,34 @@ class CRFLayer(torch.nn.Module):
         self.tokenizer = BertTokenizer.from_pretrained('nlpaueb/bert-base-greek-uncased-v1')
         self.crf = CRF(num_tags=num_labels, batch_first=True).to(self.device_name)
 
-    def forward(self, logits, labels, mask):
+    def forward(self, in_tokens, in_logits, in_labels, in_mask):
+        logits, labels, mask = [], [], []
+        for i in range(len(in_tokens)):
+            preds, lbls, ma = self.handle_subwords(tokens=in_tokens[i], predictions=in_logits[i], 
+                                                   labels=in_labels[i], mask=in_mask[i])
+            logits.append(preds)
+            labels.append(lbls)
+            mask.append(ma)
+        logits = torch.stack(logits)
+        labels = torch.stack(labels)
+        mask = torch.stack(mask)
         log_likelihood = self.crf.forward(emissions=logits, tags=labels, mask=mask)
         sequence_of_tags = self.crf.decode(logits)
         loss = -1 * log_likelihood  # Log likelihood is not normalized (It is not divided by the batch size).
         return {"loss": loss, "sequence_of_tags": sequence_of_tags}
 
-    def decode(self, logits, mask):
+    def decode(self, tokens, logits, mask):
+        logits, labels, mask = self.handle_subwords(tokens=tokens, predictions=logits, mask=mask)
         return self.crf.decode(logits, mask)
 
-    def handle_subwords(self, tokens, predictions, labels=None, remove_padding=True):
-        new_preds, new_labels = [], []
+    def handle_subwords(self, tokens, predictions, mask, labels=None, remove_padding=False):
+        # self.tokenizer = BertTokenizer.from_pretrained('nlpaueb/bert-base-greek-uncased-v1')
+        tokens = tokens.squeeze()
+        mask=mask.squeeze()
+        predictions = predictions.squeeze()
+        new_preds, new_labels, new_mask = [], [], []
         # extract subwords
-        pad_token = self.app_config.properties["preprocessing"]["pad_token"]
+        pad_token = self.tokenizer.pad_token_id
         if remove_padding:
             tokens, predictions = utils.remove_padding(tokens=tokens, predictions=predictions, pad_token=pad_token)
         subwords = self.tokenizer.convert_ids_to_tokens(tokens)
@@ -258,19 +273,38 @@ class CRFLayer(torch.nn.Module):
             else:
                 if curr_aggr:
                     aggr.append(curr_aggr)
+            i += 1
+        aggr.append(curr_aggr)
         # aggregate proba
-        for i in range(len(predictions)):
+        i = 0
+        while i < len(predictions):
+            print("Index: {}".format(i))
+            print("Aggr list len: {}".format(len(aggr)))
             if i not in aggr[0]:
                 # if i not anywehre in aggr
                 new_preds.append(predictions[i])
+                new_mask.append(mask[i])
                 if labels is not None:
                     new_labels.append(labels[i])
+                i += 1
             else:
                 idxs = aggr.pop(0)
-                p = torch.mean(predictions[np.asarray(idxs)])
+                p = torch.mean(predictions[np.asarray(idxs)], dim=0)
                 new_preds.append(p)
+                new_mask.append(mask[idxs[0]])
                 if labels is not None:
-                    new_labels.append(labels[idxs[0]])
+                    lbls = labels[idxs[0]]
+                    new_labels.append(lbls)
+                    if len(set(lbls)) != 1:
+                        print("yikes!")
+                        exit(1)
+                i += len(idxs)
         # aggregate words
         # (not needed)
-        return new_preds, new_labels
+        if labels is not None:
+            new_labels = torch.stack(new_labels)
+            new_labels = torch.unsqueeze(new_labels, dim=0)
+
+        new_preds = torch.stack(new_preds)
+        new_mask = torch.stack(new_mask)
+        return torch.unsqueeze(new_preds, dim=0), new_labels, torch.unsqueeze(new_mask, dim=0)
