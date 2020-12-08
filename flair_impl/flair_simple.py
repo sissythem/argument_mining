@@ -62,6 +62,19 @@ def get_base_path(path, hidden_size, rnn_layers, use_crf, optimizer, learning_ra
     return base_path
 
 
+def configure_device():
+    if torch.cuda.is_available():
+        devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
+        if type(devices) == str:
+            devices = devices.split(",")
+            device_name = "cuda:{}".format(devices[0].strip())
+        else:
+            device_name = "cuda:{}".format(devices)
+    else:
+        device_name = "cpu"
+    flair.device = torch.device(device_name)
+
+
 def main():
     properties = {
         "hidden_size": 256,
@@ -72,6 +85,8 @@ def main():
         "num_workers": 8,
         "max_epochs": 150
     }
+    random.seed(2020)
+    configure_device()
     curr_dir = Path(getcwd())
     curr_dir = str(curr_dir) if str(curr_dir).endswith("mining") else str(curr_dir.parent)
     data_folder = join(curr_dir, "resources")
@@ -111,15 +126,4 @@ def main():
 
 
 if __name__ == '__main__':
-    random.seed(2020)
-    if torch.cuda.is_available():
-        devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
-        if type(devices) == str:
-            devices = devices.split(",")
-            device_name = "cuda:{}".format(devices[0].strip())
-        else:
-            device_name = "cuda:{}".format(devices)
-    else:
-        device_name = "cpu"
-    flair.device = torch.device(device_name)
     main()
