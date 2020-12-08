@@ -1,3 +1,9 @@
+import hashlib
+import os
+from os import environ, getcwd
+from os.path import join
+from pathlib import Path
+
 import torch
 
 
@@ -32,3 +38,66 @@ def remove_padding(tokens, predictions, pad_token=0):
             new_tokens.append(token)
             new_predictions.append(predictions[idx])
     return torch.stack(new_tokens), torch.stack(new_predictions)
+
+
+def get_curr_path():
+    curr_dir = Path(getcwd())
+    parent = str(curr_dir.parent)
+    curr_dir = str(curr_dir)
+    return curr_dir if curr_dir.endswith("mining") else parent
+
+
+def configure_device():
+    if torch.cuda.is_available():
+        devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
+        if type(devices) == str:
+            devices = devices.split(",")
+            device_name = "cuda:{}".format(devices[0].strip())
+        else:
+            device_name = "cuda:{}".format(devices)
+    else:
+        device_name = "cpu"
+    return device_name
+
+
+def get_base_path(path, hidden_size, rnn_layers, use_crf, optimizer, learning_rate, mini_batch_size):
+    # Create a base path:
+    embedding_names = 'bert-greek'
+    base_path = 'model-' + '-'.join([
+        str(embedding_names),
+        'hs=' + str(hidden_size),
+        'hl=' + str(rnn_layers),
+        'crf=' + str(use_crf),
+        str(optimizer.__name__),
+        'lr=' + str(learning_rate),
+        'bs=' + str(mini_batch_size)
+    ])
+    base_path = join(path, base_path)
+    try:
+        # os.mkdir(base_path, 0o755)
+        os.makedirs(base_path)
+    except (OSError, Exception):
+        pass
+    return base_path
+
+
+def get_initial_json(name, text):
+    hash_id = hashlib.md5(name.encode())
+    return {
+        "id": hash_id.hexdigest(),
+        "link": "",
+        "description": "",
+        "date": "",
+        "tags": [],
+        "document_link": "",
+        "publishedAt": "",
+        "crawledAt": "",
+        "domain": "",
+        "netloc": "",
+        "content": text,
+        "annotations": {
+            "ADUs": [],
+            "Relations": [],
+            "Stance": []
+        }
+    }

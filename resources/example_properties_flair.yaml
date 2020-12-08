@@ -1,0 +1,21 @@
+config:
+  email:
+    sender: "example@gmail.com"
+    receiver: "example@gmail.com"
+    password: "password"
+  data:
+    eval_doc: "kasteli.json"
+    train_csv: "train.csv"
+    dev_csv: "dev.csv"
+    test_csv: "test.csv"
+tasks: ["train", "eval"]
+do_prep: True
+adu_model:
+  hidden_size: 256
+  rnn_layers: 2
+  use_crf: True
+  learning_rate: 0.0001
+  mini_batch_size: 32
+  num_workers: 8
+  max_epochs: 150
+  optimizer: Adam

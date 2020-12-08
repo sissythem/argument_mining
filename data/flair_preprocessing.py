@@ -3,13 +3,10 @@ from os.path import join
 
 import pandas as pd
 
-from flair_impl import utils
 
-
-def preprocess_adus():
-    curr_dir = utils.get_curr_path()
-    resources = join(curr_dir, "resources")
-    documents_path = join(resources, "documents.pkl")
+def adu_preprocess(app_config):
+    resources = app_config.resources_path
+    documents_path = join(resources, app_config.documents_pickle)
     with open(documents_path, "rb") as f:
         documents = pickle.load(f)
     df = pd.DataFrame(columns=["token", "label", "arg", "doc_sentence", "sentence", "doc_id"])

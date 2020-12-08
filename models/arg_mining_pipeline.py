@@ -51,7 +51,7 @@ class ArgumentMining:
     def predict(self, documents):
         self.app_logger.info("Doing token classification")
         for d, document in enumerate(documents):
-            doc = self._get_initial_doc(document)
+            doc = utils.get_initial_json(document.name, document.content)
             sentences = tokeniser.tokenise_no_punc(document.content)
             all_predictions = []
             for s, sentence in enumerate(sentences):
@@ -130,28 +130,6 @@ class ArgumentMining:
             filename = "{}.json".format(name)
             with open(join(self.app_config.out_files_path, filename), "w") as f:
                 f.write(json.dumps(doc, indent=4, sort_keys=False))
-
-    @staticmethod
-    def _get_initial_doc(document):
-        hash_id = hashlib.md5(document.name.encode())
-        return {
-            "id": hash_id.hexdigest(),
-            "link": "",
-            "description": "",
-            "date": "",
-            "tags": [],
-            "document_link": "",
-            "publishedAt": "",
-            "crawledAt": "",
-            "domain": "",
-            "netloc": "",
-            "content": document.content,
-            "annotations": {
-                "ADUs": [],
-                "Relations": [],
-                "Stance": []
-            }
-        }
 
     def _get_segments(self, sentences, predictions):
         self.app_logger.debug("Getting ADUs from predicted sequences")
