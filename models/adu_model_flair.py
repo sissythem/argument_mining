@@ -20,12 +20,12 @@ class AduModel:
     def __init__(self, app_config):
         random.seed(2020)
         self.app_config = app_config
-        self.properties = app_config.properties
-        self.resources_path = app_config.resources_path
-        self.dev_file = self.properties["config"]["dev_csv"]
-        self.train_file = self.properties["config"]["train_csv"]
-        self.test_file = self.properties["config"]["test_csv"]
-        self.eval_file = self.properties["config"]["eval_doc"]
+        self.properties = self.app_config.properties
+        self.resources_path = self.app_config.resources_path
+        self.dev_file = self.app_config.dev_csv
+        self.train_file = self.app_config.train_csv
+        self.test_file = self.app_config.test_csv
+        self.eval_file = self.app_config.eval_doc
         self.base_path = self.app_config.base_path
         self.model_file = "best-model.pt"
         self.model = None
