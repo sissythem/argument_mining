@@ -1,14 +1,13 @@
 import pickle
-from os import getcwd
 from os.path import join
-from pathlib import Path
 
 import pandas as pd
 
+from flair_impl import utils
+
 
 def preprocess():
-    curr_dir = Path(getcwd())
-    curr_dir = str(curr_dir) if str(curr_dir).endswith("mining") else str(curr_dir.parent)
+    curr_dir = utils.get_curr_path()
     resources = join(curr_dir, "resources")
     documents_path = join(resources, "documents.pkl")
     with open(documents_path, "rb") as f:
