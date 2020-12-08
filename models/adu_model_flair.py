@@ -77,8 +77,8 @@ class AduModel:
                     self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
                     segment_text, segment_type = self._get_args_from_sentence(sentence)
                     if segment_text and segment_type:
-                        self.app_logger("Segment text: {}".format(segment_text))
-                        self.app_logger("Segment type: {}".format(segment_type))
+                        self.app_logger.debug("Segment text: {}".format(segment_text))
+                        self.app_logger.debug("Segment type: {}".format(segment_type))
                         segment_counter += 1
                         seg = {
                             "id": "T{}".format(segment_counter),
