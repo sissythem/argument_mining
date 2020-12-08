@@ -84,12 +84,19 @@ class AduModel:
                         try:
                             start_idx = document["text"].index(segment_text)
                         except(Exception, BaseException):
-                            start_idx = document["text"].index(segment_text[:4])
+                            try:
+                                start_idx = document["text"].index(segment_text[:4])
+                            except(Exception, BaseException):
+                                start_idx = None
+                        if start_idx:
+                            end_idx = start_idx + len(segment_text)
+                        else:
+                            start_idx, end_idx = "", ""
                         seg = {
                             "id": "T{}".format(segment_counter),
                             "type": segment_type,
                             "starts": str(start_idx),
-                            "ends": str(start_idx + len(segment_text)),
+                            "ends": str(end_idx),
                             "segment": segment_text
                         }
                         initial_json["annotations"]["ADUs"].append(seg)
