@@ -4,7 +4,7 @@ from os.path import join
 from os import getcwd
 
 if __name__ == '__main__':
-    do_prep = True
+    do_prep = False
     if do_prep:
         prep.preprocess()
     else:

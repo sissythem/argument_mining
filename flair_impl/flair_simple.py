@@ -1,18 +1,17 @@
 import random
-import os
-from os import getcwd, environ
 from os.path import join
-from pathlib import Path
 from typing import List
 
 import flair
 import torch
 from flair.data import Corpus
 from flair.datasets import ColumnCorpus
-from flair.embeddings import TokenEmbeddings, TransformerWordEmbeddings, StackedEmbeddings
+from flair.embeddings import TokenEmbeddings, BertEmbeddings, StackedEmbeddings
 from flair.models import SequenceTagger
 from flair.trainers import ModelTrainer
 from torch.optim.adam import Adam
+
+from flair_impl import utils
 
 
 def train(base_path, embeddings, tag_dictionary, tag_type, corpus, hidden_size, mini_batch_size, num_workers,
@@ -41,62 +40,23 @@ def train(base_path, embeddings, tag_dictionary, tag_type, corpus, hidden_size, 
                   monitor_test=True)
 
 
-def get_base_path(path, hidden_size, rnn_layers, use_crf, optimizer, learning_rate, mini_batch_size):
-    # Create a base path:
-    embedding_names = 'bert-greek'
-    base_path = 'model-' + '-'.join([
-        str(embedding_names),
-        'hs=' + str(hidden_size),
-        'hl=' + str(rnn_layers),
-        'crf=' + str(use_crf),
-        str(optimizer.__name__),
-        'lr=' + str(learning_rate),
-        'bs=' + str(mini_batch_size)
-    ])
-    base_path = join(path, base_path)
-    try:
-        # os.mkdir(base_path, 0o755)
-        os.makedirs(base_path)
-    except (OSError, Exception):
-        pass
-    return base_path
-
-
-def configure_device():
-    if torch.cuda.is_available():
-        devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
-        if type(devices) == str:
-            devices = devices.split(",")
-            device_name = "cuda:{}".format(devices[0].strip())
-        else:
-            device_name = "cuda:{}".format(devices)
-    else:
-        device_name = "cpu"
-    flair.device = torch.device(device_name)
-
-
 def main():
-    properties = {
-        "hidden_size": 256,
-        "rnn_layers": 2,
-        "use_crf": True,
-        "learning_rate": 0.0001,
-        "mini_batch_size": 32,
-        "num_workers": 8,
-        "max_epochs": 150
-    }
+
     random.seed(2020)
-    configure_device()
-    curr_dir = Path(getcwd())
-    curr_dir = str(curr_dir) if str(curr_dir).endswith("mining") else str(curr_dir.parent)
+    properties = utils.get_properties()
+    curr_dir = utils.get_curr_path()
+    flair.device = torch.device(utils.configure_device())
+
     data_folder = join(curr_dir, "resources")
 
     # define columns
     columns = {0: 'text', 1: 'ner'}
     path = join(curr_dir, "output")
-    base_path = get_base_path(path=path, hidden_size=properties["hidden_size"], rnn_layers=properties["rnn_layers"],
-                              use_crf=properties["use_crf"], optimizer=Adam, learning_rate=properties["learning_rate"],
-                              mini_batch_size=properties["mini_batch_size"])
+    base_path = utils.get_base_path(path=path, hidden_size=properties["hidden_size"],
+                                    rnn_layers=properties["rnn_layers"],
+                                    use_crf=properties["use_crf"], optimizer=Adam,
+                                    learning_rate=properties["learning_rate"],
+                                    mini_batch_size=properties["mini_batch_size"])
 
     # 1. get the corpus
     corpus: Corpus = ColumnCorpus(data_folder, columns,
@@ -113,7 +73,7 @@ def main():
 
     # 4. initialize embeddings
     embedding_types: List[TokenEmbeddings] = [
-        TransformerWordEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
+        BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
     ]
 
     embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
