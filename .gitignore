@@ -8,12 +8,7 @@ base/__pycache__/
 data/__pycache__/
 models/__pycache__/
 resources/*.pkl
+resources/*.csv
 resources/properties.yaml
 output/
-
-# backup folder -- to be deleted
-backup/resources/*.pickle
-backup/*.pkl
-backup/output/
-backup/__pycache__/
-backup/resources/properties.yaml
+test.py
