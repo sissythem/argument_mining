@@ -27,9 +27,9 @@ class Config:
         self.run = uuid.uuid4().hex
         self._create_paths()
         self._create_output_dirs()
-        self.device_name = utils.configure_device()
         self.properties = {}
         self.app_logger = None
+        self.device_name = ""
         self.data_file = None
 
     def configure(self):
@@ -41,6 +41,8 @@ class Config:
         self.properties = self._load_properties()
         config = self.properties["config"]
         self._config_email(config=config)
+
+        self.device_name = utils.configure_device()
 
     def _config_logger(self):
         log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
