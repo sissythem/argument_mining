@@ -65,7 +65,8 @@ def main():
         "use_crf": True,
         "learning_rate": 0.0001,
         "mini_batch_size": 32,
-        "num_workers": 8
+        "num_workers": 8,
+        "max_epochs": 150
     }
     curr_dir = Path(getcwd())
     curr_dir = str(curr_dir) if str(curr_dir).endswith("mining") else str(curr_dir.parent)
