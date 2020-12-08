@@ -53,7 +53,6 @@ class ArgumentMining:
         for d, document in enumerate(documents):
             doc = self._get_initial_doc(document)
             sentences = tokeniser.tokenise_no_punc(document.content)
-            all_tokens = []
             all_predictions = []
             for s, sentence in enumerate(sentences):
                 if len(sentence) > self.max_len:
@@ -62,40 +61,28 @@ class ArgumentMining:
                                         padding="max_length", truncation=True, max_length=self.max_len)["input_ids"]
                 tokens = torch.LongTensor(tokens).unsqueeze(0).to(self.device_name)
                 predictions = self.best_adu_classifier.forward(tokens)
-                all_tokens.append(tokens)
                 all_predictions.append(predictions)
-            segments, adus, new_tokens = self._get_segments(sentences=sentences, predictions=all_predictions,
-                                                            all_tokens=all_tokens)
-            major_claims, major_claims_tokens, claims, claims_tokens, premises, premises_tokens = self._split_segments(
-                segments=segments, adus=adus, segment_tokens=new_tokens)
-            if new_tokens:
-                max_len = self.app_config.properties["preprocessing"]["max_len"]
-                pad_token = self.app_config.properties["preprocessing"]["pad_token"]
-                cls_id = self.tokenizer.cls_token_id
-                sep_id = self.tokenizer.sep_token_id
+            segments, adus = self._get_segments(sentences=sentences, predictions=all_predictions)
+            if segments:
+                major_claims, major_claims_tokens, claims, claims_tokens, \
+                    premises, premises_tokens = self._split_segments(segments=segments, adus=adus)
                 relations, stances = [], []
                 for i in range(len(major_claims)):
                     for j in range(len(claims)):
-                        arg1, arg1_txt, arg2, arg2_txt = self._get_relation_args(idx1=i, idx2=j,
-                                                                                 token1=major_claims_tokens,
-                                                                                 tokens2=claims_tokens,
-                                                                                 text1=major_claims,
-                                                                                 text2=claims, cls_id=cls_id,
-                                                                                 sep_id=sep_id, max_len=max_len,
-                                                                                 pad_token=pad_token)
+                        arg1 = major_claims_tokens[i]
+                        arg1_txt = major_claims[i]
+                        arg2 = claims_tokens[j]
+                        arg2_txt = claims[j]
                         relation_preds = self.best_relation_classifier.forward((arg1, arg2))
                         stance_preds = self.best_stance_classifier.forward((arg1, arg2))
                         relations.append(((arg1_txt, arg2_txt), relation_preds))
                         stances.append(((arg1_txt, arg2_txt), stance_preds))
                 for i in range(len(claims)):
                     for j in range(len(premises)):
-                        arg1, arg1_txt, arg2, arg2_txt = self._get_relation_args(idx1=i, idx2=j,
-                                                                                 token1=claims_tokens,
-                                                                                 tokens2=premises_tokens,
-                                                                                 text1=claims,
-                                                                                 text2=premises, cls_id=cls_id,
-                                                                                 sep_id=sep_id, max_len=max_len,
-                                                                                 pad_token=pad_token)
+                        arg1 = claims_tokens[i]
+                        arg1_txt = claims[i]
+                        arg2 = premises_tokens[j]
+                        arg2_txt = premises[j]
                         relation_preds = self.best_relation_classifier.forward((arg1, arg2))
                         relations.append(((arg1_txt, arg2_txt), relation_preds))
                 relations = self._get_relations(preds=relations)
@@ -166,11 +153,10 @@ class ArgumentMining:
             }
         }
 
-    def _get_segments(self, sentences, all_tokens, predictions):
+    def _get_segments(self, sentences, predictions):
         self.app_logger.debug("Getting ADUs from predicted sequences")
         segments = []
         adus = []
-        segment_tokens = []
         lbls = sorted(list(self.int_to_adu_lbls.keys()))
         lbls_txt = [self.int_to_adu_lbls[lbl] for lbl in lbls]
         start_lbls = [lbl for lbl in lbls_txt if lbl.startswith("B")]
@@ -178,28 +164,16 @@ class ArgumentMining:
             idx = 0
             prediction = prediction[0]
             sentence = sentences[i]
-            tokens = all_tokens[i]
             self.app_logger.debug("Checking sentence: {}".format(sentence))
             self.app_logger.debug("Predictions are: {}".format(prediction))
-            try:
-                tokens = tokens.to("cpu")
-            except(BaseException, Exception):
-                pass
-            tokens = tokens.numpy()
-            tokens = list(tokens.reshape((tokens.shape[1],)))
-            tokens, prediction = self._remove_padding(tokens=tokens, predictions=prediction,
-                                                      pad_token=self.app_config.properties["preprocessing"][
-                                                          "pad_token"])
             while idx < len(prediction):
                 pred = prediction[idx]
                 predicted_label = self.int_to_adu_lbls[pred]
                 if predicted_label in start_lbls:
-                    toks = []
                     adu_label = predicted_label.replace("B-", "")
                     self.app_logger.debug("Predicted label: {}".format(adu_label))
                     adus.append(adu_label)
                     segment_text = sentence[idx]
-                    toks.append(tokens[idx])
                     next_correct = "I-{}".format(adu_label)
                     lbl = next_correct
                     while lbl == next_correct:
@@ -211,48 +185,30 @@ class ArgumentMining:
                         if lbl != next_correct:
                             break
                         segment_text += sentence[idx]
-                        toks.append(tokens[idx])
                     self.app_logger.debug("Final segment text: {}".format(segment_text))
                     segments.append(segment_text)
-                    segment_tokens.append(toks)
                 idx += 1
-        return segments, adus, segment_tokens
+        return segments, adus
 
-    @staticmethod
-    def _split_segments(segments, adus, segment_tokens):
+    def _split_segments(self, segments, adus):
         major_claims, major_claims_tokens = [], []
         claims, claims_tokens = [], []
         premises, premises_tokens = [], []
         for i, adu in adus:
+            sentence = " ".join(segments[i])
+            tokens = self.tokenizer(sentence, is_split_into_words=True, add_special_tokens=True,
+                                        padding="max_length", truncation=True, max_length=self.max_len)["input_ids"]
+            tokens, _ = utils.add_padding(tokens=tokens, max_len=self.max_len, pad_token=self.pad_token)
             if "major" in adu:
                 major_claims.append(segments[i])
-                major_claims_tokens.append(segment_tokens[i])
+                major_claims_tokens.append(tokens)
             elif adu == "claim":
                 claims.append(segments[i])
-                claims_tokens.append(segment_tokens[i])
+                claims_tokens.append(tokens)
             else:
                 premises.append(segments[i])
-                premises_tokens.append(segment_tokens[i])
+                premises_tokens.append(tokens)
         return major_claims, major_claims_tokens, claims, claims_tokens, premises, premises_tokens
-
-    @staticmethod
-    def _get_relation_args(idx1, idx2, token1, tokens2, text1, text2, cls_id, sep_id, max_len, pad_token):
-        arg1 = token1[idx1]
-        arg2 = tokens2[idx2]
-        arg1_txt = text1[idx1]
-        arg2_txt = text2[idx2]
-        arg1 = utils.wrap_and_pad_tokens(inputs=arg1, prefix=cls_id, suffix=sep_id, seq_len=max_len, padding=pad_token)
-        arg2 = utils.wrap_and_pad_tokens(inputs=arg2, prefix=cls_id, suffix=sep_id, seq_len=max_len, padding=pad_token)
-        return arg1, arg1_txt, arg2, arg2_txt
-
-    @staticmethod
-    def _remove_padding(tokens, predictions, pad_token=0):
-        new_tokens, new_predictions = [], []
-        for idx, token in enumerate(tokens):
-            if (token != pad_token) and (token != 101) and (token != 102):
-                new_tokens.append(token)
-                new_predictions.append(predictions[idx])
-        return new_tokens, new_predictions
 
     def _get_relations(self, preds, kind="relations"):
         self.app_logger.debug("Getting predicted relations")

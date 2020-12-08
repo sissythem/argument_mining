@@ -6,6 +6,8 @@ import torch.utils.data as torch_data
 from sklearn.metrics import accuracy_score
 from torchcrf import CRF
 from transformers import BertForTokenClassification
+from transformers import BertTokenizer
+from base import utils
 from models.ff_model import FeedForward
 
 
@@ -227,6 +229,7 @@ class CRFLayer(torch.nn.Module):
         self.app_logger = logger
         self.device_name = device_name
         self.encoded_labels = encoded_labels
+        self.tokenizer = BertTokenizer.from_pretrained('nlpaueb/bert-base-greek-uncased-v1')
         self.crf = CRF(num_tags=num_labels, batch_first=True).to(self.device_name)
 
     def forward(self, logits, labels, mask):
@@ -237,3 +240,37 @@ class CRFLayer(torch.nn.Module):
 
     def decode(self, logits, mask):
         return self.crf.decode(logits, mask)
+
+    def handle_subwords(self, tokens, predictions, labels=None, remove_padding=True):
+        new_preds, new_labels = [], []
+        # extract subwords
+        pad_token = self.app_config.properties["preprocessing"]["pad_token"]
+        if remove_padding:
+            tokens, predictions = utils.remove_padding(tokens=tokens, predictions=predictions, pad_token=pad_token)
+        subwords = self.tokenizer.convert_ids_to_tokens(tokens)
+        # find indexes for aggregation
+        aggr = []
+        curr_aggr = []
+        i = 0
+        while i < len(subwords):
+            if subwords[i].startswith("##"):
+                curr_aggr = [i - 1, i] if not curr_aggr else curr_aggr + [i]
+            else:
+                if curr_aggr:
+                    aggr.append(curr_aggr)
+        # aggregate proba
+        for i in range(len(predictions)):
+            if i not in aggr[0]:
+                # if i not anywehre in aggr
+                new_preds.append(predictions[i])
+                if labels is not None:
+                    new_labels.append(labels[i])
+            else:
+                idxs = aggr.pop(0)
+                p = torch.mean(predictions[np.asarray(idxs)])
+                new_preds.append(p)
+                if labels is not None:
+                    new_labels.append(labels[idxs[0]])
+        # aggregate words
+        # (not needed)
+        return new_preds, new_labels

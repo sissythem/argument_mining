@@ -4,6 +4,8 @@ from os.path import join, exists
 import torch
 from transformers import BertTokenizer
 
+from base import utils
+
 
 class DataPreprocessor:
 
@@ -29,6 +31,8 @@ class DataPreprocessor:
         self.app_logger.debug("Labels to ints: {}".format(self.labels_to_int))
         self._transform_labels(documents)
         sentences, labels = self._collect_instances(documents=documents)
+        max_len = self.properties["preprocessing"]["max_len"]
+        pad_token = self.properties["preprocessing"]["pad_token"]
         for sentence, lbls in zip(sentences, labels):
             if len(sentence) != len(lbls):
                 self.app_logger.error("Found sentence and labels with different lengths")
@@ -38,12 +42,10 @@ class DataPreprocessor:
             self.app_logger.debug("Processing sentence {} and labels {}".format(sentence, lbls))
             other_label = self.properties["preprocessing"]["other_label"]
             tokens, new_labels = self._tokenize_input(sentence=sentence, labels=lbls, other_label=other_label)
+            tokens, new_labels = utils.add_padding(tokens=tokens, labels=new_labels, max_len=max_len,
+                                                   pad_token=pad_token)
             final_sentences.append(tokens)
             final_labels.append(new_labels)
-        max_len = self.properties["preprocessing"]["max_len"]
-        pad_token = self.properties["preprocessing"]["pad_token"]
-        final_sentences, final_labels = self._add_padding(tokens=final_sentences, labels=final_labels, max_len=max_len,
-                                                          pad_token=pad_token)
         output = (final_sentences, final_labels, self.labels_to_int)
         with open(join(self.resources_folder, "adu_labels.pkl"), "wb") as f:
             pickle.dump(obj=(self.labels_to_int, self.int_to_labels), file=f)
@@ -100,22 +102,3 @@ class DataPreprocessor:
             tokens.extend(tokenized)
             new_labels.extend([label] * len(tokenized))
         return tokens, new_labels
-
-    @staticmethod
-    def _add_padding(tokens, labels, max_len=512, pad_token=0):
-        for idx, token in enumerate(tokens):
-            diff = max_len - token.shape[-1]
-            if diff < 0:
-                token = token[:, :max_len]
-                tokens[idx] = token
-                label = labels[idx]
-                label = label[:, :max_len]
-                labels[idx] = label
-            else:
-                padding = torch.ones((1, diff), dtype=torch.long) * pad_token
-                token = torch.cat([token, padding], dim=1)
-                label = labels[idx]
-                label = torch.cat([label, padding], dim=1)
-                tokens[idx] = token
-                labels[idx] = label
-        return tokens, labels
