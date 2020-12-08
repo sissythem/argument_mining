@@ -141,11 +141,12 @@ class FlairConfig(Config):
     def __init__(self, app_path):
         super(FlairConfig, self).__init__(app_path=app_path, properties_file=self.properties_file,
                                           example_properties=self.example_properties)
-        self.base_path = utils.get_base_path(path=self.output_path, hidden_size=self.properties["hidden_size"],
-                                             rnn_layers=self.properties["rnn_layers"],
-                                             use_crf=self.properties["use_crf"], optimizer=Adam,
-                                             learning_rate=self.properties["learning_rate"],
-                                             mini_batch_size=self.properties["mini_batch_size"])
+        properties = self.properties["adu_model"]
+        self.base_path = utils.get_base_path(path=self.output_path, hidden_size=properties["hidden_size"],
+                                             rnn_layers=properties["rnn_layers"],
+                                             use_crf=properties["use_crf"], optimizer=Adam,
+                                             learning_rate=properties["learning_rate"],
+                                             mini_batch_size=properties["mini_batch_size"])
 
         config = self.properties["config"]
         self.eval_doc = config["eval_doc"]
