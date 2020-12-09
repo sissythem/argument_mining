@@ -15,8 +15,7 @@ def main():
     do_prep = properties["do_prep"]
     if do_prep:
         logger.info("Creating CSV file in CONLL format for ADUs classification")
-        # TODO uncomment below line
-        # prep.adu_preprocess(app_config=app_config)
+        prep.adu_preprocess(app_config=app_config)
         logger.info("Creating CSV file in CONLL format for relations classification")
         prep.preprocess_relations(app_config=app_config)
         logger.info("Creating CSV file in CONLL format for stance classification")
@@ -29,7 +28,8 @@ def main():
                                   eval_doc=app_config.eval_doc, base_path=app_config.stance_base_path)
     if "train" in properties["tasks"]:
         logger.info("Training ADU classifier")
-        adu_model.train()
+        # TODO uncomment below line
+        # adu_model.train()
         logger.info("ADU Training is finished!")
         logger.info("Training relations model")
         rel_model.train()
