@@ -219,13 +219,13 @@ class ArgumentMining:
                 major_claims, claims, premises = [], [], []
                 for segment in segments:
                     text = segment["segment"]
-                    id = segment["id"]
+                    segment_id = segment["id"]
                     if segment["type"] == "major_claim":
-                        major_claims.append((text, id))
+                        major_claims.append((text, segment_id))
                     elif segment["type"] == "claim":
-                        claims.append((text, id))
+                        claims.append((text, segment_id))
                     else:
-                        premises.append((text, id))
+                        premises.append((text, segment_id))
                 json_obj = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises,
                                                    json_obj=json_obj)
                 json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=json_obj)
@@ -285,7 +285,23 @@ class ArgumentMining:
                         "id": "R{}".format(rel_counter),
                         "type": label,
                         "arg1": claim[1],
-                        "arg2": claim[0]
+                        "arg2": major_claim[1]
+                    }
+                    json_obj["annotations"]["Relations"].append(rel_dict)
+        for claim in claims:
+            for premise in premises:
+                sentence_pair = "[CLS] " + premise[0] + " [SEP] " + claim[0]
+                self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
+                sentence = Sentence(sentence_pair)
+                self.stance_model.model.predict(sentence)
+                label = sentence.get_labels()
+                if label != "other":
+                    rel_counter += 1
+                    rel_dict = {
+                        "id": "R{}".format(rel_counter),
+                        "type": label,
+                        "arg1": premise[1],
+                        "arg2": claim[1]
                     }
                     json_obj["annotations"]["Relations"].append(rel_dict)
         return json_obj
