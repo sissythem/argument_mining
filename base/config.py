@@ -11,7 +11,6 @@ from os import mkdir
 from os.path import exists, join
 
 import yaml
-from torch.optim.adam import Adam
 
 from base import utils
 
@@ -21,6 +20,7 @@ class Config:
     def __init__(self, app_path, properties_file, example_properties):
         self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
         self.documents_pickle = "documents.pkl"
+
         self.properties_file = properties_file
         self.example_properties = example_properties
         self.app_path = app_path
@@ -42,7 +42,6 @@ class Config:
         self.properties = self._load_properties()
         config = self.properties["config"]
         self._config_email(config=config)
-
         self.device_name = utils.configure_device()
 
     def _config_logger(self):
@@ -145,26 +144,49 @@ class FlairConfig(Config):
         super(FlairConfig, self).__init__(app_path=app_path, properties_file=self.properties_file,
                                           example_properties=self.example_properties)
         properties = self.properties["adu_model"]
-        self.base_path = utils.get_base_path(path=self.output_path, hidden_size=properties["hidden_size"],
-                                             rnn_layers=properties["rnn_layers"],
-                                             use_crf=properties["use_crf"], optimizer=Adam,
-                                             learning_rate=properties["learning_rate"],
-                                             mini_batch_size=properties["mini_batch_size"])
+        self.adu_base_path = utils.get_base_path(path=self.output_path, base_name="adu_model",
+                                                 hidden_size=properties["hidden_size"],
+                                                 layers=properties["rnn_layers"],
+                                                 use_crf=properties["use_crf"], optimizer=properties["optimizer"],
+                                                 learning_rate=properties["learning_rate"],
+                                                 mini_batch_size=properties["mini_batch_size"])
+        properties = self.properties["rel_model"]
+        self.rel_base_path = utils.get_base_path(path=self.output_path, base_name="rel_model",
+                                                 hidden_size=properties["hidden_size"], use_crf=properties["use_crf"],
+                                                 optimizer=properties["optimizer"], layers=properties["layers"],
+                                                 learning_rate=properties["learning_rate"],
+                                                 mini_batch_size=properties["mini_batch_size"])
+        self.stance_base_path = utils.get_base_path(path=self.output_path, base_name="stance_model",
+                                                    hidden_size=properties["hidden_size"],
+                                                    use_crf=properties["use_crf"],
+                                                    optimizer=properties["optimizer"], layers=properties["layers"],
+                                                    learning_rate=properties["learning_rate"],
+                                                    mini_batch_size=properties["mini_batch_size"])
 
-        config = self.properties["config"]["data"]
+        config = self.properties["config"]["adu_data"]
         self.eval_doc = config["eval_doc"]
-        self.train_csv = config["train_csv"]
-        self.dev_csv = config["dev_csv"]
-        self.test_csv = config["test_csv"]
+        self.adu_train_csv = config["train_csv"]
+        self.adu_dev_csv = config["dev_csv"]
+        self.adu_test_csv = config["test_csv"]
+
+        config = self.properties["config"]["rel_data"]
+        self.rel_train_csv = config["train_csv"]
+        self.rel_dev_csv = config["dev_csv"]
+        self.rel_test_csv = config["test_csv"]
+
+        config = self.properties["config"]["stance_data"]
+        self.stance_train_csv = config["train_csv"]
+        self.stance_dev_csv = config["dev_csv"]
+        self.stance_test_csv = config["test_csv"]
 
 
 class AppConfig(Config):
     properties_file = "properties.yaml"
     example_properties = "example_properties.yaml"
-    pickle_sentences_filename = "sentences.pkl"
-    pickle_segments_filename = "segments.pkl"
     relations_pickle_file = "relations.pkl"
     stances_pickle_file = "stances.pkl"
+    pickle_sentences_filename = "sentences.pkl"
+    pickle_segments_filename = "segments.pkl"
     pickle_relations_labels = "relations_labels.pkl"
 
     def __init__(self, app_path):
