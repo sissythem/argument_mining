@@ -36,7 +36,7 @@ class Classifier:
 
         if model_name == "adu":
             self.model_properties = self.properties["adu_model"]
-        elif model_name == "rel":
+        elif model_name == "rel" or model_name == "stance":
             self.model_properties = self.properties["rel_model"]
 
     def get_optimizer(self):
