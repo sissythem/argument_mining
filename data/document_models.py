@@ -1,4 +1,5 @@
 import re
+from typing import List
 
 from ellogon import tokeniser
 
@@ -7,13 +8,13 @@ class Document:
 
     def __init__(self, app_logger, document_id, name, content, annotations):
         self.app_logger = app_logger
-        self.document_id = document_id
-        self.name = name
-        self.content = content
-        self.annotations = annotations
-        self.segments = []
-        self.relations = []
-        self.stance = []
+        self.document_id: int = document_id
+        self.name: str = name
+        self.content: str = content
+        self.annotations: List[dict] = annotations
+        self.segments: List[Segment] = []
+        self.relations: List[Relation] = []
+        self.stance: List[Relation] = []
         self.sentences = []
         self.sentences_labels = []
 
@@ -103,12 +104,12 @@ class Document:
 class Segment:
 
     def __init__(self, segment_id, document_id, text, char_start, char_end, arg_type):
-        self.segment_id = segment_id
-        self.document_id = document_id
-        self.text = text
-        self.char_start = char_start
-        self.char_end = char_end
-        self.arg_type = arg_type
+        self.segment_id: str = segment_id
+        self.document_id: int = document_id
+        self.text: str = text
+        self.char_start: int = char_start
+        self.char_end: int = char_end
+        self.arg_type: str = arg_type
         self.sentences = []
         self.sentences_labels = []
 
@@ -137,9 +138,9 @@ class Segment:
 class Relation:
 
     def __init__(self, relation_id, document_id, arg1, arg2, kind, relation_type):
-        self.relation_id = relation_id
-        self.document_id = document_id
-        self.arg1 = arg1
-        self.arg2 = arg2
-        self.kind = kind
-        self.relation_type = relation_type
+        self.relation_id: str = relation_id
+        self.document_id: int = document_id
+        self.arg1: Segment = arg1
+        self.arg2: Segment = arg2
+        self.kind: str = kind
+        self.relation_type: str = relation_type

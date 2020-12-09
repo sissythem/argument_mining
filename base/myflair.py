@@ -216,9 +216,9 @@ data_folder = join(curr_dir, "resources")
 #                                                               test_file='test.txt',
 #                                                               dev_file='dev.txt')
 corpus: Corpus = ColumnCorpus(data_folder, columns,
-                              train_file='train.csv',
-                              test_file='train.csv',
-                              dev_file='train.csv')
+                              train_file='train_adu.csv',
+                              test_file='train_adu.csv',
+                              dev_file='train_adu.csv')
 print(len(corpus.train))
 print(corpus.train[4].to_tagged_string('pos'))
 print(corpus.train[4].to_tagged_string('ner'))

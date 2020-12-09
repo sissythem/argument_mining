@@ -60,15 +60,15 @@ def configure_device():
     return device_name
 
 
-def get_base_path(path, hidden_size, rnn_layers, use_crf, optimizer, learning_rate, mini_batch_size):
+def get_base_path(path, base_name, hidden_size, layers, use_crf, optimizer, learning_rate, mini_batch_size):
     # Create a base path:
     embedding_names = 'bert-greek'
-    base_path = 'model-' + '-'.join([
+    base_path = "{}-".format(base_name) + '-'.join([
         str(embedding_names),
         'hs=' + str(hidden_size),
-        'hl=' + str(rnn_layers),
+        'hl=' + str(layers),
         'crf=' + str(use_crf),
-        str(optimizer.__name__),
+        "optmizer=" + optimizer,
         'lr=' + str(learning_rate),
         'bs=' + str(mini_batch_size)
     ])
@@ -97,7 +97,6 @@ def get_initial_json(name, text):
         "content": text,
         "annotations": {
             "ADUs": [],
-            "Relations": [],
-            "Stance": []
+            "Relations": []
         }
     }
