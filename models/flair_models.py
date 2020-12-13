@@ -8,7 +8,7 @@ import torch
 from ellogon import tokeniser
 from flair.data import Corpus, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, BertEmbeddings, StackedEmbeddings, TransformerDocumentEmbeddings
+from flair.embeddings import TokenEmbeddings, BertEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 
@@ -172,8 +172,12 @@ class RelationsModel(Classifier):
         label_dictionary = corpus.make_label_dictionary()
 
         # 3. initialize embeddings
-        document_embeddings = TransformerDocumentEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
-        document_embeddings.tokenizer.model_max_length = 512
+        # document_embeddings = TransformerDocumentEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
+        # document_embeddings.tokenizer.model_max_length = 512
+        bert_embeddings = BertEmbeddings("nlpaueb/bert-base-greek-uncased-v1")
+
+        # initialize the document embeddings, mode = mean
+        document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
 
         # 4. create the TextClassifier
         classifier = TextClassifier(document_embeddings=document_embeddings, label_dictionary=label_dictionary,
