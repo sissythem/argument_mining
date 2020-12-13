@@ -152,7 +152,6 @@ class RelationsModel(Classifier):
         self.mini_batch_size = self.model_properties["mini_batch_size"]
         self.max_epochs = self.model_properties["max_epochs"]
         self.num_workers = self.model_properties["num_workers"]
-        self.patience = self.model_properties["patience"]
         self.use_tensorboard = self.model_properties["use_tensorboard"]
         self.train_with_dev = self.model_properties["train_with_dev"]
         self.save_final_model = self.model_properties["save_final_model"]
@@ -190,7 +189,7 @@ class RelationsModel(Classifier):
         self.app_logger.debug("Starting training with ModelTrainer")
         self.app_logger.debug("Model configuration properties: {}".format(self.model_properties))
         # 7. start training
-        trainer.train(self.base_path, patience=self.patience, learning_rate=self.learning_rate,
+        trainer.train(self.base_path, learning_rate=self.learning_rate,
                       mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
                       train_with_dev=self.train_with_dev, save_final_model=self.save_final_model,
                       num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)

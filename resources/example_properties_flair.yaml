@@ -40,7 +40,6 @@ rel_model:
   mini_batch_size: 32
   num_workers: 8
   max_epochs: 150
-  patience: 50
   optimizer: Adam
   use_tensorboard: True
   train_with_dev: False
