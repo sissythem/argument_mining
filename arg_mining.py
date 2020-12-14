@@ -10,7 +10,9 @@ from flair.data import Corpus, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, BertEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings
 from flair.models import SequenceTagger, TextClassifier
+from flair.nn import Model
 from flair.trainers import ModelTrainer
+from torch.optim.optimizer import Optimizer
 
 import utils
 from utils import AppConfig
@@ -20,24 +22,24 @@ class Classifier:
 
     def __init__(self, app_config, dev_csv, train_csv, test_csv, eval_doc, base_path, model_name):
         random.seed(2020)
-        self.app_config = app_config
+        self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
-        self.properties = self.app_config.properties
-        self.resources_path = self.app_config.resources_path
-        self.dev_file = dev_csv
-        self.train_file = train_csv
-        self.test_file = test_csv
-        self.eval_file = eval_doc
-        self.base_path = base_path
-        self.model_file = "best-model.pt"
-        self.model = None
-        self.optimizer = self.get_optimizer()
+        self.properties: dict = self.app_config.properties
+        self.resources_path: str = self.app_config.resources_path
+        self.dev_file: str = dev_csv
+        self.train_file: str = train_csv
+        self.test_file: str = test_csv
+        self.eval_file: str = eval_doc
+        self.base_path: str = base_path
+        self.model_file: str = "best-model.pt"
+        self.model: Model = None
+        self.optimizer: Optimizer = self.get_optimizer()
         flair.device = torch.device(app_config.device_name)
 
         if model_name == "adu":
-            self.model_properties = self.properties["adu_model"]
+            self.model_properties: dict = self.properties["adu_model"]
         elif model_name == "rel" or model_name == "stance":
-            self.model_properties = self.properties["rel_model"]
+            self.model_properties: dict = self.properties["rel_model"]
 
     def get_optimizer(self):
         optimizer_name = self.properties["adu_model"]["optimizer"]
@@ -64,18 +66,18 @@ class AduModel(Classifier):
                                        eval_doc=app_config.eval_doc, base_path=app_config.adu_base_path,
                                        model_name="adu")
 
-        self.hidden_size = self.model_properties["hidden_size"]
-        self.use_crf = self.model_properties["use_crf"]
-        self.rnn_layers = self.model_properties["rnn_layers"]
-        self.learning_rate = self.model_properties["learning_rate"]
-        self.mini_batch_size = self.model_properties["mini_batch_size"]
-        self.max_epochs = self.model_properties["max_epochs"]
-        self.num_workers = self.model_properties["num_workers"]
-        self.patience = self.model_properties["patience"]
-        self.use_tensorboard = self.model_properties["use_tensorboard"]
-        self.train_with_dev = self.model_properties["train_with_dev"]
-        self.save_final_model = self.model_properties["save_final_model"]
-        self.shuffle = self.model_properties["shuffle"]
+        self.hidden_size: int = self.model_properties["hidden_size"]
+        self.use_crf: bool = self.model_properties["use_crf"]
+        self.rnn_layers: int = self.model_properties["rnn_layers"]
+        self.learning_rate: float = self.model_properties["learning_rate"]
+        self.mini_batch_size: int = self.model_properties["mini_batch_size"]
+        self.max_epochs: int = self.model_properties["max_epochs"]
+        self.num_workers: int = self.model_properties["num_workers"]
+        self.patience: int = self.model_properties["patience"]
+        self.use_tensorboard: bool = self.model_properties["use_tensorboard"]
+        self.train_with_dev: bool = self.model_properties["train_with_dev"]
+        self.save_final_model: bool = self.model_properties["save_final_model"]
+        self.shuffle: bool = self.model_properties["shuffle"]
 
     def train(self):
         # define columns
@@ -137,17 +139,17 @@ class RelationsModel(Classifier):
                                              test_csv=test_csv, eval_doc=eval_doc, base_path=base_path,
                                              model_name=model_name)
 
-        self.hidden_size = self.model_properties["hidden_size"]
-        self.use_crf = self.model_properties["use_crf"]
-        self.rnn_layers = self.model_properties["layers"]
-        self.learning_rate = self.model_properties["learning_rate"]
-        self.mini_batch_size = self.model_properties["mini_batch_size"]
-        self.max_epochs = self.model_properties["max_epochs"]
-        self.num_workers = self.model_properties["num_workers"]
-        self.use_tensorboard = self.model_properties["use_tensorboard"]
-        self.train_with_dev = self.model_properties["train_with_dev"]
-        self.save_final_model = self.model_properties["save_final_model"]
-        self.shuffle = self.model_properties["shuffle"]
+        self.hidden_size: int = self.model_properties["hidden_size"]
+        self.use_crf: bool = self.model_properties["use_crf"]
+        self.layers: int = self.model_properties["layers"]
+        self.learning_rate: float = self.model_properties["learning_rate"]
+        self.mini_batch_size: int = self.model_properties["mini_batch_size"]
+        self.max_epochs: int = self.model_properties["max_epochs"]
+        self.num_workers: int = self.model_properties["num_workers"]
+        self.use_tensorboard: bool = self.model_properties["use_tensorboard"]
+        self.train_with_dev: bool = self.model_properties["train_with_dev"]
+        self.save_final_model: bool = self.model_properties["save_final_model"]
+        self.shuffle: bool = self.model_properties["shuffle"]
 
     def train(self):
         # define columns
