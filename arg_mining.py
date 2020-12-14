@@ -13,7 +13,7 @@ from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 
 import utils
-from base.config import FlairConfig
+from utils import AppConfig
 
 
 class Classifier:
@@ -196,7 +196,7 @@ class RelationsModel(Classifier):
 class ArgumentMining:
 
     def __init__(self, app_config):
-        self.app_config: FlairConfig = app_config
+        self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
 
     def predict(self):
