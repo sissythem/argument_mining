@@ -49,14 +49,6 @@ class Classifier:
             optimizer = torch.optim.Adam
         return optimizer
 
-    def load_eval_doc(self):
-        self.app_logger.info("Loading data from json file")
-        filepath = join(self.resources_path, self.eval_file)
-        with open(filepath, "r") as f:
-            data = json.load(f)
-        self.app_logger.info("Data are loaded!")
-        return data["data"]["documents"]
-
     def train(self):
         raise NotImplementedError
 
@@ -203,18 +195,12 @@ class RelationsModel(Classifier):
 
 class ArgumentMining:
 
-    def __init__(self, app_config, adu_model, rel_model, stance_model):
+    def __init__(self, app_config):
         self.app_config: FlairConfig = app_config
         self.app_logger = app_config.app_logger
-        self.adu_model: AduModel = adu_model
-        self.rel_model: RelationsModel = rel_model
-        self.stance_model: RelationsModel = stance_model
 
     def predict(self):
-        self.adu_model.load()
-        self.rel_model.load()
-        self.stance_model.load()
-        data = self.adu_model.load_eval_doc()
+        data = utils.load_data(base_path=self.app_config.resources_path, filename=self.app_config.eval_doc)
         if data:
             for document in data:
                 json_obj = self._predict_adus(document=document)
@@ -235,6 +221,8 @@ class ArgumentMining:
                 self._save_data(filename=document["name"], json_obj=json_obj)
 
     def _predict_adus(self, document):
+        adu_model = AduModel(app_config=self.app_config)
+        adu_model.load()
         self.app_logger.debug(
             "Processing document with id: {} and name: {}".format(document["id"], document["name"]))
         segment_counter = 0
@@ -244,7 +232,7 @@ class ArgumentMining:
             self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
             sentence = list(sentence)
             sentence = Sentence(" ".join(sentence).strip())
-            self.adu_model.model.predict(sentence)
+            adu_model.model.predict(sentence)
             self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
             segment_text, segment_type = self._get_args_from_sentence(sentence)
             if segment_text and segment_type:
@@ -273,13 +261,18 @@ class ArgumentMining:
         return initial_json
 
     def _predict_relations(self, major_claims, claims, premises, json_obj):
+        rel_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.rel_dev_csv,
+                                   train_csv=self.app_config.rel_train_csv, test_csv=self.app_config.rel_test_csv,
+                                   eval_doc=self.app_config.eval_doc, base_path=self.app_config.rel_base_path,
+                                   model_name="rel")
+        rel_model.load()
         rel_counter = 0
         for major_claim in major_claims:
             for claim in claims:
                 sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
                 self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
                 sentence = Sentence(sentence_pair)
-                self.rel_model.model.predict(sentence)
+                rel_model.model.predict(sentence)
                 # TODO check get_labels
                 label = sentence.get_labels()
                 if label != "other":
@@ -296,7 +289,7 @@ class ArgumentMining:
                 sentence_pair = "[CLS] " + premise[0] + " [SEP] " + claim[0]
                 self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
                 sentence = Sentence(sentence_pair)
-                self.stance_model.model.predict(sentence)
+                rel_model.model.predict(sentence)
                 label = sentence.get_labels()
                 if label != "other":
                     rel_counter += 1
@@ -310,13 +303,18 @@ class ArgumentMining:
         return json_obj
 
     def _predict_stance(self, major_claims, claims, json_obj):
+        stance_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.stance_dev_csv,
+                                      train_csv=self.app_config.stance_train_csv,
+                                      test_csv=self.app_config.stance_test_csv, eval_doc=self.app_config.eval_doc,
+                                      base_path=self.app_config.stance_base_path, model_name="stance")
+        stance_model.load()
         stance_counter = 0
         for major_claim in major_claims:
             for claim in claims:
                 sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
                 self.app_logger.debug("Predicting stance for sentence pair: {}".format(sentence_pair))
                 sentence = Sentence(sentence_pair)
-                self.stance_model.model.predict(sentence)
+                stance_model.model.predict(sentence)
                 label = sentence.get_labels()
                 # TODO check label
                 if label != "other":
