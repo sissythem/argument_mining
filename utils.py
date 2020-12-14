@@ -1,4 +1,7 @@
+import hashlib
+import json
 import logging
+import os
 import smtplib
 import ssl
 import uuid
@@ -7,22 +10,92 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from os import environ, getcwd
 from os import mkdir
 from os.path import exists, join
+from pathlib import Path
 
+import torch
 import yaml
 
-from base import utils
+
+def get_curr_path():
+    curr_dir = Path(getcwd())
+    parent = str(curr_dir.parent)
+    curr_dir = str(curr_dir)
+    return curr_dir if curr_dir.endswith("mining") else parent
 
 
-class Config:
+def configure_device():
+    if torch.cuda.is_available():
+        devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
+        if type(devices) == str:
+            devices = devices.split(",")
+            device_name = "cuda:{}".format(devices[0].strip())
+        else:
+            device_name = "cuda:{}".format(devices)
+    else:
+        device_name = "cpu"
+    return device_name
 
-    def __init__(self, app_path, properties_file, example_properties):
+
+def get_base_path(path, base_name, hidden_size, layers, use_crf, optimizer, learning_rate, mini_batch_size):
+    # Create a base path:
+    embedding_names = 'bert-greek'
+    base_path = "{}-".format(base_name) + '-'.join([
+        str(embedding_names),
+        'hs=' + str(hidden_size),
+        'hl=' + str(layers),
+        'crf=' + str(use_crf),
+        "optmizer=" + optimizer,
+        'lr=' + str(learning_rate),
+        'bs=' + str(mini_batch_size)
+    ])
+    base_path = join(path, base_path)
+    try:
+        # os.mkdir(base_path, 0o755)
+        os.makedirs(base_path)
+    except (OSError, Exception):
+        pass
+    return base_path
+
+
+def get_initial_json(name, text):
+    hash_id = hashlib.md5(name.encode())
+    return {
+        "id": hash_id.hexdigest(),
+        "link": "",
+        "description": "",
+        "date": "",
+        "tags": [],
+        "document_link": "",
+        "publishedAt": "",
+        "crawledAt": "",
+        "domain": "",
+        "netloc": "",
+        "content": text,
+        "annotations": {
+            "ADUs": [],
+            "Relations": []
+        }
+    }
+
+
+def load_data(base_path, filename):
+    filepath = join(base_path, filename)
+    with open(filepath, "r") as f:
+        data = json.load(f)
+    return data["data"]["documents"]
+
+
+class AppConfig:
+
+    def __init__(self, app_path):
         self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
         self.documents_pickle = "documents.pkl"
+        self.properties_file = "properties.yaml"
+        self.example_properties = "example_properties.yaml"
         self.app_path = app_path
-        self.properties_file = properties_file
-        self.example_properties = example_properties
         self.app_path = app_path
         self.run = uuid.uuid4().hex
         self._create_paths()
@@ -42,7 +115,8 @@ class Config:
         self.properties = self._load_properties()
         config = self.properties["config"]
         self._config_email(config=config)
-        self.device_name = utils.configure_device()
+        self._configure_base_paths_and_data_files()
+        self.device_name = configure_device()
 
     def _config_logger(self):
         log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
@@ -57,6 +131,44 @@ class Config:
         console_handler.setFormatter(log_formatter)
         program_logger.addHandler(console_handler)
         return program_logger
+
+    def _configure_base_paths_and_data_files(self):
+        properties = self.properties["adu_model"]
+        self.adu_base_path = get_base_path(path=self.output_path, base_name="adu_model",
+                                           hidden_size=properties["hidden_size"],
+                                           layers=properties["rnn_layers"],
+                                           use_crf=properties["use_crf"], optimizer=properties["optimizer"],
+                                           learning_rate=properties["learning_rate"],
+                                           mini_batch_size=properties["mini_batch_size"])
+        properties = self.properties["rel_model"]
+        self.rel_base_path = get_base_path(path=self.output_path, base_name="rel_model",
+                                           hidden_size=properties["hidden_size"], use_crf=properties["use_crf"],
+                                           optimizer=properties["optimizer"], layers=properties["layers"],
+                                           learning_rate=properties["learning_rate"],
+                                           mini_batch_size=properties["mini_batch_size"])
+        self.stance_base_path = get_base_path(path=self.output_path, base_name="stance_model",
+                                              hidden_size=properties["hidden_size"],
+                                              use_crf=properties["use_crf"],
+                                              optimizer=properties["optimizer"], layers=properties["layers"],
+                                              learning_rate=properties["learning_rate"],
+                                              mini_batch_size=properties["mini_batch_size"])
+
+        config = self.properties["config"]["adu_data"]
+
+        self.eval_doc = config["eval_doc"]
+        self.adu_train_csv = config["train_csv"]
+        self.adu_dev_csv = config["dev_csv"]
+        self.adu_test_csv = config["test_csv"]
+
+        config = self.properties["config"]["rel_data"]
+        self.rel_train_csv = config["train_csv"]
+        self.rel_dev_csv = config["dev_csv"]
+        self.rel_test_csv = config["test_csv"]
+
+        config = self.properties["config"]["stance_data"]
+        self.stance_train_csv = config["train_csv"]
+        self.stance_dev_csv = config["dev_csv"]
+        self.stance_test_csv = config["test_csv"]
 
     def _load_properties(self):
         path_to_properties = join(self.resources_path, self.properties_file)
@@ -135,62 +247,3 @@ class Config:
             server.login(self.sender_email, self.password)
             server.sendmail(self.sender_email, self.receiver_email, text)
 
-
-class FlairConfig(Config):
-    properties_file = "properties_flair.yaml"
-    example_properties = "example_properties_flair.yaml"
-
-    def __init__(self, app_path):
-        super(FlairConfig, self).__init__(app_path=app_path, properties_file=self.properties_file,
-                                          example_properties=self.example_properties)
-        properties = self.properties["adu_model"]
-        self.adu_base_path = utils.get_base_path(path=self.output_path, base_name="adu_model",
-                                                 hidden_size=properties["hidden_size"],
-                                                 layers=properties["rnn_layers"],
-                                                 use_crf=properties["use_crf"], optimizer=properties["optimizer"],
-                                                 learning_rate=properties["learning_rate"],
-                                                 mini_batch_size=properties["mini_batch_size"])
-        properties = self.properties["rel_model"]
-        self.rel_base_path = utils.get_base_path(path=self.output_path, base_name="rel_model",
-                                                 hidden_size=properties["hidden_size"], use_crf=properties["use_crf"],
-                                                 optimizer=properties["optimizer"], layers=properties["layers"],
-                                                 learning_rate=properties["learning_rate"],
-                                                 mini_batch_size=properties["mini_batch_size"])
-        self.stance_base_path = utils.get_base_path(path=self.output_path, base_name="stance_model",
-                                                    hidden_size=properties["hidden_size"],
-                                                    use_crf=properties["use_crf"],
-                                                    optimizer=properties["optimizer"], layers=properties["layers"],
-                                                    learning_rate=properties["learning_rate"],
-                                                    mini_batch_size=properties["mini_batch_size"])
-
-        config = self.properties["config"]["adu_data"]
-        self.eval_doc = config["eval_doc"]
-        self.adu_train_csv = config["train_csv"]
-        self.adu_dev_csv = config["dev_csv"]
-        self.adu_test_csv = config["test_csv"]
-
-        config = self.properties["config"]["rel_data"]
-        self.rel_train_csv = config["train_csv"]
-        self.rel_dev_csv = config["dev_csv"]
-        self.rel_test_csv = config["test_csv"]
-
-        config = self.properties["config"]["stance_data"]
-        self.stance_train_csv = config["train_csv"]
-        self.stance_dev_csv = config["dev_csv"]
-        self.stance_test_csv = config["test_csv"]
-
-
-class AppConfig(Config):
-    properties_file = "properties.yaml"
-    example_properties = "example_properties.yaml"
-    relations_pickle_file = "relations.pkl"
-    stances_pickle_file = "stances.pkl"
-    pickle_sentences_filename = "sentences.pkl"
-    pickle_segments_filename = "segments.pkl"
-    pickle_relations_labels = "relations_labels.pkl"
-
-    def __init__(self, app_path):
-        super(AppConfig, self).__init__(app_path=app_path, properties_file=self.properties_file,
-                                        example_properties=self.example_properties)
-        config = self.properties["config"]
-        self.data_file = config["data"]["filename"]
