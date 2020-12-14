@@ -3,11 +3,6 @@
 venv/
 output/
 runs/
-
 __pycache__/
-base/__pycache__/
-data/__pycache__/
-models/__pycache__/
-resources/*.pkl
-resources/*.csv
-resources/properties.yaml
+resources/
+!resources/example_properties.yaml
