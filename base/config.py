@@ -20,7 +20,7 @@ class Config:
     def __init__(self, app_path, properties_file, example_properties):
         self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
         self.documents_pickle = "documents.pkl"
-
+        self.app_path = app_path
         self.properties_file = properties_file
         self.example_properties = example_properties
         self.app_path = app_path
@@ -77,7 +77,7 @@ class Config:
         self.output_path = join(self.app_path, "output")
         self.logs_path = join(self.output_path, "logs")
         self.model_path = join(self.output_path, "model")
-        self.tensorboard_path = join(self.output_path, "runs")
+        self.tensorboard_path = join(self.app_path, "runs")
         self.out_files_path = join(self.output_path, "output_files")
 
     def _create_output_dirs(self):
