@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 from os import environ, getcwd
 from os.path import join
@@ -100,3 +101,10 @@ def get_initial_json(name, text):
             "Relations": []
         }
     }
+
+
+def load_data(base_path, filename):
+    filepath = join(base_path, filename)
+    with open(filepath, "r") as f:
+        data = json.load(f)
+    return data["data"]["documents"]
