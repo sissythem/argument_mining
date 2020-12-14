@@ -12,7 +12,7 @@ from flair.embeddings import TokenEmbeddings, BertEmbeddings, StackedEmbeddings,
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 
-from base import utils
+import utils
 from base.config import FlairConfig
 
 
