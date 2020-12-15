@@ -88,7 +88,7 @@ class AppConfig:
     def _config_logger(self):
         self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
         log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-        program_logger = logging.getLogger(__name__)
+        program_logger = logging.getLogger("flair")
 
         program_logger.setLevel(logging.DEBUG)
         file_handler = logging.FileHandler("{0}/{1}.log".format(self.logs_path, self.log_filename))
