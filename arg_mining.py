@@ -9,7 +9,7 @@ import torch
 from ellogon import tokeniser
 from flair.data import Corpus, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, BertEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, TransformerWordEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.nn import Model
 from flair.trainers import ModelTrainer
@@ -99,7 +99,7 @@ class AduModel(Classifier):
 
         # 4. initialize embeddings
         embedding_types: List[TokenEmbeddings] = [
-            BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
+            TransformerWordEmbeddings('nlpaueb/bert-base-greek-uncased-v1', fine_tune=True)
         ]
 
         embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
@@ -164,7 +164,7 @@ class RelationsModel(Classifier):
         # 3. initialize embeddings
         # document_embeddings = TransformerDocumentEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
         # document_embeddings.tokenizer.model_max_length = 512
-        bert_embeddings = BertEmbeddings("nlpaueb/bert-base-greek-uncased-v1")
+        bert_embeddings = TransformerWordEmbeddings('nlpaueb/bert-base-greek-uncased-v1', fine_tune=True)
 
         # initialize the document embeddings, mode = mean
         document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
