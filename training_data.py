@@ -158,7 +158,7 @@ class DataLoader:
         self.pickle_file = app_config.documents_pickle
         self.load()
 
-    def load(self, filename=None):
+    def load(self, filename="kasteli.json"):
         path_to_pickle = join(self.resources_folder,
                               self.app_config.documents_pickle)
         if exists(path_to_pickle):

@@ -16,6 +16,11 @@ config:
     dev_csv: "dev_stance.csv"
     test_csv: "test_stance.csv"
 tasks: ["prep", "train", "eval"]
+preprocessing:
+  other_label: "O"
+  repl_char: "="
+  max_len: 512
+  pad_token: 0
 adu_model:
   hidden_size: 256
   rnn_layers: 2
