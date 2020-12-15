@@ -1,3 +1,4 @@
+import json
 from os.path import join
 
 from elasticsearch_dsl import Search
@@ -6,6 +7,7 @@ from ellogon import esclient_swo
 from arg_mining import AduModel, RelationsModel, ArgumentMining
 from training_data import DataLoader
 from utils import AppConfig
+import utils
 
 
 def preprocess(app_config):
@@ -40,12 +42,21 @@ def train(app_config):
 
 def evaluate(app_config):
     logger = app_config.app_logger
+    eval_source = app_config.properties["eval"]["source"]
+    if eval_source == "elasticsearch":
+        eval_from_elasticsearch(app_config)
+    else:
+        eval_from_file(app_config=app_config)
+    logger.info("Evaluation is finished!")
+
+
+def eval_from_elasticsearch(app_config):
+    logger = app_config.app_logger
     client = esclient_swo.elastic_server_client
     file_path = join(app_config.resources_path, "kasteli_34_urls.txt")
     # read the list of urls from the file:
     with open(file_path, "r") as f:
         urls = [line.rstrip() for line in f]
-
     search_articles = Search(using=client, index='articles').filter('terms', link=urls)
     # print(search_articles.to_dict())
     found = 0
@@ -54,9 +65,24 @@ def evaluate(app_config):
         arg_mining = ArgumentMining(app_config=app_config)
         arg_mining.predict(document=document)
         found += 1
-    print(f"Found documents: {found}")
+    logger.info(f"Found documents: {found}")
     esclient_swo.stop()
-    logger.info("Evaluation is finished!")
+
+
+def eval_from_file(app_config, filename="kasteli.json"):
+    logger = app_config.app_logger
+    logger.info("Evaluating using file: {}".format(filename))
+    file_path = join(app_config.resources_path, filename)
+    with open(file_path, "r") as f:
+        data = json.load(f.read())
+    documents = data["data"]["documents"]
+    if documents:
+        for document in documents:
+            document = utils.get_initial_json(document["name"], document["text"])
+            document["content"] = document["text"]
+            document["title"] = document["name"]
+            arg_mining = ArgumentMining(app_config=app_config)
+            arg_mining.predict(document=document)
 
 
 def main():
