@@ -1,13 +1,14 @@
 import json
+import traceback
 from os.path import join
 
 from elasticsearch_dsl import Search
 from ellogon import esclient_swo
 
+import utils
 from arg_mining import AduModel, RelationsModel, ArgumentMining
 from training_data import DataLoader
 from utils import AppConfig
-import utils
 
 
 def preprocess(app_config):
@@ -103,8 +104,9 @@ def main():
             esclient_swo.stop()
         except(BaseException, Exception):
             pass
-        app_config.send_email(body="Argument mining pipeline finished with errors",
-                              subject="Error in argument mining run: {}".format(app_config.run))
+        app_config.send_email(
+            body="Argument mining pipeline finished with errors".format(traceback.format_exc(limit=100)),
+            subject="Error in argument mining run: {}".format(app_config.run))
 
 
 if __name__ == '__main__':
