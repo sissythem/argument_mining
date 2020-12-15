@@ -224,10 +224,13 @@ class DataLoader:
         with open(documents_path, "rb") as f:
             documents = pickle.load(f)
         self.app_logger.debug("Documents are loaded")
-        major_claims, claims, premises, relation_pairs, stance_pairs = self._collect_segments(documents)
-        relations = self._collect_relation_pairs(parents=major_claims, children=claims, relation_pairs=relation_pairs)
-        relations += self._collect_relation_pairs(parents=claims, children=premises, relation_pairs=relation_pairs)
-        stances = self._collect_relation_pairs(parents=major_claims, children=claims, relation_pairs=stance_pairs)
+        relations, stances = [], []
+        for document in documents:
+            major_claims, claims, premises, relation_pairs, stance_pairs = self._collect_segments(document)
+            relations += self._collect_relation_pairs(parents=major_claims, children=claims,
+                                                      relation_pairs=relation_pairs)
+            relations += self._collect_relation_pairs(parents=claims, children=premises, relation_pairs=relation_pairs)
+            stances += self._collect_relation_pairs(parents=major_claims, children=claims, relation_pairs=stance_pairs)
         return relations, stances
 
     def _save_rel_df(self, rel_list, filename):
@@ -253,25 +256,24 @@ class DataLoader:
         self.app_logger.debug("Dataframe saved!")
 
     @staticmethod
-    def _collect_segments(documents: List[Document]):
+    def _collect_segments(document):
         major_claims, claims, premises = {}, {}, {}
         relation_pairs, stance_pairs = {}, {}
-        for document in documents:
-            relations: List[Relation] = document.relations
-            stances = document.stance
-            for relation in relations:
-                relation_pairs[(relation.arg1.segment_id, relation.arg2.segment_id)] = relation.relation_type
-            for stance in stances:
-                stance_pairs[(stance.arg1.segment_id, stance.arg2.segment_id)] = stance.relation_type
-            for segment in document.segments:
-                if segment.arg_type == "major_claim":
-                    major_claims[segment.segment_id] = segment.text
-                elif segment.arg_type == "claim":
-                    claims[segment.segment_id] = segment.text
-                elif segment.arg_type == "premise":
-                    premises[segment.segment_id] = segment.text
-                else:
-                    continue
+        relations: List[Relation] = document.relations
+        stances = document.stance
+        for relation in relations:
+            relation_pairs[(relation.arg1.segment_id, relation.arg2.segment_id)] = relation.relation_type
+        for stance in stances:
+            stance_pairs[(stance.arg1.segment_id, stance.arg2.segment_id)] = stance.relation_type
+        for segment in document.segments:
+            if segment.arg_type == "major_claim":
+                major_claims[segment.segment_id] = segment.text
+            elif segment.arg_type == "claim":
+                claims[segment.segment_id] = segment.text
+            elif segment.arg_type == "premise":
+                premises[segment.segment_id] = segment.text
+            else:
+                continue
         return major_claims, claims, premises, relation_pairs, stance_pairs
 
     def _collect_relation_pairs(self, parents, children, relation_pairs):
