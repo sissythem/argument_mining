@@ -15,6 +15,7 @@ from flair.nn import Model
 from flair.trainers import ModelTrainer
 from torch.optim.optimizer import Optimizer
 
+import utils
 from utils import AppConfig
 
 
@@ -226,7 +227,10 @@ class ArgumentMining:
         json_obj = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises,
                                            json_obj=json_obj)
         json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=json_obj)
-        self._save_data(filename=document["title"] + ".json", json_obj=json_obj)
+        filename = document["title"] + ".json"
+        if utils.name_exceeds_bytes(filename):
+            filename = document["id"] + ".json"
+        self._save_data(filename=filename, json_obj=json_obj)
 
     @staticmethod
     def _get_adus(segments):
