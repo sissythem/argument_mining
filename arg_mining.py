@@ -201,6 +201,14 @@ class ArgumentMining:
     def predict(self, document):
         json_obj = self._predict_adus(document=document)
         segments = json_obj["annotations"]["ADUs"]
+        major_claims, claims, premises = self._get_adus(segments)
+        json_obj = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises,
+                                           json_obj=json_obj)
+        json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=json_obj)
+        self._save_data(filename=document["title"] + ".json", json_obj=json_obj)
+
+    @staticmethod
+    def _get_adus(segments):
         major_claims, claims, premises = [], [], []
         for segment in segments:
             text = segment["segment"]
@@ -211,10 +219,7 @@ class ArgumentMining:
                 claims.append((text, segment_id))
             else:
                 premises.append((text, segment_id))
-        json_obj = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises,
-                                           json_obj=json_obj)
-        json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=json_obj)
-        self._save_data(filename=document["title"] + ".json", json_obj=json_obj)
+        return major_claims, claims, premises
 
     def _predict_adus(self, document):
         # init document id & annotations
@@ -275,39 +280,41 @@ class ArgumentMining:
         rel_model.load()
 
         rel_counter = 0
-        for major_claim in major_claims:
+        if major_claims and claims:
+            for major_claim in major_claims:
+                for claim in claims:
+                    sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
+                    self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
+                    sentence = Sentence(sentence_pair)
+                    rel_model.model.predict(sentence)
+                    # TODO check get_labels
+                    label = sentence.get_labels()
+                    if label != "other":
+                        rel_counter += 1
+                        rel_dict = {
+                            "id": "R{}".format(rel_counter),
+                            "type": label,
+                            "arg1": claim[1],
+                            "arg2": major_claim[1]
+                        }
+                        json_obj["annotations"]["Relations"].append(rel_dict)
+        if claims and premises:
             for claim in claims:
-                sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
-                self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
-                sentence = Sentence(sentence_pair)
-                rel_model.model.predict(sentence)
-                # TODO check get_labels
-                label = sentence.get_labels()
-                if label != "other":
-                    rel_counter += 1
-                    rel_dict = {
-                        "id": "R{}".format(rel_counter),
-                        "type": label,
-                        "arg1": claim[1],
-                        "arg2": major_claim[1]
-                    }
-                    json_obj["annotations"]["Relations"].append(rel_dict)
-        for claim in claims:
-            for premise in premises:
-                sentence_pair = "[CLS] " + premise[0] + " [SEP] " + claim[0]
-                self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
-                sentence = Sentence(sentence_pair)
-                rel_model.model.predict(sentence)
-                label = sentence.get_labels()
-                if label != "other":
-                    rel_counter += 1
-                    rel_dict = {
-                        "id": "R{}".format(rel_counter),
-                        "type": label,
-                        "arg1": premise[1],
-                        "arg2": claim[1]
-                    }
-                    json_obj["annotations"]["Relations"].append(rel_dict)
+                for premise in premises:
+                    sentence_pair = "[CLS] " + premise[0] + " [SEP] " + claim[0]
+                    self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
+                    sentence = Sentence(sentence_pair)
+                    rel_model.model.predict(sentence)
+                    label = sentence.get_labels()
+                    if label != "other":
+                        rel_counter += 1
+                        rel_dict = {
+                            "id": "R{}".format(rel_counter),
+                            "type": label,
+                            "arg1": premise[1],
+                            "arg2": claim[1]
+                        }
+                        json_obj["annotations"]["Relations"].append(rel_dict)
         return json_obj
 
     def _predict_stance(self, major_claims, claims, json_obj):
@@ -319,23 +326,24 @@ class ArgumentMining:
         stance_model.load()
 
         stance_counter = 0
-        for major_claim in major_claims:
-            for claim in claims:
-                sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
-                self.app_logger.debug("Predicting stance for sentence pair: {}".format(sentence_pair))
-                sentence = Sentence(sentence_pair)
-                stance_model.model.predict(sentence)
-                label = sentence.get_labels()
-                # TODO check label
-                if label != "other":
-                    stance_counter += 1
-                    stance_list = [{
-                        "id": "A{}".format(stance_counter),
-                        "type": label
-                    }]
-                    for segment in json_obj["annotations"]["ADUs"]:
-                        if segment["id"] == claim[1]:
-                            segment["stance"] = stance_list
+        if major_claims and claims:
+            for major_claim in major_claims:
+                for claim in claims:
+                    sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
+                    self.app_logger.debug("Predicting stance for sentence pair: {}".format(sentence_pair))
+                    sentence = Sentence(sentence_pair)
+                    stance_model.model.predict(sentence)
+                    label = sentence.get_labels()
+                    # TODO check label
+                    if label != "other":
+                        stance_counter += 1
+                        stance_list = [{
+                            "id": "A{}".format(stance_counter),
+                            "type": label
+                        }]
+                        for segment in json_obj["annotations"]["ADUs"]:
+                            if segment["id"] == claim[1]:
+                                segment["stance"] = stance_list
         return json_obj
 
     def _save_data(self, filename, json_obj):
