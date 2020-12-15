@@ -64,6 +64,8 @@ def eval_from_elasticsearch(app_config):
     arg_mining = ArgumentMining(app_config=app_config)
     for hit in search_articles.scan():
         document = hit.to_dict()
+        if not document["content"].startswith(document["title"]):
+            document["content"] = document["title"] + "\r\n\r\n" + document["content"]
         arg_mining.predict(document=document)
         found += 1
     logger.info(f"Found documents: {found}")
