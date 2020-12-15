@@ -23,7 +23,6 @@ class AppConfig:
     def __init__(self):
         random.seed(2020)
 
-        self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
         self.documents_pickle = "documents.pkl"
         self.properties_file = "properties.yaml"
         self.example_properties = "example_properties.yaml"
@@ -32,15 +31,13 @@ class AppConfig:
     def _configure(self):
         self.run = uuid.uuid4().hex
         self._configure_device()
+        # properties
+        self.properties = self._load_properties()
+        self._create_paths()
 
         # logging
         self.app_logger = self._config_logger()
         self.app_logger.info("Run id: {}".format(self.run))
-
-        # properties
-        self.properties = self._load_properties()
-
-        self._create_paths()
         # training data
         self._configure_training_data()
 
@@ -61,6 +58,7 @@ class AppConfig:
             self.device_name = "cpu"
 
     def _config_logger(self):
+        self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
         log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
         program_logger = logging.getLogger(__name__)
 
