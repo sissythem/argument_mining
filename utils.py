@@ -22,23 +22,21 @@ class AppConfig:
 
     def __init__(self):
         random.seed(2020)
-
         self.documents_pickle = "documents.pkl"
-        self.properties_file = "properties.yaml"
-        self.example_properties = "example_properties.yaml"
         self._configure()
 
     def _configure(self):
         self.run = uuid.uuid4().hex
         self._configure_device()
-        # properties
-        self.properties = self._load_properties()
         self._create_paths()
+        self.properties = self._load_properties()
 
         # logging
         self.app_logger = self._config_logger()
         self.app_logger.info("Run id: {}".format(self.run))
+
         # training data
+        self._create_output_dirs()
         self._configure_training_data()
 
         # email
@@ -73,6 +71,8 @@ class AppConfig:
         return program_logger
 
     def _load_properties(self):
+        self.properties_file = "properties.yaml"
+        self.example_properties = "example_properties.yaml"
         path_to_properties = join(self.resources_path, self.properties_file)
         path_to_example_properties = join(self.resources_path, self.example_properties)
         final_path = path_to_properties if exists(path_to_properties) else path_to_example_properties
@@ -93,13 +93,12 @@ class AppConfig:
         self.tensorboard_path = join(self.app_path, "runs")
         self.out_files_path = join(self.output_path, "output_files")
 
+    def _create_output_dirs(self):
+
         self.adu_base_path = self._get_base_path(base_name="adu_model")
         self.rel_base_path = self._get_base_path(base_name="rel_model")
         self.stance_base_path = self._get_base_path(base_name="stance_model")
 
-        self._create_output_dirs()
-
-    def _create_output_dirs(self):
         if not exists(self.output_path):
             mkdir(self.output_path)
         if not exists(self.out_files_path):
