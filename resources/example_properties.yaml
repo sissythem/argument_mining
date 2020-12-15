@@ -15,8 +15,7 @@ config:
     train_csv: "train_stance.csv"
     dev_csv: "dev_stance.csv"
     test_csv: "test_stance.csv"
-tasks: ["train", "eval"]
-do_prep: True
+tasks: ["prep", "train", "eval"]
 adu_model:
   hidden_size: 256
   rnn_layers: 2
