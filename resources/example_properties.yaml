@@ -21,6 +21,8 @@ preprocessing:
   repl_char: "="
   max_len: 512
   pad_token: 0
+eval:
+  source: "elasticsearch" # options: elasticsearch, file
 adu_model:
   hidden_size: 256
   rnn_layers: 2

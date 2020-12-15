@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 import random
@@ -16,6 +17,28 @@ from pathlib import Path
 
 import torch
 import yaml
+
+
+def get_initial_json(name, text):
+    hash_id = hashlib.md5(name.encode())
+    return {
+        "id": hash_id.hexdigest(),
+        "title": text,
+        "link": "",
+        "description": "",
+        "date": "",
+        "tags": [],
+        "document_link": "",
+        "publishedAt": "",
+        "crawledAt": "",
+        "domain": "",
+        "netloc": "",
+        "content": text,
+        "annotations": {
+            "ADUs": [],
+            "Relations": []
+        }
+    }
 
 
 class AppConfig:
