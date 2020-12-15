@@ -238,7 +238,7 @@ class ArgumentMining:
             "Processing document with id: {} and name: {}".format(document["id"], document["title"]))
 
         segment_counter = 0
-        sentences = tokeniser.tokenise(document["content"])
+        sentences = tokeniser.tokenise_no_punc(document["content"])
         for sentence in sentences:
             self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
             sentence = list(sentence)
