@@ -82,8 +82,6 @@ def eval_from_file(app_config, filename="kasteli.json"):
     if documents:
         for document in documents:
             document = utils.get_initial_json(document["name"], document["text"])
-            document["content"] = document["text"]
-            document["title"] = document["name"]
             arg_mining = ArgumentMining(app_config=app_config)
             arg_mining.predict(document=document)
 
