@@ -133,8 +133,6 @@ class AppConfig:
             mkdir(self.logs_path)
         if not exists(self.tensorboard_path):
             mkdir(self.tensorboard_path)
-        if not exists(join(self.tensorboard_path, self.run)):
-            mkdir(join(self.tensorboard_path, self.run))
 
     def _get_base_path(self, base_name):
         # Create a base path:
