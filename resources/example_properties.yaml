@@ -4,7 +4,6 @@ config:
     receiver: "example@gmail.com"
     password: "password"
   adu_data:
-    eval_doc: "kasteli.json"
     train_csv: "train_adu.csv"
     dev_csv: "dev_adu.csv"
     test_csv: "test_adu.csv"
