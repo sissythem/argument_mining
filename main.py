@@ -3,10 +3,8 @@ import traceback
 from os.path import join
 
 from elasticsearch_dsl import Search
-try:
-    from ellogon import esclient_swo
-except:
-    pass
+from ellogon import esclient_swo
+
 import utils
 from arg_mining import AduModel, RelationsModel, ArgumentMining
 from training_data import DataLoader
@@ -51,7 +49,6 @@ def evaluate(app_config):
     else:
         eval_from_file(app_config=app_config)
     logger.info("Evaluation is finished!")
-    esclient_swo.stop()
 
 
 def eval_from_elasticsearch(app_config):
@@ -99,15 +96,16 @@ def main():
             evaluate(app_config=app_config)
         app_config.send_email(body="Argument mining pipeline finished successfully",
                               subject="Argument mining run: {}".format(app_config.run))
-    except(BaseException, Exception) as e:
+    except(BaseException, Exception):
         app_config.app_logger.error(traceback.format_exc())
+        app_config.send_email(
+            body="Argument mining pipeline finished with errors".format(traceback.format_exc(limit=100)),
+            subject="Error in argument mining run: {}".format(app_config.run))
+    finally:
         try:
             esclient_swo.stop()
         except(BaseException, Exception):
             pass
-        app_config.send_email(
-            body="Argument mining pipeline finished with errors".format(traceback.format_exc(limit=100)),
-            subject="Error in argument mining run: {}".format(app_config.run))
 
 
 if __name__ == '__main__':
