@@ -123,11 +123,13 @@ class AduModel(Classifier):
                       train_with_dev=self.train_with_dev, save_final_model=self.save_final_model,
                       num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
         self.model = trainer.model
+        self.model.eval()
 
     def load(self):
         model_path = join(self.base_path, self.model_file)
         self.app_logger.info("Loading ADU model from path: {}".format(model_path))
         self.model = SequenceTagger.load(model_path)
+        self.model.eval()
 
 
 class RelationsModel(Classifier):
@@ -185,11 +187,13 @@ class RelationsModel(Classifier):
                       train_with_dev=self.train_with_dev, save_final_model=self.save_final_model,
                       num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
         self.model = trainer.model
+        self.model.eval()
 
     def load(self):
         model_path = join(self.base_path, self.model_file)
         self.app_logger.info("Loading Relations model from path: {}".format(model_path))
         self.model = TextClassifier.load(model_path)
+        self.model.eval()
 
 
 class ArgumentMining:
@@ -197,6 +201,23 @@ class ArgumentMining:
     def __init__(self, app_config):
         self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
+
+        # load ADU model
+        self.adu_model = AduModel(app_config=self.app_config)
+        self.adu_model.load()
+
+        # load Relations model
+        self.rel_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.rel_dev_csv,
+                                        train_csv=self.app_config.rel_train_csv, test_csv=self.app_config.rel_test_csv,
+                                        base_path=self.app_config.rel_base_path, model_name="rel")
+        self.rel_model.load()
+
+        # load Stance model
+        self.stance_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.stance_dev_csv,
+                                           train_csv=self.app_config.stance_train_csv,
+                                           test_csv=self.app_config.stance_test_csv,
+                                           base_path=self.app_config.stance_base_path, model_name="stance")
+        self.stance_model.load()
 
     def predict(self, document):
         json_obj = self._predict_adus(document=document)
@@ -230,10 +251,6 @@ class ArgumentMining:
             "Relations": []
         }
 
-        # load ADU model
-        adu_model = AduModel(app_config=self.app_config)
-        adu_model.load()
-
         self.app_logger.debug(
             "Processing document with id: {} and name: {}".format(document["id"], document["title"]))
 
@@ -243,7 +260,7 @@ class ArgumentMining:
             self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
             sentence = list(sentence)
             sentence = Sentence(sentence)
-            adu_model.model.predict(sentence)
+            self.adu_model.model.predict(sentence)
             self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
             segment_text, segment_type = self._get_args_from_sentence(sentence)
             if segment_text and segment_type:
@@ -272,13 +289,6 @@ class ArgumentMining:
         return document
 
     def _predict_relations(self, major_claims, claims, premises, json_obj):
-
-        # load Relations model
-        rel_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.rel_dev_csv,
-                                   train_csv=self.app_config.rel_train_csv, test_csv=self.app_config.rel_test_csv,
-                                   base_path=self.app_config.rel_base_path, model_name="rel")
-        rel_model.load()
-
         rel_counter = 0
         if major_claims and claims:
             for major_claim in major_claims:
@@ -286,7 +296,7 @@ class ArgumentMining:
                     sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
                     self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
                     sentence = Sentence(sentence_pair)
-                    rel_model.model.predict(sentence)
+                    self.rel_model.model.predict(sentence)
                     labels = sentence.get_labels()
                     label, conf = self._get_label_with_max_conf(labels=labels)
                     if label != "other":
@@ -304,7 +314,7 @@ class ArgumentMining:
                     sentence_pair = "[CLS] " + premise[0] + " [SEP] " + claim[0]
                     self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
                     sentence = Sentence(sentence_pair)
-                    rel_model.model.predict(sentence)
+                    self.rel_model.model.predict(sentence)
                     labels = sentence.get_labels()
                     label, conf = self._get_label_with_max_conf(labels=labels)
                     if label != "other":
@@ -319,13 +329,6 @@ class ArgumentMining:
         return json_obj
 
     def _predict_stance(self, major_claims, claims, json_obj):
-        # load Stance model
-        stance_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.stance_dev_csv,
-                                      train_csv=self.app_config.stance_train_csv,
-                                      test_csv=self.app_config.stance_test_csv,
-                                      base_path=self.app_config.stance_base_path, model_name="stance")
-        stance_model.load()
-
         stance_counter = 0
         if major_claims and claims:
             for major_claim in major_claims:
@@ -333,7 +336,7 @@ class ArgumentMining:
                     sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
                     self.app_logger.debug("Predicting stance for sentence pair: {}".format(sentence_pair))
                     sentence = Sentence(sentence_pair)
-                    stance_model.model.predict(sentence)
+                    self.stance_model.model.predict(sentence)
                     labels = sentence.get_labels()
                     label, conf = self._get_label_with_max_conf(labels=labels)
                     if label != "other":
