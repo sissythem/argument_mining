@@ -189,7 +189,7 @@ class RelationsModel(Classifier):
     def load(self):
         model_path = join(self.base_path, self.model_file)
         self.app_logger.info("Loading Relations model from path: {}".format(model_path))
-        self.model = TextClassifier.load_from_file(model_path)
+        self.model = TextClassifier.load(model_path)
 
 
 class ArgumentMining:
