@@ -258,7 +258,7 @@ class ArgumentMining:
         sentences = tokeniser.tokenise_no_punc(document["content"])
         for sentence in sentences:
             self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
-            sentence = list(sentence)
+            sentence = " ".join(list(sentence))
             sentence = Sentence(sentence)
             self.adu_model.model.predict(sentence)
             self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
