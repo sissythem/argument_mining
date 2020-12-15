@@ -75,7 +75,7 @@ def eval_from_file(app_config, filename="kasteli.json"):
     logger.info("Evaluating using file: {}".format(filename))
     file_path = join(app_config.resources_path, filename)
     with open(file_path, "r") as f:
-        data = json.load(f.read())
+        data = json.load(f)
     documents = data["data"]["documents"]
     if documents:
         for document in documents:
@@ -99,7 +99,8 @@ def main():
             evaluate(app_config=app_config)
         app_config.send_email(body="Argument mining pipeline finished successfully",
                               subject="Argument mining run: {}".format(app_config.run))
-    except(BaseException, Exception):
+    except(BaseException, Exception) as e:
+        app_config.app_logger.error(e)
         try:
             esclient_swo.stop()
         except(BaseException, Exception):
