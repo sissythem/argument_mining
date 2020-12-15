@@ -71,6 +71,7 @@ class AduModel(Classifier):
         self.mini_batch_size: int = self.model_properties["mini_batch_size"]
         self.max_epochs: int = self.model_properties["max_epochs"]
         self.num_workers: int = self.model_properties["num_workers"]
+        self.patience: int = self.model_properties["patience"]
         self.use_tensorboard: bool = self.model_properties["use_tensorboard"]
         self.train_with_dev: bool = self.model_properties["train_with_dev"]
         self.save_final_model: bool = self.model_properties["save_final_model"]
@@ -117,7 +118,7 @@ class AduModel(Classifier):
         self.app_logger.debug("Starting training with ModelTrainer")
         self.app_logger.debug("Model configuration properties: {}".format(self.model_properties))
         # 7. start training
-        trainer.train(self.base_path, learning_rate=self.learning_rate,
+        trainer.train(self.base_path, patience=self.patience, learning_rate=self.learning_rate,
                       mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
                       train_with_dev=self.train_with_dev, save_final_model=self.save_final_model,
                       num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
@@ -232,11 +233,11 @@ class ArgumentMining:
             "Processing document with id: {} and name: {}".format(document["id"], document["title"]))
 
         segment_counter = 0
-        sentences = tokeniser.tokenise_no_punc(document["content"])
+        sentences = tokeniser.tokenise(document["content"])
         for sentence in sentences:
             self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
             sentence = list(sentence)
-            sentence = Sentence(" ".join(sentence).strip())
+            sentence = Sentence(sentence)
             adu_model.model.predict(sentence)
             self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
             segment_text, segment_type = self._get_args_from_sentence(sentence)
