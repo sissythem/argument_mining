@@ -27,9 +27,60 @@ class AppConfig:
         self.documents_pickle = "documents.pkl"
         self.properties_file = "properties.yaml"
         self.example_properties = "example_properties.yaml"
+        self._configure()
+
+    def _configure(self):
+        self.run = uuid.uuid4().hex
+        self._configure_device()
+
+        # logging
+        self.app_logger = self._config_logger()
+        self.app_logger.info("Run id: {}".format(self.run))
+
+        # properties
+        self.properties = self._load_properties()
 
         self._create_paths()
-        self._configure()
+        # training data
+        self._configure_training_data()
+
+        # email
+        config = self.properties["config"]
+        self._config_email(config=config)
+        self._configure_training_data()
+
+    def _configure_device(self):
+        if torch.cuda.is_available():
+            devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
+            if type(devices) == str:
+                devices = devices.split(",")
+                self.device_name = "cuda:{}".format(devices[0].strip())
+            else:
+                self.device_name = "cuda:{}".format(devices)
+        else:
+            self.device_name = "cpu"
+
+    def _config_logger(self):
+        log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+        program_logger = logging.getLogger(__name__)
+
+        program_logger.setLevel(logging.DEBUG)
+        file_handler = logging.FileHandler("{0}/{1}.log".format(self.logs_path, self.log_filename))
+        file_handler.setFormatter(log_formatter)
+        program_logger.addHandler(file_handler)
+
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(log_formatter)
+        program_logger.addHandler(console_handler)
+        return program_logger
+
+    def _load_properties(self):
+        path_to_properties = join(self.resources_path, self.properties_file)
+        path_to_example_properties = join(self.resources_path, self.example_properties)
+        final_path = path_to_properties if exists(path_to_properties) else path_to_example_properties
+        with open(final_path, "r") as f:
+            properties = yaml.safe_load(f.read())
+        return properties
 
     def _create_paths(self):
         curr_dir = Path(getcwd())
@@ -82,58 +133,6 @@ class AppConfig:
         except (OSError, Exception):
             pass
         return base_path
-
-    def _configure(self):
-        self.run = uuid.uuid4().hex
-        self._configure_device()
-
-        # logging
-        self.app_logger = self._config_logger()
-        self.app_logger.info("Run id: {}".format(self.run))
-
-        # properties
-        self.properties = self._load_properties()
-
-        # training data
-        self._configure_training_data()
-
-        # email
-        config = self.properties["config"]
-        self._config_email(config=config)
-        self._configure_training_data()
-
-    def _configure_device(self):
-        if torch.cuda.is_available():
-            devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
-            if type(devices) == str:
-                devices = devices.split(",")
-                self.device_name = "cuda:{}".format(devices[0].strip())
-            else:
-                self.device_name = "cuda:{}".format(devices)
-        else:
-            self.device_name = "cpu"
-
-    def _config_logger(self):
-        log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
-        program_logger = logging.getLogger(__name__)
-
-        program_logger.setLevel(logging.DEBUG)
-        file_handler = logging.FileHandler("{0}/{1}.log".format(self.logs_path, self.log_filename))
-        file_handler.setFormatter(log_formatter)
-        program_logger.addHandler(file_handler)
-
-        console_handler = logging.StreamHandler()
-        console_handler.setFormatter(log_formatter)
-        program_logger.addHandler(console_handler)
-        return program_logger
-
-    def _load_properties(self):
-        path_to_properties = join(self.resources_path, self.properties_file)
-        path_to_example_properties = join(self.resources_path, self.example_properties)
-        final_path = path_to_properties if exists(path_to_properties) else path_to_example_properties
-        with open(final_path, "r") as f:
-            properties = yaml.safe_load(f.read())
-        return properties
 
     def _configure_training_data(self):
         config = self.properties["config"]["adu_data"]
