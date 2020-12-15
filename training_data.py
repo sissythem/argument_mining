@@ -155,18 +155,17 @@ class DataLoader:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.resources_folder = app_config.resources_path
-        self.data_file = app_config.data_file
         self.pickle_file = app_config.documents_pickle
         self.load()
 
-    def load(self):
+    def load(self, filename=None):
         path_to_pickle = join(self.resources_folder,
                               self.app_config.documents_pickle)
         if exists(path_to_pickle):
             with open(path_to_pickle, "rb") as f:
                 return pickle.load(f)
 
-        path_to_data = join(self.resources_folder, self.data_file)
+        path_to_data = join(self.resources_folder, filename)
         with open(path_to_data, "r") as f:
             content = json.loads(f.read())
         documents = content["data"]["documents"]

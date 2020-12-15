@@ -1,7 +1,6 @@
-import hashlib
-import json
 import logging
 import os
+import random
 import smtplib
 import ssl
 import uuid
@@ -19,104 +18,100 @@ import torch
 import yaml
 
 
-def get_curr_path():
-    curr_dir = Path(getcwd())
-    parent = str(curr_dir.parent)
-    curr_dir = str(curr_dir)
-    return curr_dir if curr_dir.endswith("mining") else parent
-
-
-def configure_device():
-    if torch.cuda.is_available():
-        devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
-        if type(devices) == str:
-            devices = devices.split(",")
-            device_name = "cuda:{}".format(devices[0].strip())
-        else:
-            device_name = "cuda:{}".format(devices)
-    else:
-        device_name = "cpu"
-    return device_name
-
-
-def get_base_path(path, base_name, hidden_size, layers, use_crf, optimizer, learning_rate, mini_batch_size):
-    # Create a base path:
-    embedding_names = 'bert-greek'
-    base_path = "{}-".format(base_name) + '-'.join([
-        str(embedding_names),
-        'hs=' + str(hidden_size),
-        'hl=' + str(layers),
-        'crf=' + str(use_crf),
-        "optmizer=" + optimizer,
-        'lr=' + str(learning_rate),
-        'bs=' + str(mini_batch_size)
-    ])
-    base_path = join(path, base_path)
-    try:
-        # os.mkdir(base_path, 0o755)
-        os.makedirs(base_path)
-    except (OSError, Exception):
-        pass
-    return base_path
-
-
-def get_initial_json(name, text):
-    hash_id = hashlib.md5(name.encode())
-    return {
-        "id": hash_id.hexdigest(),
-        "link": "",
-        "description": "",
-        "date": "",
-        "tags": [],
-        "document_link": "",
-        "publishedAt": "",
-        "crawledAt": "",
-        "domain": "",
-        "netloc": "",
-        "content": text,
-        "annotations": {
-            "ADUs": [],
-            "Relations": []
-        }
-    }
-
-
-def load_data(base_path, filename):
-    filepath = join(base_path, filename)
-    with open(filepath, "r") as f:
-        data = json.load(f)
-    return data["data"]["documents"]
-
-
 class AppConfig:
 
-    def __init__(self, app_path):
+    def __init__(self):
+        random.seed(2020)
+
         self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
         self.documents_pickle = "documents.pkl"
         self.properties_file = "properties.yaml"
         self.example_properties = "example_properties.yaml"
-        self.app_path = app_path
-        self.app_path = app_path
-        self.run = uuid.uuid4().hex
+
         self._create_paths()
-        self._create_output_dirs()
-        self.properties = {}
-        self.app_logger = None
-        self.device_name = ""
-        self.data_file = None
         self._configure()
 
+    def _create_paths(self):
+        curr_dir = Path(getcwd())
+        parent = str(curr_dir.parent)
+        curr_dir = str(curr_dir)
+        self.app_path = curr_dir if curr_dir.endswith("mining") else parent
+
+        self.resources_path = join(self.app_path, "resources")
+        self.output_path = join(self.app_path, "output")
+        self.logs_path = join(self.output_path, "logs")
+        self.model_path = join(self.output_path, "model")
+        self.tensorboard_path = join(self.app_path, "runs")
+        self.out_files_path = join(self.output_path, "output_files")
+
+        self.adu_base_path = self._get_base_path(base_name="adu_model")
+        self.rel_base_path = self._get_base_path(base_name="rel_model")
+        self.stance_base_path = self._get_base_path(base_name="stance_model")
+
+        self._create_output_dirs()
+
+    def _create_output_dirs(self):
+        if not exists(self.output_path):
+            mkdir(self.output_path)
+        if not exists(self.out_files_path):
+            mkdir(self.out_files_path)
+        if not exists(self.logs_path):
+            mkdir(self.logs_path)
+        if not exists(self.tensorboard_path):
+            mkdir(self.tensorboard_path)
+        if not exists(join(self.tensorboard_path, self.run)):
+            mkdir(join(self.tensorboard_path, self.run))
+
+    def _get_base_path(self, base_name):
+        # Create a base path:
+        embedding_names = 'bert-greek'
+        properties = self.properties["adu_model"] if base_name == "adu_model" else self.properties["rel_model"]
+        layers = properties["rnn_layers"] if base_name == "adu_model" else properties["layers"]
+        base_path = "{}-".format(base_name) + '-'.join([
+            str(embedding_names),
+            'hs=' + str(properties["hidden_size"]),
+            'hl=' + str(layers),
+            'crf=' + str(properties["use_crf"]),
+            "optmizer=" + properties["optimizer"],
+            'lr=' + str(properties["learning_rate"]),
+            'bs=' + str(properties["mini_batch_size"])
+        ])
+        base_path = join(self.output_path, base_path)
+        try:
+            os.makedirs(base_path)
+        except (OSError, Exception):
+            pass
+        return base_path
+
     def _configure(self):
+        self.run = uuid.uuid4().hex
+        self._configure_device()
+
         # logging
         self.app_logger = self._config_logger()
         self.app_logger.info("Run id: {}".format(self.run))
 
         # properties
         self.properties = self._load_properties()
+
+        # training data
+        self._configure_training_data()
+
+        # email
         config = self.properties["config"]
         self._config_email(config=config)
-        self._configure_base_paths_and_data_files()
-        self.device_name = configure_device()
+        self._configure_training_data()
+
+    def _configure_device(self):
+        if torch.cuda.is_available():
+            devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
+            if type(devices) == str:
+                devices = devices.split(",")
+                self.device_name = "cuda:{}".format(devices[0].strip())
+            else:
+                self.device_name = "cuda:{}".format(devices)
+        else:
+            self.device_name = "cpu"
 
     def _config_logger(self):
         log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
@@ -132,30 +127,16 @@ class AppConfig:
         program_logger.addHandler(console_handler)
         return program_logger
 
-    def _configure_base_paths_and_data_files(self):
-        properties = self.properties["adu_model"]
-        self.adu_base_path = get_base_path(path=self.output_path, base_name="adu_model",
-                                           hidden_size=properties["hidden_size"],
-                                           layers=properties["rnn_layers"],
-                                           use_crf=properties["use_crf"], optimizer=properties["optimizer"],
-                                           learning_rate=properties["learning_rate"],
-                                           mini_batch_size=properties["mini_batch_size"])
-        properties = self.properties["rel_model"]
-        self.rel_base_path = get_base_path(path=self.output_path, base_name="rel_model",
-                                           hidden_size=properties["hidden_size"], use_crf=properties["use_crf"],
-                                           optimizer=properties["optimizer"], layers=properties["layers"],
-                                           learning_rate=properties["learning_rate"],
-                                           mini_batch_size=properties["mini_batch_size"])
-        self.stance_base_path = get_base_path(path=self.output_path, base_name="stance_model",
-                                              hidden_size=properties["hidden_size"],
-                                              use_crf=properties["use_crf"],
-                                              optimizer=properties["optimizer"], layers=properties["layers"],
-                                              learning_rate=properties["learning_rate"],
-                                              mini_batch_size=properties["mini_batch_size"])
+    def _load_properties(self):
+        path_to_properties = join(self.resources_path, self.properties_file)
+        path_to_example_properties = join(self.resources_path, self.example_properties)
+        final_path = path_to_properties if exists(path_to_properties) else path_to_example_properties
+        with open(final_path, "r") as f:
+            properties = yaml.safe_load(f.read())
+        return properties
 
+    def _configure_training_data(self):
         config = self.properties["config"]["adu_data"]
-
-        self.eval_doc = config["eval_doc"]
         self.adu_train_csv = config["train_csv"]
         self.adu_dev_csv = config["dev_csv"]
         self.adu_test_csv = config["test_csv"]
@@ -170,43 +151,11 @@ class AppConfig:
         self.stance_dev_csv = config["dev_csv"]
         self.stance_test_csv = config["test_csv"]
 
-    def _load_properties(self):
-        path_to_properties = join(self.resources_path, self.properties_file)
-        path_to_example_properties = join(self.resources_path, self.example_properties)
-        final_path = path_to_properties if exists(path_to_properties) else path_to_example_properties
-        with open(final_path, "r") as f:
-            properties = yaml.safe_load(f.read())
-        return properties
-
     def _config_email(self, config):
         config_email = config["email"]
         self.sender_email = config_email.get("sender", "skthemeli@gmail.com")
         self.receiver_email = config_email.get("receiver", "skthemeli@gmail.com")
         self.password = config_email["password"]
-
-    def _create_paths(self):
-        self.resources_path = join(self.app_path, "resources")
-        self.output_path = join(self.app_path, "output")
-        self.logs_path = join(self.output_path, "logs")
-        self.model_path = join(self.output_path, "model")
-        self.tensorboard_path = join(self.app_path, "runs")
-        self.out_files_path = join(self.output_path, "output_files")
-
-    def _create_output_dirs(self):
-        if not exists(self.output_path):
-            mkdir(self.output_path)
-        if not exists(self.out_files_path):
-            mkdir(self.out_files_path)
-        if not exists(self.logs_path):
-            mkdir(self.logs_path)
-        if not exists(self.tensorboard_path):
-            mkdir(self.tensorboard_path)
-        if not exists(self.model_path):
-            mkdir(self.model_path)
-        if not exists(join(self.model_path, self.run)):
-            mkdir(join(self.model_path, self.run))
-        if not exists(join(self.tensorboard_path, self.run)):
-            mkdir(join(self.tensorboard_path, self.run))
 
     def send_email(self, body, subject=None):
         if not subject:
@@ -246,4 +195,3 @@ class AppConfig:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
             server.login(self.sender_email, self.password)
             server.sendmail(self.sender_email, self.receiver_email, text)
-

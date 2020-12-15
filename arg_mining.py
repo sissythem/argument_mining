@@ -1,3 +1,4 @@
+import hashlib
 import json
 import random
 from os.path import join
@@ -14,13 +15,12 @@ from flair.nn import Model
 from flair.trainers import ModelTrainer
 from torch.optim.optimizer import Optimizer
 
-import utils
 from utils import AppConfig
 
 
 class Classifier:
 
-    def __init__(self, app_config, dev_csv, train_csv, test_csv, eval_doc, base_path, model_name):
+    def __init__(self, app_config, dev_csv, train_csv, test_csv, base_path, model_name):
         random.seed(2020)
         self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
@@ -29,7 +29,6 @@ class Classifier:
         self.dev_file: str = dev_csv
         self.train_file: str = train_csv
         self.test_file: str = test_csv
-        self.eval_file: str = eval_doc
         self.base_path: str = base_path
         self.model_file: str = "best-model.pt"
         self.model: Model = None
@@ -63,8 +62,7 @@ class AduModel(Classifier):
     def __init__(self, app_config):
         super(AduModel, self).__init__(app_config=app_config, dev_csv=app_config.adu_dev_csv,
                                        train_csv=app_config.adu_train_csv, test_csv=app_config.adu_test_csv,
-                                       eval_doc=app_config.eval_doc, base_path=app_config.adu_base_path,
-                                       model_name="adu")
+                                       base_path=app_config.adu_base_path, model_name="adu")
 
         self.hidden_size: int = self.model_properties["hidden_size"]
         self.use_crf: bool = self.model_properties["use_crf"]
@@ -134,10 +132,9 @@ class AduModel(Classifier):
 
 class RelationsModel(Classifier):
 
-    def __init__(self, app_config, dev_csv, train_csv, test_csv, eval_doc, base_path, model_name):
+    def __init__(self, app_config, dev_csv, train_csv, test_csv, base_path, model_name):
         super(RelationsModel, self).__init__(app_config=app_config, dev_csv=dev_csv, train_csv=train_csv,
-                                             test_csv=test_csv, eval_doc=eval_doc, base_path=base_path,
-                                             model_name=model_name)
+                                             test_csv=test_csv, base_path=base_path, model_name=model_name)
 
         self.hidden_size: int = self.model_properties["hidden_size"]
         self.use_crf: bool = self.model_properties["use_crf"]
@@ -201,35 +198,42 @@ class ArgumentMining:
         self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
 
-    def predict(self):
-        data = utils.load_data(base_path=self.app_config.resources_path, filename=self.app_config.eval_doc)
-        if data:
-            for document in data:
-                json_obj = self._predict_adus(document=document)
-                segments = json_obj["annotations"]["ADUs"]
-                major_claims, claims, premises = [], [], []
-                for segment in segments:
-                    text = segment["segment"]
-                    segment_id = segment["id"]
-                    if segment["type"] == "major_claim":
-                        major_claims.append((text, segment_id))
-                    elif segment["type"] == "claim":
-                        claims.append((text, segment_id))
-                    else:
-                        premises.append((text, segment_id))
-                json_obj = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises,
-                                                   json_obj=json_obj)
-                json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=json_obj)
-                self._save_data(filename=document["name"], json_obj=json_obj)
+    def predict(self, document):
+        json_obj = self._predict_adus(document=document)
+        segments = json_obj["annotations"]["ADUs"]
+        major_claims, claims, premises = [], [], []
+        for segment in segments:
+            text = segment["segment"]
+            segment_id = segment["id"]
+            if segment["type"] == "major_claim":
+                major_claims.append((text, segment_id))
+            elif segment["type"] == "claim":
+                claims.append((text, segment_id))
+            else:
+                premises.append((text, segment_id))
+        json_obj = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises,
+                                           json_obj=json_obj)
+        json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=json_obj)
+        self._save_data(filename=document["title"] + ".json", json_obj=json_obj)
 
     def _predict_adus(self, document):
+        # init document id & annotations
+        hash_id = hashlib.md5(document["title"].encode())
+        document["id"] = hash_id.hexdigest()
+        document["annotations"] = {
+            "ADUs": [],
+            "Relations": []
+        }
+
+        # load ADU model
         adu_model = AduModel(app_config=self.app_config)
         adu_model.load()
+
         self.app_logger.debug(
-            "Processing document with id: {} and name: {}".format(document["id"], document["name"]))
+            "Processing document with id: {} and name: {}".format(document["id"], document["title"]))
+
         segment_counter = 0
-        initial_json = utils.get_initial_json(name=document["name"], text=document["text"])
-        sentences = tokeniser.tokenise_no_punc(document["text"])
+        sentences = tokeniser.tokenise_no_punc(document["content"])
         for sentence in sentences:
             self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
             sentence = list(sentence)
@@ -242,10 +246,10 @@ class ArgumentMining:
                 self.app_logger.debug("Segment type: {}".format(segment_type))
                 segment_counter += 1
                 try:
-                    start_idx = document["text"].index(segment_text)
+                    start_idx = document["content"].index(segment_text)
                 except(Exception, BaseException):
                     try:
-                        start_idx = document["text"].index(segment_text[:4])
+                        start_idx = document["content"].index(segment_text[:4])
                     except(Exception, BaseException):
                         start_idx = None
                 if start_idx:
@@ -259,15 +263,17 @@ class ArgumentMining:
                     "ends": str(end_idx),
                     "segment": segment_text
                 }
-                initial_json["annotations"]["ADUs"].append(seg)
-        return initial_json
+                document["annotations"]["ADUs"].append(seg)
+        return document
 
     def _predict_relations(self, major_claims, claims, premises, json_obj):
+
+        # load Relations model
         rel_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.rel_dev_csv,
                                    train_csv=self.app_config.rel_train_csv, test_csv=self.app_config.rel_test_csv,
-                                   eval_doc=self.app_config.eval_doc, base_path=self.app_config.rel_base_path,
-                                   model_name="rel")
+                                   base_path=self.app_config.rel_base_path, model_name="rel")
         rel_model.load()
+
         rel_counter = 0
         for major_claim in major_claims:
             for claim in claims:
@@ -305,11 +311,13 @@ class ArgumentMining:
         return json_obj
 
     def _predict_stance(self, major_claims, claims, json_obj):
+        # load Stance model
         stance_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.stance_dev_csv,
                                       train_csv=self.app_config.stance_train_csv,
-                                      test_csv=self.app_config.stance_test_csv, eval_doc=self.app_config.eval_doc,
+                                      test_csv=self.app_config.stance_test_csv,
                                       base_path=self.app_config.stance_base_path, model_name="stance")
         stance_model.load()
+
         stance_counter = 0
         for major_claim in major_claims:
             for claim in claims:
