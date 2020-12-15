@@ -145,7 +145,6 @@ class RelationsModel(Classifier):
         self.learning_rate: float = self.model_properties["learning_rate"]
         self.mini_batch_size: int = self.model_properties["mini_batch_size"]
         self.max_epochs: int = self.model_properties["max_epochs"]
-        self.optimizer: str = self.model_properties["optimizer"]
         self.patience: int = self.model_properties["patience"]
         self.num_workers: int = self.model_properties["num_workers"]
         self.use_tensorboard: bool = self.model_properties["use_tensorboard"]
