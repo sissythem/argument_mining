@@ -57,7 +57,7 @@ def main():
         stance_model.train()
         logger.info("Stance training finished!")
     if "eval" in properties["tasks"]:
-
+        collect_documents(app_config=app_config)
         logger.info("Evaluation is finished!")
 
 
