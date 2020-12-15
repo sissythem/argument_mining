@@ -224,6 +224,7 @@ class DataLoader:
         self.app_logger.debug("Documents are loaded")
         relations, stances = [], []
         for document in documents:
+            self.app_logger.debug("Processing relations for document: {}".format(document.document_id))
             major_claims, claims, premises, relation_pairs, stance_pairs = self._collect_segments(document)
             relations += self._collect_relation_pairs(parents=major_claims, children=claims,
                                                       relation_pairs=relation_pairs)
@@ -253,15 +254,20 @@ class DataLoader:
         df.to_csv(output_filepath, sep='\t', index=False, header=None)
         self.app_logger.debug("Dataframe saved!")
 
-    @staticmethod
-    def _collect_segments(document):
+    def _collect_segments(self, document):
         major_claims, claims, premises = {}, {}, {}
         relation_pairs, stance_pairs = {}, {}
         relations: List[Relation] = document.relations
         stances = document.stance
         for relation in relations:
+            if relation.arg1 is None or relation.arg2 is None:
+                self.app_logger.error("None segment for relation: {} and document {}".format(relation.relation_id,
+                                                                                             relation.document_id))
             relation_pairs[(relation.arg1.segment_id, relation.arg2.segment_id)] = relation.relation_type
         for stance in stances:
+            if stance.arg1 is None or stance.arg2 is None:
+                self.app_logger.error("None segment for relation: {} and document {}".format(stance.relation_id,
+                                                                                             stance.document_id))
             stance_pairs[(stance.arg1.segment_id, stance.arg2.segment_id)] = stance.relation_type
         for segment in document.segments:
             if segment.arg_type == "major_claim":
@@ -281,7 +287,6 @@ class DataLoader:
             for c_id, c_text in children.items():
                 key = (c_id, p_id)
                 if key in relation_pairs.keys():
-                    print("Found relation")
                     count_relations += 1
                 relation = relation_pairs.get(key, "other")
                 new_relation_pairs.append((c_text, p_text, relation))
