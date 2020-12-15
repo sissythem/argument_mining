@@ -61,9 +61,9 @@ def eval_from_elasticsearch(app_config):
     search_articles = Search(using=client, index='articles').filter('terms', link=urls)
     # print(search_articles.to_dict())
     found = 0
+    arg_mining = ArgumentMining(app_config=app_config)
     for hit in search_articles.scan():
         document = hit.to_dict()
-        arg_mining = ArgumentMining(app_config=app_config)
         arg_mining.predict(document=document)
         found += 1
     logger.info(f"Found documents: {found}")
@@ -77,9 +77,9 @@ def eval_from_file(app_config, filename="kasteli.json"):
         data = json.load(f)
     documents = data["data"]["documents"]
     if documents:
+        arg_mining = ArgumentMining(app_config=app_config)
         for document in documents:
             document = utils.get_initial_json(document["name"], document["text"])
-            arg_mining = ArgumentMining(app_config=app_config)
             arg_mining.predict(document=document)
 
 
