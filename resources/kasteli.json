@@ -33452,27 +33452,6 @@
             ]
           },
           {
-            "_id": "5fb665da1a6b6af1f10a3296",
-            "document_id": 204,
-            "collection_id": 32,
-            "type": "argument_relation",
-            "spans": [],
-            "attributes": [
-              {
-                "name": "type",
-                "value": "for"
-              },
-              {
-                "name": "arg1",
-                "value": "5fb653821a6b6af1f10a3274"
-              },
-              {
-                "name": "arg2",
-                "value": "5fb650881a6b6af1f10a326b"
-              }
-            ]
-          },
-          {
             "_id": "5fb666721a6b6af1f10a329e",
             "document_id": 204,
             "collection_id": 32,

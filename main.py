@@ -3,9 +3,10 @@ import traceback
 from os.path import join
 
 from elasticsearch_dsl import Search
-from ellogon import esclient_swo
-
-
+try:
+    from ellogon import esclient_swo
+except:
+    pass
 import utils
 from arg_mining import AduModel, RelationsModel, ArgumentMining
 from training_data import DataLoader
@@ -101,7 +102,7 @@ def main():
         app_config.send_email(body="Argument mining pipeline finished successfully",
                               subject="Argument mining run: {}".format(app_config.run))
     except(BaseException, Exception) as e:
-        app_config.app_logger.error(e)
+        app_config.app_logger.error(traceback.format_exc())
         try:
             esclient_swo.stop()
         except(BaseException, Exception):
