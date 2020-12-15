@@ -36,7 +36,6 @@ class AppConfig:
         self.app_logger.info("Run id: {}".format(self.run))
 
         # training data
-        self._create_output_dirs()
         self._configure_training_data()
 
         # email
@@ -92,13 +91,9 @@ class AppConfig:
         self.model_path = join(self.output_path, "model")
         self.tensorboard_path = join(self.app_path, "runs")
         self.out_files_path = join(self.output_path, "output_files")
+        self._create_output_dirs()
 
     def _create_output_dirs(self):
-
-        self.adu_base_path = self._get_base_path(base_name="adu_model")
-        self.rel_base_path = self._get_base_path(base_name="rel_model")
-        self.stance_base_path = self._get_base_path(base_name="stance_model")
-
         if not exists(self.output_path):
             mkdir(self.output_path)
         if not exists(self.out_files_path):
@@ -132,6 +127,10 @@ class AppConfig:
         return base_path
 
     def _configure_training_data(self):
+        self.adu_base_path = self._get_base_path(base_name="adu_model")
+        self.rel_base_path = self._get_base_path(base_name="rel_model")
+        self.stance_base_path = self._get_base_path(base_name="stance_model")
+
         config = self.properties["config"]["adu_data"]
         self.adu_train_csv = config["train_csv"]
         self.adu_dev_csv = config["dev_csv"]
