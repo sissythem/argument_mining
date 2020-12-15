@@ -19,6 +19,14 @@ import torch
 import yaml
 
 
+def name_exceeds_bytes(name):
+    return utf8len(name) >= 255
+
+
+def utf8len(s):
+    return len(s.encode('utf-8'))
+
+
 def get_initial_json(name, text):
     hash_id = hashlib.md5(name.encode())
     return {
