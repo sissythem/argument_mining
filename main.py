@@ -3,10 +3,8 @@ import traceback
 from os.path import join
 
 from elasticsearch_dsl import Search
-try:
-    from ellogon import esclient_swo
-except:
-    pass
+from ellogon import esclient_swo
+
 
 import utils
 from arg_mining import AduModel, RelationsModel, ArgumentMining
