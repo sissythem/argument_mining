@@ -33452,27 +33452,6 @@
             ]
           },
           {
-            "_id": "5fb665d21a6b6af1f10a3295",
-            "document_id": 204,
-            "collection_id": 32,
-            "type": "argument_relation",
-            "spans": [],
-            "attributes": [
-              {
-                "name": "type",
-                "value": "support"
-              },
-              {
-                "name": "arg1",
-                "value": "5fb653821a6b6af1f10a3274"
-              },
-              {
-                "name": "arg2",
-                "value": "5fb650881a6b6af1f10a326b"
-              }
-            ]
-          },
-          {
             "_id": "5fb665da1a6b6af1f10a3296",
             "document_id": 204,
             "collection_id": 32,
@@ -33490,111 +33469,6 @@
               {
                 "name": "arg2",
                 "value": "5fb650881a6b6af1f10a326b"
-              }
-            ]
-          },
-          {
-            "_id": "5fb665e71a6b6af1f10a3297",
-            "document_id": 204,
-            "collection_id": 32,
-            "type": "argument_relation",
-            "spans": [],
-            "attributes": [
-              {
-                "name": "type",
-                "value": "support"
-              },
-              {
-                "name": "arg1",
-                "value": "5fb654911a6b6af1f10a3277"
-              },
-              {
-                "name": "arg2",
-                "value": "5fb653821a6b6af1f10a3274"
-              }
-            ]
-          },
-          {
-            "_id": "5fb665fe1a6b6af1f10a3298",
-            "document_id": 204,
-            "collection_id": 32,
-            "type": "argument_relation",
-            "spans": [],
-            "attributes": [
-              {
-                "name": "type",
-                "value": "support"
-              },
-              {
-                "name": "arg1",
-                "value": "5fb654781a6b6af1f10a3276"
-              },
-              {
-                "name": "arg2",
-                "value": "5fb653821a6b6af1f10a3274"
-              }
-            ]
-          },
-          {
-            "_id": "5fb666181a6b6af1f10a3299",
-            "document_id": 204,
-            "collection_id": 32,
-            "type": "argument_relation",
-            "spans": [],
-            "attributes": [
-              {
-                "name": "type",
-                "value": "support"
-              },
-              {
-                "name": "arg1",
-                "value": "5fb6641a1a6b6af1f10a3280"
-              },
-              {
-                "name": "arg2",
-                "value": "5fb653821a6b6af1f10a3274"
-              }
-            ]
-          },
-          {
-            "_id": "5fb6662a1a6b6af1f10a329a",
-            "document_id": 204,
-            "collection_id": 32,
-            "type": "argument_relation",
-            "spans": [],
-            "attributes": [
-              {
-                "name": "type",
-                "value": "support"
-              },
-              {
-                "name": "arg1",
-                "value": "5fb655111a6b6af1f10a3278"
-              },
-              {
-                "name": "arg2",
-                "value": "5fb653821a6b6af1f10a3274"
-              }
-            ]
-          },
-          {
-            "_id": "5fb666391a6b6af1f10a329b",
-            "document_id": 204,
-            "collection_id": 32,
-            "type": "argument_relation",
-            "spans": [],
-            "attributes": [
-              {
-                "name": "type",
-                "value": "support"
-              },
-              {
-                "name": "arg1",
-                "value": "5fb655381a6b6af1f10a3279"
-              },
-              {
-                "name": "arg2",
-                "value": "5fb653821a6b6af1f10a3274"
               }
             ]
           },
