@@ -7,7 +7,7 @@ from typing import List
 import flair
 import torch
 from ellogon import tokeniser
-from flair.data import Corpus, Sentence
+from flair.data import Corpus, Sentence, Label
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings
 from flair.models import SequenceTagger, TextClassifier
@@ -287,8 +287,8 @@ class ArgumentMining:
                     self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
                     sentence = Sentence(sentence_pair)
                     rel_model.model.predict(sentence)
-                    # TODO check get_labels
-                    label = sentence.get_labels()
+                    labels = sentence.get_labels()
+                    label, conf = self._get_label_with_max_conf(labels=labels)
                     if label != "other":
                         rel_counter += 1
                         rel_dict = {
@@ -305,7 +305,8 @@ class ArgumentMining:
                     self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
                     sentence = Sentence(sentence_pair)
                     rel_model.model.predict(sentence)
-                    label = sentence.get_labels()
+                    labels = sentence.get_labels()
+                    label, conf = self._get_label_with_max_conf(labels=labels)
                     if label != "other":
                         rel_counter += 1
                         rel_dict = {
@@ -333,18 +334,31 @@ class ArgumentMining:
                     self.app_logger.debug("Predicting stance for sentence pair: {}".format(sentence_pair))
                     sentence = Sentence(sentence_pair)
                     stance_model.model.predict(sentence)
-                    label = sentence.get_labels()
-                    # TODO check label
+                    labels = sentence.get_labels()
+                    label, conf = self._get_label_with_max_conf(labels=labels)
                     if label != "other":
                         stance_counter += 1
                         stance_list = [{
                             "id": "A{}".format(stance_counter),
-                            "type": label
+                            "type": label,
+                            "confidence": conf
                         }]
                         for segment in json_obj["annotations"]["ADUs"]:
                             if segment["id"] == claim[1]:
                                 segment["stance"] = stance_list
         return json_obj
+
+    @staticmethod
+    def _get_label_with_max_conf(labels: List[Label]):
+        max_lbl, max_conf = "", 0.0
+        if labels:
+            for label in labels:
+                lbl = label.value
+                conf = label.score
+                if conf > max_conf:
+                    max_lbl = lbl
+                    max_conf = conf
+        return max_lbl, max_conf
 
     def _save_data(self, filename, json_obj):
         file_path = join(self.app_config.out_files_path, filename)
