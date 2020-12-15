@@ -48,6 +48,7 @@ def evaluate(app_config):
     else:
         eval_from_file(app_config=app_config)
     logger.info("Evaluation is finished!")
+    esclient_swo.stop()
 
 
 def eval_from_elasticsearch(app_config):
@@ -66,7 +67,6 @@ def eval_from_elasticsearch(app_config):
         arg_mining.predict(document=document)
         found += 1
     logger.info(f"Found documents: {found}")
-    esclient_swo.stop()
 
 
 def eval_from_file(app_config, filename="kasteli.json"):
@@ -87,14 +87,24 @@ def eval_from_file(app_config, filename="kasteli.json"):
 
 def main():
     app_config: AppConfig = AppConfig()
-    properties = app_config.properties
-    tasks = properties["tasks"]
-    if "prep" in tasks:
-        preprocess(app_config=app_config)
-    if "train" in tasks:
-        train(app_config=app_config)
-    if "eval" in properties["tasks"]:
-        evaluate(app_config=app_config)
+    try:
+        properties = app_config.properties
+        tasks = properties["tasks"]
+        if "prep" in tasks:
+            preprocess(app_config=app_config)
+        if "train" in tasks:
+            train(app_config=app_config)
+        if "eval" in properties["tasks"]:
+            evaluate(app_config=app_config)
+        app_config.send_email(body="Argument mining pipeline finished successfully",
+                              subject="Argument mining run: {}".format(app_config.run))
+    except(BaseException, Exception):
+        try:
+            esclient_swo.stop()
+        except(BaseException, Exception):
+            pass
+        app_config.send_email(body="Argument mining pipeline finished with errors",
+                              subject="Error in argument mining run: {}".format(app_config.run))
 
 
 if __name__ == '__main__':
