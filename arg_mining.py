@@ -303,7 +303,7 @@ class ArgumentMining:
                     self.rel_model.model.predict(sentence)
                     labels = sentence.get_labels()
                     label, conf = self._get_label_with_max_conf(labels=labels)
-                    if label != "other":
+                    if label and label != "other":
                         rel_counter += 1
                         rel_dict = {
                             "id": "R{}".format(rel_counter),
@@ -321,7 +321,7 @@ class ArgumentMining:
                     self.rel_model.model.predict(sentence)
                     labels = sentence.get_labels()
                     label, conf = self._get_label_with_max_conf(labels=labels)
-                    if label != "other":
+                    if label and label != "other":
                         rel_counter += 1
                         rel_dict = {
                             "id": "R{}".format(rel_counter),
@@ -343,7 +343,7 @@ class ArgumentMining:
                     self.stance_model.model.predict(sentence)
                     labels = sentence.get_labels()
                     label, conf = self._get_label_with_max_conf(labels=labels)
-                    if label != "other":
+                    if label and label != "other":
                         stance_counter += 1
                         stance_list = [{
                             "id": "A{}".format(stance_counter),
