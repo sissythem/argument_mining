@@ -23,7 +23,7 @@ def get_initial_json(name, text):
     hash_id = hashlib.md5(name.encode())
     return {
         "id": hash_id.hexdigest(),
-        "title": text,
+        "title": name,
         "link": "",
         "description": "",
         "date": "",
