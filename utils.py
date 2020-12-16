@@ -1,3 +1,4 @@
+import threading
 import hashlib
 import logging
 import os
@@ -17,6 +18,8 @@ from pathlib import Path
 
 import torch
 import yaml
+from elasticsearch import Elasticsearch
+from sshtunnel import SSHTunnelForwarder
 
 
 def name_exceeds_bytes(name):
@@ -55,6 +58,8 @@ class AppConfig:
         random.seed(2020)
         self.documents_pickle = "documents.pkl"
         self._configure()
+        self.elastic_save = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="save")
+        self.elastic_retrieve = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="retrieve")
 
     def _configure(self):
         self.run = uuid.uuid4().hex
@@ -219,3 +224,41 @@ class AppConfig:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
             server.login(self.sender_email, self.password)
             server.sendmail(self.sender_email, self.receiver_email, text)
+
+
+class ElasticSearchConfig:
+
+    def __init__(self, properties, elasticsearch):
+        properties = properties["elastic_save"] if elasticsearch == "save" else properties["elastic_retrieve"]
+        self.username = properties["username"]
+        self.password = properties["password"]
+        self.host = properties["host"]
+        self.port = properties["port"]
+        self.ssh_port = properties["ssh"]["port"]
+        self.ssh_username = properties["ssh"]["username"]
+        self.ssh_key = properties["ssh"]["key_path"]
+        self._init_ssh_tunnel()
+        self._init_elasticsearch_client()
+
+    def _init_ssh_tunnel(self):
+        self.tunnel = SSHTunnelForwarder(
+            ssh_address=self.host,
+            ssh_port=self.ssh_port,
+            ssh_username=self.ssh_username,
+            ssh_private_key=self.ssh_key,
+            remote_bind_address=('127.0.0.1', self.port),
+            compression=True
+        )
+        self.tunnel.start()
+
+    def _init_elasticsearch_client(self, timeout=60):
+        self.elasticsearch_client = Elasticsearch([{
+            'host': 'localhost',
+            'port': self.tunnel.local_bind_port,
+            'http_auth': (self.username, self.password)
+        }], timeout=timeout)
+
+    def stop(self):
+        del self.elasticsearch_client
+        [t.close() for t in threading.enumerate() if t.__class__.__name__ == "Transport"]
+        self.tunnel.stop()
