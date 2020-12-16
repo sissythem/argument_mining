@@ -81,7 +81,8 @@ def save_output_files_to_elasticsearch(path):
     }], timeout=60)
     for filename in os.listdir(path):
         if filename.endswith(".json"):
-            f = open(filename)
+            file_path = join(path, filename)
+            f = open(file_path)
             docket_content = f.read()
             # Send the data into es
             es.index(index='debatelab', ignore=400, doc_type='docket',
