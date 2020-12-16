@@ -250,6 +250,12 @@ class ArgumentMining:
                 claims.append((text, segment_id))
             else:
                 premises.append((text, segment_id))
+        if major_claims:
+            final_mc_str = ""
+            for major_claim in major_claims:
+                final_mc_str += " " + major_claim
+            final_mc_str = final_mc_str.strip()
+            major_claims.append(final_mc_str)
         return major_claims, claims, premises
 
     def _predict_adus(self, document):
