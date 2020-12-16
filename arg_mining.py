@@ -124,8 +124,6 @@ class AduModel(Classifier):
                       mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
                       train_with_dev=self.train_with_dev, save_final_model=self.save_final_model,
                       num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
-        self.model = trainer.model
-        self.model.eval()
 
     def load(self):
         model_path = join(self.base_path, self.model_file)
@@ -189,8 +187,6 @@ class RelationsModel(Classifier):
                       mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
                       train_with_dev=self.train_with_dev, save_final_model=self.save_final_model,
                       num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
-        self.model = trainer.model
-        self.model.eval()
 
     def load(self):
         model_path = join(self.base_path, self.model_file)
