@@ -9,8 +9,7 @@ import torch
 from ellogon import tokeniser
 from flair.data import Corpus, Sentence, Label
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings, \
-    TransformerWordEmbeddings, TransformerDocumentEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.nn import Model
 from flair.trainers import ModelTrainer
@@ -101,19 +100,14 @@ class AduModel(Classifier):
         self.app_logger.debug(tag_dictionary.idx2item)
 
         # 4. initialize embeddings
-        # embedding_types: List[TokenEmbeddings] = [
-        #     BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
-        # ]
-
         embedding_types: List[TokenEmbeddings] = [
-            TransformerWordEmbeddings('nlpaueb/bert-base-greek-uncased-v1', fine_tune=True)
+            BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
         ]
 
         embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
 
         # 5. initialize sequence tagger
         tagger: SequenceTagger = SequenceTagger(hidden_size=self.hidden_size,
-                                                dropout=self.dropout,
                                                 embeddings=embeddings,
                                                 tag_dictionary=tag_dictionary,
                                                 tag_type=tag_type,
@@ -173,12 +167,12 @@ class RelationsModel(Classifier):
         label_dictionary = corpus.make_label_dictionary()
 
         # 3. initialize embeddings
-        document_embeddings = TransformerDocumentEmbeddings('nlpaueb/bert-base-greek-uncased-v1', fine_tune=True)
+        # document_embeddings = TransformerDocumentEmbeddings('nlpaueb/bert-base-greek-uncased-v1', fine_tune=True)
         # document_embeddings.tokenizer.model_max_length = 512
 
         # 3. initialize the document embeddings, mode = mean
-        # bert_embeddings = BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
-        # document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
+        bert_embeddings = BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
+        document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
 
         # 4. create the TextClassifier
         classifier = TextClassifier(document_embeddings=document_embeddings, label_dictionary=label_dictionary,
