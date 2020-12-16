@@ -27,6 +27,7 @@ eval:
 adu_model:
   hidden_size: 256
   rnn_layers: 2
+  dropout: 0.5
   use_crf: True
   learning_rate: 0.0001
   mini_batch_size: 32
