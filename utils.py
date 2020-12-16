@@ -67,12 +67,12 @@ class AppConfig:
         self.app_logger.info("Run id: {}".format(self.run))
 
         # training data
-        self._configure_training_data()
+        self._configure_training_data_and_model_path()
 
         # email
         config = self.properties["config"]
         self._config_email(config=config)
-        self._configure_training_data()
+        self._configure_training_data_and_model_path()
 
     def _configure_device(self):
         if torch.cuda.is_available():
@@ -155,7 +155,7 @@ class AppConfig:
             pass
         return base_path
 
-    def _configure_training_data(self):
+    def _configure_training_data_and_model_path(self):
         self.adu_base_path = self._get_base_path(base_name="adu_model")
         self.rel_base_path = self._get_base_path(base_name="rel_model")
         self.stance_base_path = self._get_base_path(base_name="stance_model")
