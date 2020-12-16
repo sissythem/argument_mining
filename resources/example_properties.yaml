@@ -3,6 +3,24 @@ config:
     sender: "example@gmail.com"
     receiver: "example@gmail.com"
     password: "password"
+  elastic_save:
+    username: "debatelab"
+    password: "password"
+    host: "143.233.226.60"
+    port: 9200
+    ssh:
+      port: 222
+      username: "debatelab"
+      key_path: "/path/to/key"
+  elastic_retrieve:
+    username: "elastic"
+    password: "password"
+    host: "socialwebobservatory.iit.demokritos.gr"
+    port: 9200
+    ssh:
+      port: 222
+      username: "debatelab"
+      key_path: "/path/to/key"
   adu_data:
     train_csv: "train_adu.csv"
     dev_csv: "dev_adu.csv"

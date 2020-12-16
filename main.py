@@ -1,11 +1,10 @@
 import json
+import os
 import traceback
 from os.path import join
 
 from elasticsearch_dsl import Search
-from ellogon import esclient_swo
-import requests, json, os
-from elasticsearch import Elasticsearch
+
 import utils
 from arg_mining import AduModel, RelationsModel, ArgumentMining
 from training_data import DataLoader
@@ -54,7 +53,7 @@ def evaluate(app_config):
 
 def eval_from_elasticsearch(app_config):
     logger = app_config.app_logger
-    client = esclient_swo.elastic_server_client
+    client = app_config.elastic_retrieve.elasticsearch_client
     file_path = join(app_config.resources_path, "kasteli_34_urls.txt")
     # read the list of urls from the file:
     with open(file_path, "r") as f:
@@ -70,15 +69,12 @@ def eval_from_elasticsearch(app_config):
         arg_mining.predict(document=document)
         found += 1
     logger.info(f"Found documents: {found}")
-    save_output_files_to_elasticsearch(path=app_config.out_files_path)
+    save_output_files_to_elasticsearch(app_config=app_config)
 
 
-def save_output_files_to_elasticsearch(path):
-    es = Elasticsearch([{
-        'host': '143.233.226.60',
-        'port': "9200",
-        'http_auth': ('debatelab', 'SRr4TqV9rPjfzxUmYcjR4R92')
-    }], timeout=60)
+def save_output_files_to_elasticsearch(app_config):
+    es = app_config.elastic_save.elasticsearch_client
+    path = app_config.out_files_path
     for filename in os.listdir(path):
         if filename.endswith(".json"):
             file_path = join(path, filename)
@@ -123,9 +119,11 @@ def main():
             subject="Error in argument mining run: {}".format(app_config.run))
     finally:
         try:
-            esclient_swo.stop()
+            app_config.elastic_save.stop()
+            app_config.elastic_retrieve.stop()
         except(BaseException, Exception):
-            pass
+            app_config.app_logger.error("Could not close ssh tunnels")
+            exit(-1)
 
 
 if __name__ == '__main__':
