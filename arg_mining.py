@@ -32,7 +32,7 @@ class Classifier:
         self.train_file: str = train_csv
         self.test_file: str = test_csv
         self.base_path: str = base_path
-        self.model_file: str = "best-model.pt"
+        self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
         self.model: Model = None
         self.optimizer: Optimizer = self.get_optimizer()
         flair.device = torch.device(app_config.device_name)

@@ -23,6 +23,7 @@ preprocessing:
   pad_token: 0
 eval:
   source: "elasticsearch" # options: elasticsearch, file
+  model: "best" # options: best, final
 adu_model:
   hidden_size: 256
   rnn_layers: 2
