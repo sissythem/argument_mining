@@ -69,6 +69,7 @@ class AduModel(Classifier):
         self.hidden_size: int = self.model_properties["hidden_size"]
         self.use_crf: bool = self.model_properties["use_crf"]
         self.rnn_layers: int = self.model_properties["rnn_layers"]
+        self.dropout: float = self.model_properties["dropout"]
         self.learning_rate: float = self.model_properties["learning_rate"]
         self.mini_batch_size: int = self.model_properties["mini_batch_size"]
         self.max_epochs: int = self.model_properties["max_epochs"]
@@ -112,6 +113,7 @@ class AduModel(Classifier):
 
         # 5. initialize sequence tagger
         tagger: SequenceTagger = SequenceTagger(hidden_size=self.hidden_size,
+                                                dropout=self.dropout,
                                                 embeddings=embeddings,
                                                 tag_dictionary=tag_dictionary,
                                                 tag_type=tag_type,
