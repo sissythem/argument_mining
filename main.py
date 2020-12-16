@@ -4,7 +4,8 @@ from os.path import join
 
 from elasticsearch_dsl import Search
 from ellogon import esclient_swo
-
+import requests, json, os
+from elasticsearch import Elasticsearch
 import utils
 from arg_mining import AduModel, RelationsModel, ArgumentMining
 from training_data import DataLoader
@@ -69,6 +70,22 @@ def eval_from_elasticsearch(app_config):
         arg_mining.predict(document=document)
         found += 1
     logger.info(f"Found documents: {found}")
+    save_output_files_to_elasticsearch(path=app_config.out_files_path)
+
+
+def save_output_files_to_elasticsearch(path):
+    es = Elasticsearch([{
+        'host': '143.233.226.60',
+        'port': "9200",
+        'http_auth': ('debatelab', 'SRr4TqV9rPjfzxUmYcjR4R92')
+    }], timeout=60)
+    for filename in os.listdir(path):
+        if filename.endswith(".json"):
+            f = open(filename)
+            docket_content = f.read()
+            # Send the data into es
+            es.index(index='debatelab', ignore=400, doc_type='docket',
+                     body=json.loads(docket_content))
 
 
 def eval_from_file(app_config, filename="kasteli.json"):
