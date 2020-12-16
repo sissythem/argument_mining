@@ -58,8 +58,10 @@ class AppConfig:
         random.seed(2020)
         self.documents_pickle = "documents.pkl"
         self._configure()
-        self.elastic_save = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="save")
         self.elastic_retrieve = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="retrieve")
+
+        # TODO fix ssh tunnel for elasticsearch for saving documents
+        self.elastic_save = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="save")
 
     def _configure(self):
         self.run = uuid.uuid4().hex
