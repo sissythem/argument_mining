@@ -248,8 +248,6 @@ class ArgumentMining:
 
     def _predict_adus(self, document):
         # init document id & annotations
-        hash_id = hashlib.md5(document["title"].encode())
-        document["id"] = hash_id.hexdigest()
         document["annotations"] = {
             "ADUs": [],
             "Relations": []
