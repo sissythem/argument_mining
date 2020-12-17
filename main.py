@@ -3,7 +3,6 @@ import traceback
 from os.path import join
 
 from elasticsearch_dsl import Search
-from ellogon import esclient_swo
 
 import utils
 from arg_mining import AduModel, RelationsModel, ArgumentMining
@@ -53,16 +52,14 @@ def evaluate(app_config):
 
 def eval_from_elasticsearch(app_config):
     logger = app_config.app_logger
-    # client = app_config.elastic_retrieve.elasticsearch_client
-    client = esclient_swo.elastic_server_client
-    es = app_config.elastic_save.elasticsearch_client
-
+    client = app_config.elastic_retrieve.elasticsearch_client
+    # client = esclient_swo.elastic_server_client
+    # es = app_config.elastic_save.elasticsearch_client
     file_path = join(app_config.resources_path, "kasteli_34_urls.txt")
     # read the list of urls from the file:
     with open(file_path, "r") as f:
         urls = [line.rstrip() for line in f]
     search_articles = Search(using=client, index='articles').filter('terms', link=urls)
-    # print(search_articles.to_dict())
     found = 0
     arg_mining = ArgumentMining(app_config=app_config)
     ids = []
@@ -72,8 +69,8 @@ def eval_from_elasticsearch(app_config):
         ids.append(document["id"])
         if not document["content"].startswith(document["title"]):
             document["content"] = document["title"] + "\r\n\r\n" + document["content"]
-        document = arg_mining.predict(document=document)
-        es.index(index='debatelab', ignore=400, doc_type='docket', id=document["id"], body=document)
+        arg_mining.predict(document=document)
+        # es.index(index='debatelab', ignore=400, doc_type='docket', id=document["id"], body=document)
         found += 1
     logger.info(f"Found documents: {found}")
     logger.info("Saved ids: {}".format(ids))
@@ -113,9 +110,9 @@ def main():
             subject="Error in argument mining run: {}".format(app_config.run))
     finally:
         try:
-            # app_config.elastic_save.stop()
-            # app_config.elastic_retrieve.stop()
-            esclient_swo.stop()
+            app_config.elastic_save.stop()
+            app_config.elastic_retrieve.stop()
+            # esclient_swo.stop()
         except(BaseException, Exception):
             app_config.app_logger.error("Could not close ssh tunnels")
             exit(-1)

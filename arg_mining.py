@@ -229,7 +229,9 @@ class ArgumentMining:
         if utils.name_exceeds_bytes(filename):
             filename = document["id"] + ".json"
         self._save_data(filename=filename, json_obj=json_obj)
-        return json_obj
+        self.app_config.elastic_save.index(index='debatelab', ignore=400, doc_type='docket', id=json_obj["id"],
+                                           body=json_obj)
+        # return json_obj
 
     @staticmethod
     def _get_adus(segments):
