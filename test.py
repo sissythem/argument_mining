@@ -15,7 +15,7 @@ def read_docs(path):
             file_path = join(path, filename)
             with open(file_path, "r") as f:
                 document = json.load(f)
-                title = document["title"][:int(len(document["title"])/2)]
+                title = document["title"][:int(len(document["title"]) / 2)]
                 doc_dict[title] = (document["title"], document["content"])
     return doc_dict
 
@@ -34,5 +34,17 @@ def main():
                     print("Elastic title: {}".format(elastic_value[0]))
 
 
+def clear_elastic():
+    from elasticsearch import Elasticsearch
+    from elasticsearch_dsl import Search, Q
+    client = Elasticsearch([{
+        "host": "143.233.226.60",
+        "port": 9200,
+        "http_auth": ("debatelab", "SRr4TqV9rPjfzxUmYcjR4R92")
+    }], timeout=60)
+    s = Search(using=client, index="debatelab").query("match_all").delete()
+
+
 if __name__ == '__main__':
-    main()
+    # main()
+    clear_elastic()
