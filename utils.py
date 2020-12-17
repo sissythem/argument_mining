@@ -62,7 +62,7 @@ class AppConfig:
         random.seed(2020)
         self.documents_pickle = "documents.pkl"
         self._configure()
-        # self.elastic_retrieve = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="retrieve")
+        self.elastic_retrieve = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="retrieve")
         self.elastic_save = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="save")
 
     def _configure(self):
@@ -241,8 +241,7 @@ class ElasticSearchConfig:
         self.ssh_port = properties["ssh"]["port"]
         self.ssh_username = properties["ssh"]["username"]
         self.ssh_key = properties["ssh"]["key_path"]
-        # TODO fix ssh tunnel for elasticsearch for saving documents
-        # self._init_ssh_tunnel()
+        self._init_ssh_tunnel()
         self._init_elasticsearch_client()
 
     def _init_ssh_tunnel(self):
@@ -258,8 +257,8 @@ class ElasticSearchConfig:
 
     def _init_elasticsearch_client(self, timeout=60):
         self.elasticsearch_client = Elasticsearch([{
-            'host': "143.233.226.60",  # "localhost"
-            'port': 9200,  # self.tunnel.local_bind_port
+            'host': "localhost",
+            'port': self.tunnel.local_bind_port,
             'http_auth': (self.username, self.password)
         }], timeout=timeout)
 
