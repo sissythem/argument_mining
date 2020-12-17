@@ -30,10 +30,14 @@ def utf8len(s):
     return len(s.encode('utf-8'))
 
 
+def create_document_id(text):
+    hash_id = hashlib.md5(text.encode())
+    return hash_id.hexdigest()
+
+
 def get_initial_json(name, text):
-    hash_id = hashlib.md5(name.encode())
     return {
-        "id": hash_id.hexdigest(),
+        "id": create_document_id(text=name),
         "title": name,
         "link": "",
         "description": "",
