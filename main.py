@@ -53,8 +53,7 @@ def evaluate(app_config):
 def eval_from_elasticsearch(app_config):
     logger = app_config.app_logger
     client = app_config.elastic_retrieve.elasticsearch_client
-    # client = esclient_swo.elastic_server_client
-    # es = app_config.elastic_save.elasticsearch_client
+    # TODO retrieve previous day's articles
     file_path = join(app_config.resources_path, "kasteli_34_urls.txt")
     # read the list of urls from the file:
     with open(file_path, "r") as f:
@@ -70,7 +69,6 @@ def eval_from_elasticsearch(app_config):
         if not document["content"].startswith(document["title"]):
             document["content"] = document["title"] + "\r\n\r\n" + document["content"]
         arg_mining.predict(document=document)
-        # es.index(index='debatelab', ignore=400, doc_type='docket', id=document["id"], body=document)
         found += 1
     logger.info(f"Found documents: {found}")
     logger.info("Saved ids: {}".format(ids))
