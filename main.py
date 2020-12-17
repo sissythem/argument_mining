@@ -55,6 +55,8 @@ def eval_from_elasticsearch(app_config):
     logger = app_config.app_logger
     # client = app_config.elastic_retrieve.elasticsearch_client
     client = esclient_swo.elastic_server_client
+    es = app_config.elastic_save.elasticsearch_client
+
     file_path = join(app_config.resources_path, "kasteli_34_urls.txt")
     # read the list of urls from the file:
     with open(file_path, "r") as f:
@@ -65,25 +67,13 @@ def eval_from_elasticsearch(app_config):
     arg_mining = ArgumentMining(app_config=app_config)
     for hit in search_articles.scan():
         document = hit.to_dict()
+        document["id"] = utils.create_document_id(text=document["link"])
         if not document["content"].startswith(document["title"]):
             document["content"] = document["title"] + "\r\n\r\n" + document["content"]
-        arg_mining.predict(document=document)
+        document = arg_mining.predict(document=document)
+        es.index(index='debatelab', ignore=400, doc_type='docket', id=document["id"], body=document)
         found += 1
     logger.info(f"Found documents: {found}")
-    save_output_files_to_elasticsearch(app_config=app_config)
-
-
-def save_output_files_to_elasticsearch(app_config):
-    es = app_config.elastic_save.elasticsearch_client
-    path = app_config.out_files_path
-    for filename in os.listdir(path):
-        if filename.endswith(".json"):
-            file_path = join(path, filename)
-            f = open(file_path)
-            docket_content = f.read()
-            # Send the data into es
-            es.index(index='debatelab', ignore=400, doc_type='docket',
-                     body=json.loads(docket_content))
 
 
 def eval_from_file(app_config, filename="kasteli.json"):
