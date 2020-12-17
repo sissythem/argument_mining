@@ -307,7 +307,8 @@ class ArgumentMining:
                             "id": "R{}".format(rel_counter),
                             "type": label,
                             "arg1": claim[1],
-                            "arg2": major_claim[1]
+                            "arg2": major_claim[1],
+                            "confidence": conf
                         }
                         json_obj["annotations"]["Relations"].append(rel_dict)
         if claims and premises:
@@ -325,7 +326,8 @@ class ArgumentMining:
                             "id": "R{}".format(rel_counter),
                             "type": label,
                             "arg1": premise[1],
-                            "arg2": claim[1]
+                            "arg2": claim[1],
+                            "confidence": conf
                         }
                         json_obj["annotations"]["Relations"].append(rel_dict)
         return json_obj
