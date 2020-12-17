@@ -65,15 +65,18 @@ def eval_from_elasticsearch(app_config):
     # print(search_articles.to_dict())
     found = 0
     arg_mining = ArgumentMining(app_config=app_config)
+    ids = []
     for hit in search_articles.scan():
         document = hit.to_dict()
         document["id"] = utils.create_document_id(text=document["link"])
+        ids.append(document["id"])
         if not document["content"].startswith(document["title"]):
             document["content"] = document["title"] + "\r\n\r\n" + document["content"]
         document = arg_mining.predict(document=document)
         es.index(index='debatelab', ignore=400, doc_type='docket', id=document["id"], body=document)
         found += 1
     logger.info(f"Found documents: {found}")
+    logger.info("Saved ids: {}".format(ids))
 
 
 def eval_from_file(app_config, filename="kasteli.json"):
