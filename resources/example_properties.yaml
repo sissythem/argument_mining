@@ -39,9 +39,13 @@ preprocessing:
   repl_char: "="
   max_len: 512
   pad_token: 0
+train:
+  models: ["adu", "rel", "stance"]
 eval:
   source: "elasticsearch" # options: elasticsearch, file
+  target: "elasticsearch" # options: elasticsearch, file
   model: "best" # options: best, final
+  last_date: ""
 adu_model:
   hidden_size: 256
   rnn_layers: 2
