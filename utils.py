@@ -58,7 +58,7 @@ class AppConfig:
         random.seed(2020)
         self.documents_pickle = "documents.pkl"
         self._configure()
-        self.elastic_retrieve = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="retrieve")
+        # self.elastic_retrieve = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="retrieve")
         self.elastic_save = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="save")
 
     def _configure(self):

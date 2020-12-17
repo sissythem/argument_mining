@@ -4,7 +4,7 @@ import traceback
 from os.path import join
 
 from elasticsearch_dsl import Search
-
+from ellogon import esclient_swo
 import utils
 from arg_mining import AduModel, RelationsModel, ArgumentMining
 from training_data import DataLoader
@@ -53,7 +53,8 @@ def evaluate(app_config):
 
 def eval_from_elasticsearch(app_config):
     logger = app_config.app_logger
-    client = app_config.elastic_retrieve.elasticsearch_client
+    # client = app_config.elastic_retrieve.elasticsearch_client
+    client = esclient_swo.elastic_server_client
     file_path = join(app_config.resources_path, "kasteli_34_urls.txt")
     # read the list of urls from the file:
     with open(file_path, "r") as f:
@@ -119,8 +120,9 @@ def main():
             subject="Error in argument mining run: {}".format(app_config.run))
     finally:
         try:
-            app_config.elastic_save.stop()
-            app_config.elastic_retrieve.stop()
+            # app_config.elastic_save.stop()
+            # app_config.elastic_retrieve.stop()
+            esclient_swo.stop()
         except(BaseException, Exception):
             app_config.app_logger.error("Could not close ssh tunnels")
             exit(-1)
