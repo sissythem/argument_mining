@@ -7,3 +7,5 @@ __pycache__/
 resources/
 !resources/example_properties.yaml
 !resources/kasteli_34_urls.txt
+retrieve_articles.py
+test.py
