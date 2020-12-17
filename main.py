@@ -68,7 +68,7 @@ def eval_from_elasticsearch(app_config):
     ids = []
     for hit in search_articles.scan():
         document = hit.to_dict()
-        document["id"] = utils.create_document_id(text=document["link"])
+        document["id"] = hit.meta["id"]
         ids.append(document["id"])
         if not document["content"].startswith(document["title"]):
             document["content"] = document["title"] + "\r\n\r\n" + document["content"]
