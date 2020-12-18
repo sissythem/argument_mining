@@ -272,8 +272,6 @@ class ArgumentMining:
             current_idx = 0
         if current_idx >= len(tokens):
             self.app_logger.debug("Sequence ended")
-            last_token = tokens[-1]
-            segment.end = last_token.end_pos
             return segment, None
         token = tokens[current_idx]
         raw_label = token.get_tag(label_type=None)
