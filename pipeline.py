@@ -2,6 +2,7 @@ import json
 from os.path import join
 from typing import List
 
+import numpy as np
 from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
@@ -13,6 +14,14 @@ from utils import AppConfig
 
 
 class ArgumentMining:
+    class Segment:
+
+        def __init__(self, text, label, char_start, char_end=None):
+            self.text = text
+            self.label = label
+            self.start = char_start
+            self.end = char_end
+            self.confidences = None
 
     def __init__(self, app_config):
         self.app_config: AppConfig = app_config
@@ -83,7 +92,7 @@ class ArgumentMining:
         # properties = self.app_config.properties
         # properties["eval"]["last_date"] = now
         # with open(join(self.app_config.resources_path, self.app_config.properties_file), "w") as f:
-            # yaml.dump(properties, f)
+        # yaml.dump(properties, f)
         return documents, ids
 
     def _retrieve_from_file(self, filename="kasteli.json"):
@@ -127,30 +136,32 @@ class ArgumentMining:
             sentence = Sentence(sentence)
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
-            segment_text, segment_type = self._get_args_from_sentence(sentence)
-            if segment_text and segment_type:
-                self.app_logger.debug("Segment text: {}".format(segment_text))
-                self.app_logger.debug("Segment type: {}".format(segment_type))
-                segment_counter += 1
-                try:
-                    start_idx = document["content"].index(segment_text)
-                except(Exception, BaseException):
-                    try:
-                        start_idx = document["content"].index(segment_text[:4])
-                    except(Exception, BaseException):
-                        start_idx = None
-                if start_idx:
-                    end_idx = start_idx + len(segment_text)
-                else:
-                    start_idx, end_idx = "", ""
-                seg = {
-                    "id": "T{}".format(segment_counter),
-                    "type": segment_type,
-                    "starts": str(start_idx),
-                    "ends": str(end_idx),
-                    "segment": segment_text
-                }
-                document["annotations"]["ADUs"].append(seg)
+            segments: ArgumentMining.Segment = self._get_args_from_sentence(sentence)
+            if segments:
+                for segment in segments:
+                    if segment.text and segment.label:
+                        self.app_logger.debug("Segment text: {}".format(segment.text))
+                        self.app_logger.debug("Segment type: {}".format(segment.label))
+                        segment_counter += 1
+                        try:
+                            start_idx = document["content"].index(segment.text)
+                        except(Exception, BaseException):
+                            try:
+                                start_idx = document["content"].index(segment.text[:10])
+                            except(Exception, BaseException):
+                                start_idx = None
+                        if start_idx:
+                            end_idx = start_idx + len(segment.text)
+                        else:
+                            start_idx, end_idx = "", ""
+                        seg = {
+                            "id": "T{}".format(segment_counter),
+                            "type": segment.label,
+                            "starts": str(start_idx),
+                            "ends": str(end_idx),
+                            "segment": segment.text
+                        }
+                        document["annotations"]["ADUs"].append(seg)
         return document
 
     @staticmethod
@@ -245,38 +256,52 @@ class ArgumentMining:
         return max_lbl, max_conf
 
     def _get_args_from_sentence(self, sentence: Sentence):
-        tagged_string = sentence.to_tagged_string()
-        tagged_string_split = tagged_string.split()
-        words, labels = [], []
-        for tok in tagged_string_split:
-            if tok.startswith("<"):
-                tok = tok.replace("<", "")
-                tok = tok.replace(">", "")
-                labels.append(tok)
-            else:
-                words.append(tok)
-        self.app_logger.debug("Words and labels for current sentence: {}".format(words, labels))
-        self.app_logger.debug("Extracting ADU from sentence...")
-        idx = 0
-        segment_text, segment_type = "", ""
-        while idx < len(labels):
-            label = labels[idx]
-            self.app_logger.debug("Current label: {}".format(label))
-            if label.startswith("B-"):
-                segment_type = label.replace("B-", "")
-                self.app_logger.debug("Found ADU with type: {}".format(segment_type))
-                segment_text = words[idx]
-                next_correct_label = "I-{}".format(segment_type)
-                idx += 1
-                if idx >= len(labels):
+        if sentence.tokens:
+            segments = []
+            while True:
+                segment_text, segment_label, confidences, idx = self._get_next_segment(sentence.tokens)
+                segment_confidence = np.mean(confidences)
+                segments.append((segment_text, segment_label, segment_confidence))
+                if idx is None:
                     break
-                next_label = labels[idx]
-                while next_label == next_correct_label:
-                    segment_text += " {}".format(words[idx])
-                    idx += 1
-                    if idx >= len(labels):
-                        break
-                    next_label = labels[idx]
+            return segments
+
+    def _get_next_segment(self, tokens, current_idx=None, current_label=None, segment: Segment = None):
+        if current_idx is None:
+            current_idx = 0
+        if current_idx >= len(tokens):
+            self.app_logger.debug("Sequence ended")
+            last_token = tokens[-1]
+            segment.end = last_token.end_pos
+            return segment, None
+        if segment.confidences is None:
+            segment.confidences = []
+        token = tokens[current_idx]
+
+        raw_label = token.get_tag(label_type=None)
+        lbl_txt = raw_label.value
+        confidence = raw_label.score
+
+        label_type, label = lbl_txt.split()
+
+        # if we're already tracking a contiguous segment:
+        if current_label is not None:
+            if label_type == "I" and current_label == label:
+                # append to the running collections
+                segment.text += token.text
+                segment.confidences.append(confidence)
+                return self._get_next_segment(tokens, current_idx + 1, current_label, segment)
             else:
-                idx += 1
-        return segment_text, segment_type
+                # new segment, different than the current one
+                # next function call should start at the current_idx
+                self.app_logger.debug("Returning completed segment: {}".format(segment.text))
+                segment.end = token.start_pos - 1
+                return segment, current_idx
+        else:
+            # only care about B-tags to start a segment
+            if label_type == "B":
+                segment = ArgumentMining.Segment(text=token.text, label=label, char_start=token.start_pos)
+                segment.confidences.append(confidence)
+                return self._get_next_segment(tokens, current_idx + 1, label, segment)
+            else:
+                return self._get_next_segment(tokens, current_idx + 1, None, segment)
