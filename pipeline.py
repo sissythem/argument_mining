@@ -256,13 +256,42 @@ class ArgumentMining:
     def _get_args_from_sentence(self, sentence: Sentence):
         if sentence.tokens:
             segments = []
-            while True:
-                segment, idx = self._get_next_segment(sentence.tokens)
-                if segment:
-                    segment.mean_conf = np.mean(segment.confidences)
-                    segments.append(segment)
-                if idx is None:
-                    break
+            idx = 0
+            while idx < len(sentence.tokens):
+                token = sentence.tokens[idx]
+                label = token.get_tag(label_type=None)
+                confidence = label.score
+                label = label.value
+                if label.startswith("B-"):
+                    text = token.text
+                    label = label.replace("B-", "")
+                    segment = ArgumentMining.Segment(text=text, label=label)
+                    segment.confidences.append(confidence)
+
+                    next_correct_label = "I-{}".format(label)
+                    next_label = next_correct_label
+                    while next_label == next_correct_label:
+                        idx += 1
+                        if idx >= len(sentence.tokens):
+                            break
+                        next_token = sentence.tokens[idx]
+                        next_label = next_token.get_tag(label_type=None)
+                        segment.confidences.append(next_label.score)
+                        next_label = next_label.value
+                        if next_label == next_correct_label:
+                            text += " " + next_token.text
+                            segment.confidences.append(confidence)
+                        else:
+                            segment.mean_conf = np.mean(segment.confidences)
+                            segments.append(segment)
+
+            # while True:
+            #     segment, idx = self._get_next_segment(sentence.tokens)
+            #     if segment:
+            #         segment.mean_conf = np.mean(segment.confidences)
+            #         segments.append(segment)
+            #     if idx is None:
+            #         break
             return segments
 
     def _get_next_segment(self, tokens, current_idx=None, current_label=None, segment: Segment = None):
@@ -292,7 +321,6 @@ class ArgumentMining:
                 # new segment, different than the current one
                 # next function call should start at the current_idx
                 self.app_logger.debug("Returning completed segment: {}".format(segment.text))
-                segment.end = token.start_pos - 1
                 return segment, current_idx
         else:
             # only care about B-tags to start a segment
