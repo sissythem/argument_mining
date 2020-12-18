@@ -256,8 +256,9 @@ class ArgumentMining:
     def _get_args_from_sentence(self, sentence: Sentence):
         if sentence.tokens:
             segments = []
+            idx = None
             while True:
-                segment, idx = self._get_next_segment(sentence.tokens)
+                segment, idx = self._get_next_segment(sentence.tokens, current_idx=idx)
                 if segment:
                     segment.mean_conf = np.mean(segment.confidences)
                     segments.append(segment)
