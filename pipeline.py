@@ -289,7 +289,7 @@ class ArgumentMining:
         if current_label is not None:
             if label_type == "I" and current_label == label:
                 # append to the running collections
-                segment.text += token.text
+                segment.text += " " + token.text
                 segment.confidences.append(confidence)
                 return self._get_next_segment(tokens, current_idx + 1, current_label, segment)
             else:
