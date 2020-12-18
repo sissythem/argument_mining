@@ -15,12 +15,9 @@ from utils import AppConfig
 
 class ArgumentMining:
     class Segment:
-
-        def __init__(self, text, label, char_start, char_end=None):
+        def __init__(self, text, label):
             self.text = text
             self.label = label
-            self.start = char_start
-            self.end = char_end
             self.confidences = []
             self.mean_conf = 0.0
 
@@ -258,7 +255,7 @@ class ArgumentMining:
 
     def _get_args_from_sentence(self, sentence: Sentence):
         if sentence.tokens:
-            segments: List[ArgumentMining.Segment] = []
+            segments = []
             while True:
                 segment, idx = self._get_next_segment(sentence.tokens)
                 segment.mean_conf = np.mean(segment.confidences)
@@ -299,7 +296,7 @@ class ArgumentMining:
         else:
             # only care about B-tags to start a segment
             if label_type == "B":
-                segment = ArgumentMining.Segment(text=token.text, label=label, char_start=token.start_pos)
+                segment = ArgumentMining.Segment(text=token.text, label=label)
                 segment.confidences.append(confidence)
                 return self._get_next_segment(tokens, current_idx + 1, label, segment)
             else:
