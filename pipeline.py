@@ -21,7 +21,7 @@ class ArgumentMining:
             self.label = label
             self.start = char_start
             self.end = char_end
-            self.confidences = None
+            self.confidences = []
 
     def __init__(self, app_config):
         self.app_config: AppConfig = app_config
@@ -274,15 +274,15 @@ class ArgumentMining:
             last_token = tokens[-1]
             segment.end = last_token.end_pos
             return segment, None
-        if segment.confidences is None:
-            segment.confidences = []
         token = tokens[current_idx]
-
         raw_label = token.get_tag(label_type=None)
         lbl_txt = raw_label.value
         confidence = raw_label.score
-
-        label_type, label = lbl_txt.split()
+        label_parts = lbl_txt.split("-")
+        if len(label_parts) > 1:
+            label_type, label = label_parts[0], label_parts[1]
+        else:
+            label_type, label = None, lbl_txt
 
         # if we're already tracking a contiguous segment:
         if current_label is not None:
