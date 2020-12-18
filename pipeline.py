@@ -22,6 +22,7 @@ class ArgumentMining:
             self.start = char_start
             self.end = char_end
             self.confidences = []
+            self.mean_conf = 0.0
 
     def __init__(self, app_config):
         self.app_config: AppConfig = app_config
@@ -257,11 +258,11 @@ class ArgumentMining:
 
     def _get_args_from_sentence(self, sentence: Sentence):
         if sentence.tokens:
-            segments = []
+            segments: List[ArgumentMining.Segment] = []
             while True:
-                segment_text, segment_label, confidences, idx = self._get_next_segment(sentence.tokens)
-                segment_confidence = np.mean(confidences)
-                segments.append((segment_text, segment_label, segment_confidence))
+                segment, idx = self._get_next_segment(sentence.tokens)
+                segment.mean_conf = np.mean(segment.confidences)
+                segments.append(segment)
                 if idx is None:
                     break
             return segments
