@@ -284,6 +284,7 @@ class ArgumentMining:
                         else:
                             segment.mean_conf = np.mean(segment.confidences)
                             segments.append(segment)
+                    idx += 1
 
             # while True:
             #     segment, idx = self._get_next_segment(sentence.tokens)
