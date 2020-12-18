@@ -157,7 +157,8 @@ class ArgumentMining:
                             "type": segment.label,
                             "starts": str(start_idx),
                             "ends": str(end_idx),
-                            "segment": segment.text
+                            "segment": segment.text,
+                            "confidence": segment.mean_conf
                         }
                         document["annotations"]["ADUs"].append(seg)
         return document
