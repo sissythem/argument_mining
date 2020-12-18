@@ -258,8 +258,9 @@ class ArgumentMining:
             segments = []
             while True:
                 segment, idx = self._get_next_segment(sentence.tokens)
-                segment.mean_conf = np.mean(segment.confidences)
-                segments.append(segment)
+                if segment:
+                    segment.mean_conf = np.mean(segment.confidences)
+                    segments.append(segment)
                 if idx is None:
                     break
             return segments
