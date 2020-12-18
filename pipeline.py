@@ -5,6 +5,7 @@ from typing import List
 from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
+# import yaml
 
 import utils
 from classifiers import AduModel, RelationsModel
@@ -59,6 +60,7 @@ class ArgumentMining:
     def _retrieve_from_elasticsearch(self):
         documents, ids = [], []
         client = self.app_config.elastic_retrieve.elasticsearch_client
+
         file_path = join(self.app_config.resources_path, "kasteli_34_urls.txt")
         # read the list of urls from the file:
         with open(file_path, "r") as f:
@@ -76,6 +78,12 @@ class ArgumentMining:
                 document["content"] = document["title"] + "\r\n\r\n" + document["content"]
             ids.append(document["id"])
             documents.append(document)
+
+        # update last search date
+        # properties = self.app_config.properties
+        # properties["eval"]["last_date"] = now
+        # with open(join(self.app_config.resources_path, self.app_config.properties_file), "w") as f:
+            # yaml.dump(properties, f)
         return documents, ids
 
     def _retrieve_from_file(self, filename="kasteli.json"):
@@ -117,7 +125,7 @@ class ArgumentMining:
             self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
             sentence = " ".join(list(sentence))
             sentence = Sentence(sentence)
-            self.adu_model.model.predict(sentence)
+            self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
             segment_text, segment_type = self._get_args_from_sentence(sentence)
             if segment_text and segment_type:
