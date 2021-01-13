@@ -3,6 +3,7 @@ from os.path import join
 from typing import List
 
 import numpy as np
+import requests
 from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
@@ -118,9 +119,16 @@ class ArgumentMining:
 
     def _predict_adus(self, document):
         # init document id & annotations
+        entities = []
+        data = {"text": document["content"]}
+        url = self.app_config.properties["ner_endpoint"]
+        response = requests.post(url, data=data)
+        if response.status_code == 200:
+            entities = json.loads(response.text)
         document["annotations"] = {
             "ADUs": [],
-            "Relations": []
+            "Relations": [],
+            "entities": entities
         }
 
         self.app_logger.debug(
