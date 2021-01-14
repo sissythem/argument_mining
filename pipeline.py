@@ -114,12 +114,27 @@ class ArgumentMining:
                 ids.append(document["id"])
         return documents, ids
 
+    def predict(self, document):
+        document["topics"] = self._get_topics(content=document["content"])
+        entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
+        segments = self._predict_adus(document=document)
+        major_claims, claims, premises = self._get_adus(segments)
+        relations = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises)
+        document["annotations"] = {
+            "ADUs": segments,
+            "Relations": relations,
+            "entities": entities
+        }
+        document = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
+        return document
+
     def _get_topics(self, content):
         n_features = 1000
         n_components = 400
         n_top_words = 10
         greek_stopwords = stopwords.words("greek")
-        regex = re.compile(r'\b(' + greek_stopwords + ')\b', flags=re.IGNORECASE)
+        gr_stopwords_str = '|'.join(greek_stopwords)
+        regex = re.compile(r'\b(' + gr_stopwords_str + ')\b', flags=re.IGNORECASE)
         processed_content = regex.sub("", content)
         self.app_logger.info("Extracting topics")
         tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
@@ -136,20 +151,6 @@ class ArgumentMining:
         for topic_idx, topic in enumerate(lda.components_):
             topics += [feature_names[i] for i in topic.argsort()[:-n_top_words - 1:-1]]
         return topics
-
-    def predict(self, document):
-        entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
-        segments = self._predict_adus(document=document)
-        major_claims, claims, premises = self._get_adus(segments)
-        relations = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises)
-        document["annotations"] = {
-            "ADUs": segments,
-            "Relations": relations,
-            "entities": entities
-        }
-        document["topics"] = self._get_topics(content=document["content"])
-        json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
-        return json_obj
 
     def _get_named_entities(self, doc_id, content):
         entities = []
