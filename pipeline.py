@@ -124,6 +124,9 @@ class ArgumentMining:
         response = requests.post(url, data=data)
         if response.status_code == 200:
             entities = json.loads(response.text)
+        else:
+            self.app_logger.error("Could not retrieve named entities")
+            self.app_logger.error(f"Status code: {response.status_code}, reason: {response.text}")
         return entities
 
     def _predict_adus(self, document):
