@@ -138,10 +138,14 @@ class ArgumentMining:
         corpus = [dictionary.doc2bow(text) for text in texts]
         tfidf = models.TfidfModel(corpus)
         corpus_tfidf = tfidf[corpus]
-        lda_model = models.LdaModel(corpus, id2word=dictionary, num_topics=100)
+        lda_model = models.LdaModel(corpus, id2word=dictionary, num_topics=10)
         lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
                                               workers=4)
         topics = []
+        topics_words = lda_model_tfidf.show_topics(num_topics=10, num_words=5, formatted=False)
+        topics_words = [(tp[0], [wd[0] for wd in tp[1]]) for tp in topics_words]
+        for topic, words in topics_words:
+            topics.append(" ".join(words))
         for idx, topic in lda_model_tfidf.print_topics(-1):
             topics.append(topic)
             self.app_logger.debug(f'Topic: {idx} Word: {topic}')
