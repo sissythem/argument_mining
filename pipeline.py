@@ -127,7 +127,7 @@ class ArgumentMining:
         return document
 
     def _get_topics(self, content):
-        sentences = tokeniser.tokenise_no_punc("content")
+        sentences = tokeniser.tokenise_no_punc(content)
         sentences = [" ".join(s) for s in sentences]
         greek_stopwords = stopwords.words("greek")
         texts = [
@@ -141,8 +141,10 @@ class ArgumentMining:
         # model = models.LdaModel(corpus, id2word=dictionary, num_topics=100)
         lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
                                               workers=4)
+        topics = []
         for idx, topic in lda_model_tfidf.print_topics(-1):
-            print('Topic: {} Word: {}'.format(idx, topic))
+            topics.append(topic)
+            self.app_logger.debug(f'Topic: {idx} Word: {topic}')
 
     def _get_named_entities(self, doc_id, content):
         entities = []
