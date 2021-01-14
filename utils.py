@@ -242,8 +242,23 @@ class ElasticSearchConfig:
         self.ssh_port = properties["ssh"]["port"]
         self.ssh_username = properties["ssh"]["username"]
         self.ssh_key = properties["ssh"]["key_path"]
-        self._init_ssh_tunnel()
+        self.connect = properties["connect"]
         self._init_elasticsearch_client()
+
+    def _init_elasticsearch_client(self, timeout=60):
+        if self.connect == "key":
+            self._init_ssh_tunnel()
+            self.elasticsearch_client = Elasticsearch([{
+                'host': "localhost",
+                'port': self.tunnel.local_bind_port,
+                'http_auth': (self.username, self.password)
+            }], timeout=timeout)
+        else:
+            self.elasticsearch_client = Elasticsearch([{
+                'host': self.host,
+                'port': self.port,
+                'http_auth': (self.username, self.password)
+            }], timeout=timeout)
 
     def _init_ssh_tunnel(self):
         self.tunnel = SSHTunnelForwarder(
@@ -255,13 +270,6 @@ class ElasticSearchConfig:
             compression=True
         )
         self.tunnel.start()
-
-    def _init_elasticsearch_client(self, timeout=60):
-        self.elasticsearch_client = Elasticsearch([{
-            'host': "localhost",
-            'port': self.tunnel.local_bind_port,
-            'http_auth': (self.username, self.password)
-        }], timeout=timeout)
 
     def stop(self):
         del self.elasticsearch_client

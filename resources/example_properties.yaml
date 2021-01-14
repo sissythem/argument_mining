@@ -8,6 +8,7 @@ config:
     password: "password"
     host: "143.233.226.60"
     port: 9200
+    connect: "key" # options: key, password
     ssh:
       port: 222
       username: "debatelab"
@@ -17,6 +18,7 @@ config:
     password: "password"
     host: "socialwebobservatory.iit.demokritos.gr"
     port: 9200
+    connect: "password" # options: password, key
     ssh:
       port: 222
       username: "debatelab"
