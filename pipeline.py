@@ -120,6 +120,7 @@ class ArgumentMining:
             "Relations": relations,
             "entities": entities
         }
+        document["topics"] = document.get("tags", [])
         json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return json_obj
 
