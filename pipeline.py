@@ -56,8 +56,11 @@ class ArgumentMining:
             documents, ids = self._retrieve_from_elasticsearch()
         else:
             documents, ids = self._retrieve_from_file()
-        for document in documents:
+        document_contents = [document["content"] for document in documents]
+        all_topics = self._get_topics(contents=document_contents)
+        for idx, document in enumerate(documents):
             document = self.predict(document=document)
+            document["topics"] = all_topics[idx]
             if eval_target == "elasticsearch":
                 self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
                                                                         doc_type='docket', id=document["id"],
@@ -115,7 +118,6 @@ class ArgumentMining:
         return documents, ids
 
     def predict(self, document):
-        document["topics"] = self._get_topics(content=document["content"])
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
         segments = self._predict_adus(document=document)
         major_claims, claims, premises = self._get_adus(segments)
@@ -128,7 +130,7 @@ class ArgumentMining:
         document = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return document
 
-    def _get_topics(self, content):
+    def _get_topics(self, contents):
         n_features = 1000
         n_components = 400
         n_top_words = 10
@@ -136,13 +138,11 @@ class ArgumentMining:
         # gr_stopwords_str = '|'.join(greek_stopwords)
         # regex = re.compile(r'\b(' + gr_stopwords_str + ')\b', flags=re.IGNORECASE)
         # processed_content = regex.sub("", content)
-        sentences = tokeniser.tokenise_no_punc(content)
-        sentences = [" ".join(s) for s in sentences]
         self.app_logger.info("Extracting topics")
         tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
                                         max_features=n_features,
                                         stop_words=greek_stopwords)
-        tf = tf_vectorizer.fit_transform(sentences)
+        tf = tf_vectorizer.fit_transform(contents)
         lda = LatentDirichletAllocation(n_components=n_components, max_iter=5,
                                         learning_method='online',
                                         learning_offset=50.,
@@ -152,7 +152,10 @@ class ArgumentMining:
         feature_names = tf_vectorizer.get_feature_names()
         topics = []
         for topic_idx, topic in enumerate(lda.components_):
-            topics += [feature_names[i] for i in topic.argsort()[:-n_top_words - 1:-1]]
+            topics.append([feature_names[i] for i in topic.argsort()[:-n_top_words - 1:-1]])
+        top_topics = []
+        for idx, prediction in predictions:
+            top_topics.append(topics[prediction])
         return topics
 
     def _get_named_entities(self, doc_id, content):
