@@ -113,6 +113,7 @@ class ArgumentMining:
         return documents, ids
 
     def predict(self, document):
+        topics = self._get_topics(content=document["content"])
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
         segments = self._predict_adus(document=document)
         major_claims, claims, premises = self._get_adus(segments)
@@ -144,6 +145,7 @@ class ArgumentMining:
         for idx, topic in lda_model_tfidf.print_topics(-1):
             topics.append(topic)
             self.app_logger.debug(f'Topic: {idx} Word: {topic}')
+        return topics
 
     def _get_named_entities(self, doc_id, content):
         entities = []
