@@ -121,7 +121,7 @@ class ArgumentMining:
         entities = []
         data = {"text": content}
         url = self.app_config.properties["ner_endpoint"]
-        response = requests.post(url, data=data)
+        response = requests.post(url, data=json.dumps(data))
         if response.status_code == 200:
             entities = json.loads(response.text)
         else:
