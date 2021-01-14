@@ -54,7 +54,6 @@ class ArgumentMining:
             documents, ids = self._retrieve_from_elasticsearch()
         else:
             documents, ids = self._retrieve_from_file()
-        document_contents = [document["content"] for document in documents]
         for idx, document in enumerate(documents):
             document = self.predict(document=document)
             if eval_target == "elasticsearch":
@@ -136,9 +135,9 @@ class ArgumentMining:
         ]
         dictionary = corpora.Dictionary(texts)
         corpus = [dictionary.doc2bow(text) for text in texts]
-        tfidf = models.TfidfModel(corpus)  # step 1 -- initialize a model
+        tfidf = models.TfidfModel(corpus)
         corpus_tfidf = tfidf[corpus]
-        # model = models.LdaModel(corpus, id2word=dictionary, num_topics=100)
+        lda_model = models.LdaModel(corpus, id2word=dictionary, num_topics=100)
         lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
                                               workers=4)
         topics = []
