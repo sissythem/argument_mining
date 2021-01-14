@@ -1,10 +1,10 @@
-import threading
 import hashlib
 import logging
 import os
 import random
 import smtplib
 import ssl
+import threading
 import uuid
 from datetime import datetime
 from email import encoders
@@ -19,7 +19,7 @@ from pathlib import Path
 import torch
 import yaml
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Search, Q
+from elasticsearch_dsl import Search
 from sshtunnel import SSHTunnelForwarder
 
 
@@ -241,34 +241,38 @@ class ElasticSearchConfig:
         self.port = properties["port"]
         self.ssh_port = properties["ssh"]["port"]
         self.ssh_username = properties["ssh"]["username"]
+        self.ssh_password = properties["ssh"]["password"]
         self.ssh_key = properties["ssh"]["key_path"]
         self.connect = properties["connect"]
+        self._init_ssh_tunnel()
         self._init_elasticsearch_client()
 
     def _init_elasticsearch_client(self, timeout=60):
-        if self.connect == "key":
-            self._init_ssh_tunnel()
-            self.elasticsearch_client = Elasticsearch([{
-                'host': "localhost",
-                'port': self.tunnel.local_bind_port,
-                'http_auth': (self.username, self.password)
-            }], timeout=timeout)
-        else:
-            self.elasticsearch_client = Elasticsearch([{
-                'host': self.host,
-                'port': self.port,
-                'http_auth': (self.username, self.password)
-            }], timeout=timeout)
+        self.elasticsearch_client = Elasticsearch([{
+            'host': "localhost",
+            'port': self.tunnel.local_bind_port,
+            'http_auth': (self.username, self.password)
+        }], timeout=timeout)
 
     def _init_ssh_tunnel(self):
-        self.tunnel = SSHTunnelForwarder(
-            ssh_address=self.host,
-            ssh_port=self.ssh_port,
-            ssh_username=self.ssh_username,
-            ssh_private_key=self.ssh_key,
-            remote_bind_address=('127.0.0.1', self.port),
-            compression=True
-        )
+        if self.connect == "key":
+            self.tunnel = SSHTunnelForwarder(
+                ssh_address=self.host,
+                ssh_port=self.ssh_port,
+                ssh_username=self.ssh_username,
+                ssh_private_key=self.ssh_key,
+                remote_bind_address=('127.0.0.1', self.port),
+                compression=True
+            )
+        else:
+            self.tunnel = SSHTunnelForwarder(
+                ssh_address=self.host,
+                ssh_port=self.ssh_port,
+                ssh_username=self.ssh_username,
+                ssh_password=self.ssh_password,
+                remote_bind_address=('127.0.0.1', self.port),
+                compression=True
+            )
         self.tunnel.start()
 
     def stop(self):
