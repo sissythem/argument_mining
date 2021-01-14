@@ -8,8 +8,7 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 from nltk.corpus import stopwords
-from sklearn.decomposition import LatentDirichletAllocation
-from sklearn.feature_extraction.text import CountVectorizer
+from gensim import corpora, models
 
 import utils
 from classifiers import AduModel, RelationsModel
@@ -56,10 +55,8 @@ class ArgumentMining:
         else:
             documents, ids = self._retrieve_from_file()
         document_contents = [document["content"] for document in documents]
-        all_topics = self._get_topics(contents=document_contents)
         for idx, document in enumerate(documents):
             document = self.predict(document=document)
-            document["topics"] = all_topics[idx]
             if eval_target == "elasticsearch":
                 self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
                                                                         doc_type='docket', id=document["id"],
@@ -129,33 +126,23 @@ class ArgumentMining:
         document = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return document
 
-    def _get_topics(self, contents):
-        n_features = 1000
-        n_components = 400
-        n_top_words = 10
+    def _get_topics(self, content):
+        sentences = tokeniser.tokenise_no_punc("content")
+        sentences = [" ".join(s) for s in sentences]
         greek_stopwords = stopwords.words("greek")
-        # gr_stopwords_str = '|'.join(greek_stopwords)
-        # regex = re.compile(r'\b(' + gr_stopwords_str + ')\b', flags=re.IGNORECASE)
-        # processed_content = regex.sub("", content)
-        self.app_logger.info("Extracting topics")
-        tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
-                                        max_features=n_features,
-                                        stop_words=greek_stopwords)
-        tf = tf_vectorizer.fit_transform(contents)
-        lda = LatentDirichletAllocation(n_components=n_components, max_iter=5,
-                                        learning_method='online',
-                                        learning_offset=50.,
-                                        random_state=0)
-        predictions = lda.fit_transform(tf)
-        predictions = np.argmax(predictions, axis=1)
-        feature_names = tf_vectorizer.get_feature_names()
-        topics = []
-        for topic_idx, topic in enumerate(lda.components_):
-            topics.append([feature_names[i] for i in topic.argsort()[:-n_top_words - 1:-1]])
-        top_topics = []
-        for idx, prediction in enumerate(predictions):
-            top_topics.append(topics[prediction])
-        return topics
+        texts = [
+            [word for word in sentence.lower().split() if word not in greek_stopwords]
+            for sentence in sentences
+        ]
+        dictionary = corpora.Dictionary(texts)
+        corpus = [dictionary.doc2bow(text) for text in texts]
+        tfidf = models.TfidfModel(corpus)  # step 1 -- initialize a model
+        corpus_tfidf = tfidf[corpus]
+        # model = models.LdaModel(corpus, id2word=dictionary, num_topics=100)
+        lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
+                                              workers=4)
+        for idx, topic in lda_model_tfidf.print_topics(-1):
+            print('Topic: {} Word: {}'.format(idx, topic))
 
     def _get_named_entities(self, doc_id, content):
         entities = []
