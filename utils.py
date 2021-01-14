@@ -19,6 +19,7 @@ from pathlib import Path
 import torch
 import yaml
 from elasticsearch import Elasticsearch
+from elasticsearch_dsl import Search, Q
 from sshtunnel import SSHTunnelForwarder
 
 
@@ -266,3 +267,6 @@ class ElasticSearchConfig:
         del self.elasticsearch_client
         [t.close() for t in threading.enumerate() if t.__class__.__name__ == "Transport"]
         self.tunnel.stop()
+
+    def truncate_elasticsearch(self):
+        Search(using=self.elasticsearch_client, index="httpresponses").query("match_all").delete()

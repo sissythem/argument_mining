@@ -9,3 +9,4 @@ ax-platform==0.1.19
 sshtunnel==0.3.1
 elasticsearch==7.10.1
 elasticsearch-dsl==7.3.0
+requests==2.25.1
