@@ -85,7 +85,6 @@ class ArgumentMining:
             document["id"] = hit.meta["id"]
             if not document["content"].startswith(document["title"]):
                 document["content"] = document["title"] + "\r\n\r\n" + document["content"]
-            document["date"] = datetime.now().strftime("%Y/%m/%d, %H:%M:%S")
             ids.append(document["id"])
             documents.append(document)
 
