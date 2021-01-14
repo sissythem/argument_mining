@@ -12,6 +12,7 @@ config:
     ssh:
       port: 222
       username: "debatelab"
+      password: "password"
       key_path: "/path/to/key"
   elastic_retrieve:
     username: "elastic"
@@ -22,6 +23,7 @@ config:
     ssh:
       port: 222
       username: "debatelab"
+      password: "password"
       key_path: "/path/to/key"
   adu_data:
     train_csv: "train_adu.csv"
