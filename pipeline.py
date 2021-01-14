@@ -54,9 +54,9 @@ class ArgumentMining:
         for document in documents:
             document = self.predict(document=document)
             if eval_target == "elasticsearch":
-                self.app_config.elastic_save.elasticsearch_client.create(index='debatelab', ignore=400,
-                                                                         doc_type='docket', id=document["id"],
-                                                                         body=document)
+                self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
+                                                                        doc_type='docket', id=document["id"],
+                                                                        body=document)
             else:
                 filename = document["title"] + ".json"
                 if utils.name_exceeds_bytes(filename):
