@@ -25,6 +25,7 @@ class ArgumentMining:
     def __init__(self, app_config):
         self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
+        self.cleanup = True
 
         # load ADU model
         self.adu_model = AduModel(app_config=self.app_config)
@@ -53,6 +54,8 @@ class ArgumentMining:
         for document in documents:
             document = self.predict(document=document)
             if eval_target == "elasticsearch":
+                if self.cleanup:
+                    self.app_config.elastic_save.truncate_elasticsearch()
                 self.app_config.elastic_save.elasticsearch_client.create(index='debatelab', ignore=400,
                                                                          doc_type='docket', id=document["id"],
                                                                          body=document)
@@ -117,18 +120,21 @@ class ArgumentMining:
         json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=json_obj)
         return json_obj
 
-    def _predict_adus(self, document):
-        # init document id & annotations
+    def _get_named_entities(self, content):
         entities = []
-        data = {"text": document["content"]}
+        data = {"text": content}
         url = self.app_config.properties["ner_endpoint"]
         response = requests.post(url, data=data)
         if response.status_code == 200:
             entities = json.loads(response.text)
+        return entities
+
+    def _predict_adus(self, document):
+        # init document id & annotations
         document["annotations"] = {
             "ADUs": [],
             "Relations": [],
-            "entities": entities
+            "entities": self._get_named_entities(content=document["content"])
         }
 
         self.app_logger.debug(
@@ -262,7 +268,7 @@ class ArgumentMining:
                     max_conf = conf
         return max_lbl, max_conf
 
-    def _get_args_from_sentence(self, sentence: Sentence):
+    def _get_args_from_sentence(self, sentence: Sentence) -> List[Segment]:
         if sentence.tokens:
             segments = []
             idx = None
