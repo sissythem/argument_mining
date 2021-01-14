@@ -137,7 +137,7 @@ class ArgumentMining:
         # regex = re.compile(r'\b(' + gr_stopwords_str + ')\b', flags=re.IGNORECASE)
         # processed_content = regex.sub("", content)
         sentences = tokeniser.tokenise_no_punc(content)
-        sentences = [list(s) for s in sentences]
+        sentences = [" ".join(s) for s in sentences]
         self.app_logger.info("Extracting topics")
         tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
                                         max_features=n_features,
