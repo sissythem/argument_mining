@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+import re
 from os.path import join
 from typing import List
 
@@ -8,11 +8,16 @@ import requests
 from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
-# import yaml
+from nltk.corpus import stopwords
+from sklearn.decomposition import LatentDirichletAllocation
+from sklearn.feature_extraction.text import CountVectorizer
 
 import utils
 from classifiers import AduModel, RelationsModel
 from utils import AppConfig
+
+
+# import yaml
 
 
 class ArgumentMining:
@@ -109,6 +114,29 @@ class ArgumentMining:
                 ids.append(document["id"])
         return documents, ids
 
+    def _get_topics(self, content):
+        n_features = 1000
+        n_components = 400
+        n_top_words = 10
+        greek_stopwords = stopwords.words("greek")
+        regex = re.compile(r'\b(' + greek_stopwords + ')\b', flags=re.IGNORECASE)
+        processed_content = regex.sub("", content)
+        self.app_logger.info("Extracting topics")
+        tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
+                                        max_features=n_features,
+                                        stop_words=greek_stopwords)
+        tf = tf_vectorizer.fit_transform([processed_content])
+        lda = LatentDirichletAllocation(n_components=n_components, max_iter=5,
+                                        learning_method='online',
+                                        learning_offset=50.,
+                                        random_state=0)
+        lda.fit_transform(tf)
+        feature_names = tf_vectorizer.get_feature_names()
+        topics = []
+        for topic_idx, topic in enumerate(lda.components_):
+            topics += [feature_names[i] for i in topic.argsort()[:-n_top_words - 1:-1]]
+        return topics
+
     def predict(self, document):
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
         segments = self._predict_adus(document=document)
@@ -119,7 +147,7 @@ class ArgumentMining:
             "Relations": relations,
             "entities": entities
         }
-        document["topics"] = document.get("tags", [])
+        document["topics"] = self._get_topics(content=document["content"])
         json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return json_obj
 
