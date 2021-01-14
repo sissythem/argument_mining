@@ -111,17 +111,21 @@ class ArgumentMining:
         return documents, ids
 
     def predict(self, document):
-        json_obj = self._predict_adus(document=document)
-        segments = json_obj["annotations"]["ADUs"]
+        entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
+        segments = self._predict_adus(document=document)
         major_claims, claims, premises = self._get_adus(segments)
-        json_obj = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises,
-                                           json_obj=json_obj)
-        json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=json_obj)
+        relations = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises)
+        document["annotations"] = {
+            "ADUs": segments,
+            "Relations": relations,
+            "entities": entities
+        }
+        json_obj = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return json_obj
 
-    def _get_named_entities(self, content):
+    def _get_named_entities(self, doc_id, content):
         entities = []
-        data = {"text": content}
+        data = {"text": content, "doc_id": doc_id}
         url = self.app_config.properties["ner_endpoint"]
         response = requests.post(url, data=json.dumps(data))
         if response.status_code == 200:
@@ -133,11 +137,7 @@ class ArgumentMining:
 
     def _predict_adus(self, document):
         # init document id & annotations
-        document["annotations"] = {
-            "ADUs": [],
-            "Relations": [],
-            "entities": self._get_named_entities(content=document["content"])
-        }
+        adus = []
 
         self.app_logger.debug(
             "Processing document with id: {} and name: {}".format(document["id"], document["title"]))
@@ -176,8 +176,8 @@ class ArgumentMining:
                             "segment": segment.text,
                             "confidence": segment.mean_conf
                         }
-                        document["annotations"]["ADUs"].append(seg)
-        return document
+                        adus.append(seg)
+        return adus
 
     @staticmethod
     def _get_adus(segments):
@@ -193,8 +193,9 @@ class ArgumentMining:
                 premises.append((text, segment_id))
         return major_claims, claims, premises
 
-    def _predict_relations(self, major_claims, claims, premises, json_obj):
+    def _predict_relations(self, major_claims, claims, premises):
         rel_counter = 0
+        relations = []
         if major_claims and claims:
             for major_claim in major_claims:
                 for claim in claims:
@@ -213,7 +214,7 @@ class ArgumentMining:
                             "arg2": major_claim[1],
                             "confidence": conf
                         }
-                        json_obj["annotations"]["Relations"].append(rel_dict)
+                        relations.append(rel_dict)
         if claims and premises:
             for claim in claims:
                 for premise in premises:
@@ -232,8 +233,8 @@ class ArgumentMining:
                             "arg2": claim[1],
                             "confidence": conf
                         }
-                        json_obj["annotations"]["Relations"].append(rel_dict)
-        return json_obj
+                        relations.append(rel_dict)
+        return relations
 
     def _predict_stance(self, major_claims, claims, json_obj):
         stance_counter = 0
