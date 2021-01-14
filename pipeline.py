@@ -133,19 +133,22 @@ class ArgumentMining:
         n_components = 400
         n_top_words = 10
         greek_stopwords = stopwords.words("greek")
-        gr_stopwords_str = '|'.join(greek_stopwords)
-        regex = re.compile(r'\b(' + gr_stopwords_str + ')\b', flags=re.IGNORECASE)
-        processed_content = regex.sub("", content)
+        # gr_stopwords_str = '|'.join(greek_stopwords)
+        # regex = re.compile(r'\b(' + gr_stopwords_str + ')\b', flags=re.IGNORECASE)
+        # processed_content = regex.sub("", content)
+        sentences = tokeniser.tokenise_no_punc(content)
+        sentences = [list(s) for s in sentences]
         self.app_logger.info("Extracting topics")
         tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
                                         max_features=n_features,
                                         stop_words=greek_stopwords)
-        tf = tf_vectorizer.fit_transform([processed_content])
+        tf = tf_vectorizer.fit_transform(sentences)
         lda = LatentDirichletAllocation(n_components=n_components, max_iter=5,
                                         learning_method='online',
                                         learning_offset=50.,
                                         random_state=0)
-        lda.fit_transform(tf)
+        predictions = lda.fit_transform(tf)
+        predictions = np.argmax(predictions, axis=1)
         feature_names = tf_vectorizer.get_feature_names()
         topics = []
         for topic_idx, topic in enumerate(lda.components_):
