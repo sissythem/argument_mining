@@ -25,7 +25,6 @@ class ArgumentMining:
     def __init__(self, app_config):
         self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
-        self.cleanup = True
 
         # load ADU model
         self.adu_model = AduModel(app_config=self.app_config)
@@ -54,11 +53,9 @@ class ArgumentMining:
         for document in documents:
             document = self.predict(document=document)
             if eval_target == "elasticsearch":
-                if self.cleanup:
-                    self.app_config.elastic_save.truncate_elasticsearch()
-                self.app_config.elastic_save.elasticsearch_client.create(index='debatelab', ignore=400,
-                                                                         doc_type='docket', id=document["id"],
-                                                                         body=document)
+                self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
+                                                                        doc_type='docket', id=document["id"],
+                                                                        body=document)
             else:
                 filename = document["title"] + ".json"
                 if utils.name_exceeds_bytes(filename):
