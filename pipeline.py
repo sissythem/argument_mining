@@ -1,5 +1,4 @@
 import json
-import re
 from os.path import join
 from typing import List
 
@@ -154,7 +153,7 @@ class ArgumentMining:
         for topic_idx, topic in enumerate(lda.components_):
             topics.append([feature_names[i] for i in topic.argsort()[:-n_top_words - 1:-1]])
         top_topics = []
-        for idx, prediction in predictions:
+        for idx, prediction in enumerate(predictions):
             top_topics.append(topics[prediction])
         return topics
 
