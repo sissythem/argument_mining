@@ -38,7 +38,6 @@ config:
     dev_csv: "dev_stance.csv"
     test_csv: "test_stance.csv"
 tasks: ["prep", "train", "eval"]
-ner_endpoint: "http://petasis.dyndns.org:7100/predict-ner"
 preprocessing:
   other_label: "O"
   repl_char: "="
@@ -47,10 +46,14 @@ preprocessing:
 train:
   models: ["adu", "rel", "stance"]
 eval:
-  source: "elasticsearch" # options: elasticsearch, file
-  target: "elasticsearch" # options: elasticsearch, file
   model: "best" # options: best, final
+  retrieve: "file" # options: file, date
   last_date: ""
+  ner_endpoint: "http://petasis.dyndns.org:7100/predict-ner"
+  notify:
+    url: "https://isl.ics.forth.gr/debatelab_mq/api/exchanges/dlab/amq.default/publish"
+    username: "debateLab3ServerUser"
+    password: "debateLabPassw0rd"
 adu_model:
   hidden_size: 256
   rnn_layers: 2
