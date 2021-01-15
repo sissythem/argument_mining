@@ -1,21 +1,20 @@
+import base64
 import json
+from datetime import datetime
 from os.path import join
 from typing import List
 
 import numpy as np
 import requests
+import yaml
 from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
-from nltk.corpus import stopwords
 from gensim import corpora, models
+from nltk.corpus import stopwords
 
-import utils
 from classifiers import AduModel, RelationsModel
 from utils import AppConfig
-
-
-# import yaml
 
 
 class ArgumentMining:
@@ -48,72 +47,70 @@ class ArgumentMining:
         self.stance_model.load()
 
     def run_pipeline(self):
-        eval_source = self.app_config.properties["eval"]["source"]
-        eval_target = self.app_config.properties["eval"]["target"]
-        if eval_source == "elasticsearch":
-            documents, ids = self._retrieve_from_elasticsearch()
-        else:
-            documents, ids = self._retrieve_from_file()
+        client = self.app_config.elastic_retrieve.elasticsearch_client
+        documents = self._retrieve(client=client)
         for idx, document in enumerate(documents):
             document = self.predict(document=document)
-            if eval_target == "elasticsearch":
-                self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
-                                                                        doc_type='docket', id=document["id"],
-                                                                        body=document)
-            else:
-                filename = document["title"] + ".json"
-                if utils.name_exceeds_bytes(filename):
-                    filename = document["id"] + ".json"
-                file_path = join(self.app_config.out_files_path, filename)
-                with open(file_path, "w", encoding='utf8') as f:
-                    f.write(json.dumps(document, indent=4, sort_keys=False, ensure_ascii=False))
+            self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
+                                                                    doc_type='docket', id=document["id"],
+                                                                    body=document)
+        documents_ids = [document["id"] for document in documents]
+        self.notify_ics(document_ids=documents_ids)
         self.app_logger.info("Evaluation is finished!")
 
-    def _retrieve_from_elasticsearch(self):
-        documents, ids = [], []
-        client = self.app_config.elastic_retrieve.elasticsearch_client
-
-        file_path = join(self.app_config.resources_path, "kasteli_34_urls.txt")
-        # read the list of urls from the file:
-        with open(file_path, "r") as f:
-            urls = [line.rstrip() for line in f]
-        search_articles = Search(using=client, index='articles').filter('terms', link=urls)
-
-        # TODO retrieve previous day's articles, save now to properties
-        # now = datetime.now()
-        # previous_date = app_config.properties["eval"]["last_date"]
-        # result = Search(using=client, index='articles').filter('range', date={'gt': previous_date, 'lte': now})
+    def _retrieve(self, client):
+        retrieve_kind = self.app_config.properties["eval"]["retrieve"]
+        if retrieve_kind == "file":
+            file_path = join(self.app_config.resources_path, "kasteli_34_urls.txt")
+            # read the list of urls from the file:
+            with open(file_path, "r") as f:
+                urls = [line.rstrip() for line in f]
+            search_articles = Search(using=client, index='articles').filter('terms', link=urls)
+        else:
+            # TODO retrieve previous day's articles, save now to properties
+            now = datetime.now()
+            previous_date = self.app_config.properties["eval"]["last_date"]
+            search_articles = Search(using=client, index='articles').filter('range',
+                                                                            date={'gt': previous_date, 'lte': now})
+            # update last search date
+            properties = self.app_config.properties
+            properties["eval"]["last_date"] = now
+            with open(join(self.app_config.resources_path, self.app_config.properties_file), "w") as f:
+                yaml.dump(properties, f)
+        documents = []
         for hit in search_articles.scan():
             document = hit.to_dict()
             document["id"] = hit.meta["id"]
             if not document["content"].startswith(document["title"]):
                 document["content"] = document["title"] + "\r\n\r\n" + document["content"]
-            ids.append(document["id"])
             documents.append(document)
+        return documents
 
-        # update last search date
-        # properties = self.app_config.properties
-        # properties["eval"]["last_date"] = now
-        # with open(join(self.app_config.resources_path, self.app_config.properties_file), "w") as f:
-        # yaml.dump(properties, f)
-        return documents, ids
-
-    def _retrieve_from_file(self, filename="kasteli.json"):
-        documents, ids = [], []
-        self.app_logger.info("Evaluating using file: {}".format(filename))
-        file_path = join(self.app_config.resources_path, filename)
-        with open(file_path, "r") as f:
-            data = json.load(f)
-        data = data["data"]["documents"]
-        if data:
-            for document in data:
-                document = utils.get_initial_json(document["name"], document["text"])
-                documents.append(document)
-                ids.append(document["id"])
-        return documents, ids
+    def notify_ics(self, document_ids):
+        properties = self.app_config.properties["eval"]["notify"]
+        url = properties["url"]
+        username = properties["username"]
+        password = properties["password"]
+        data = {"properties": {"delivery_mode": 2}, "routing_key": "dlabqueue", "payload": document_ids,
+                "payload_encoding": "string"}
+        data = json.dumps(data)
+        creds = f"{username}:{password}"
+        creds_bytes = creds.encode("ascii")
+        base64_bytes = base64.b64encode(creds_bytes)
+        base64_msg = base64_bytes.decode("ascii")
+        headers = {"Content-type": "application/json", "Authorization": base64_msg}
+        try:
+            response = requests.post(url, data=data, headers=headers)
+            if response.status_code == 200:
+                self.app_logger.info("Request to ICS was successful!")
+            else:
+                self.app_logger.error(
+                    f"Request to ICS failed with status code: {response.status_code} and message:{response.text}")
+        except(BaseException, Exception) as e:
+            self.app_logger.error(f"Request to ICS failed: {e}")
 
     def predict(self, document):
-        topics = self._get_topics(content=document["content"])
+        document["topics"] = self._get_topics(content=document["content"])
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
         segments = self._predict_adus(document=document)
         major_claims, claims, premises = self._get_adus(segments)
@@ -126,7 +123,8 @@ class ArgumentMining:
         document = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return document
 
-    def _get_topics(self, content):
+    @staticmethod
+    def _get_topics(content):
         sentences = tokeniser.tokenise_no_punc(content)
         sentences = [" ".join(s) for s in sentences]
         greek_stopwords = stopwords.words("greek")
@@ -142,19 +140,19 @@ class ArgumentMining:
         lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
                                               workers=4)
         topics = []
-        topics_words = lda_model_tfidf.show_topics(num_topics=10, num_words=5, formatted=False)
+        topics_words = lda_model_tfidf.show_topics(num_topics=5, num_words=5, formatted=False)
         topics_words = [(tp[0], [wd[0] for wd in tp[1]]) for tp in topics_words]
         for topic, words in topics_words:
-            topics.append(" ".join(words))
-        for idx, topic in lda_model_tfidf.print_topics(-1):
-            topics.append(topic)
-            self.app_logger.debug(f'Topic: {idx} Word: {topic}')
+            topics += words
+        # for idx, topic in lda_model_tfidf.print_topics(-1):
+        #     topics.append(topic)
+        #     self.app_logger.debug(f'Topic: {idx} Word: {topic}')
         return topics
 
     def _get_named_entities(self, doc_id, content):
         entities = []
         data = {"text": content, "doc_id": doc_id}
-        url = self.app_config.properties["ner_endpoint"]
+        url = self.app_config.properties["eval"]["ner_endpoint"]
         response = requests.post(url, data=json.dumps(data))
         if response.status_code == 200:
             entities = json.loads(response.text)
@@ -178,7 +176,7 @@ class ArgumentMining:
             sentence = Sentence(sentence)
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
-            segments: ArgumentMining.Segment = self._get_args_from_sentence(sentence)
+            segments = self._get_args_from_sentence(sentence)
             if segments:
                 for segment in segments:
                     if segment.text and segment.label:
