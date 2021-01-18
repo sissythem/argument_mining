@@ -127,7 +127,8 @@ class ArgumentMining:
     def _get_topics(content):
         sentences = tokeniser.tokenise_no_punc(content)
         sentences = [" ".join(s) for s in sentences]
-        greek_stopwords = stopwords.words("greek")
+        # greek_stopwords = stopwords.words("greek")
+        greek_stopwords = tokeniser.stop_words()
         texts = [
             [word for word in sentence.lower().split() if word not in greek_stopwords]
             for sentence in sentences
