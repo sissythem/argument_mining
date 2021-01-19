@@ -3,13 +3,21 @@ from os.path import join
 from typing import List
 
 import flair
+import hdbscan
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import torch
+import umap
+from ellogon import tokeniser
 from flair.data import Corpus
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.nn import Model
 from flair.trainers import ModelTrainer
+from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim.optimizer import Optimizer
 
 from utils import AppConfig
@@ -189,3 +197,86 @@ class RelationsModel(Classifier):
         self.app_logger.info("Loading Relations model from path: {}".format(model_path))
         self.model = TextClassifier.load(model_path)
         self.model.eval()
+
+
+class TopicModel:
+
+    def __init__(self, app_config: AppConfig):
+        self.app_config = app_config
+        self.app_logger = app_config.app_logger
+        self.device_name = app_config.device_name
+
+    def get_topics(self, sentences: List[str]):
+        model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
+        embeddings = model.encode(sentences, show_progress_bar=True)
+
+        # reduce document dimensionality
+        umap_embeddings = umap.UMAP(n_neighbors=5,
+                                    n_components=5,
+                                    metric='cosine').fit_transform(embeddings)
+
+        # clustering
+        cluster = hdbscan.HDBSCAN(min_cluster_size=5,
+                                  metric='euclidean',
+                                  cluster_selection_method='eom').fit(umap_embeddings)
+
+        docs_df = pd.DataFrame(sentences, columns=["Sentence"])
+        docs_df['Topic'] = cluster.labels_
+        docs_df['Doc_ID'] = range(len(docs_df))
+        docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Sentence': ' '.join})
+        tf_idf, count = self._c_tf_idf(docs_per_topic.Sentence.values, m=len(sentences))
+        top_n_words = self._extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=5)
+        topic_sizes = self._extract_topic_sizes(docs_df).head(5)
+        topic_ids = topic_sizes["Topic"]
+        topics = []
+        for topic in topic_ids:
+            topics.append(top_n_words[topic])
+        return topics
+
+    @staticmethod
+    def _c_tf_idf(sentences, m, ngram_range=(1, 1)):
+        greek_stopwords = tokeniser.stop_words()
+        count = CountVectorizer(ngram_range=ngram_range, stop_words=greek_stopwords).fit(sentences)
+        t = count.transform(sentences).toarray()
+        w = t.sum(axis=1)
+        tf = np.divide(t.T, w)
+        sum_t = t.sum(axis=0)
+        idf = np.log(np.divide(m, sum_t)).reshape(-1, 1)
+        tf_idf = np.multiply(tf, idf)
+        return tf_idf, count
+
+    @staticmethod
+    def _extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=20):
+        words = count.get_feature_names()
+        labels = list(docs_per_topic.Topic)
+        tf_idf_transposed = tf_idf.T
+        indices = tf_idf_transposed.argsort()[:, -n:]
+        top_n_words = {label: [(words[j], tf_idf_transposed[i][j]) for j in indices[i]][::-1] for i, label in
+                       enumerate(labels)}
+        return top_n_words
+
+    @staticmethod
+    def _extract_topic_sizes(df):
+        topic_sizes = (df.groupby(['Topic'])
+                       .Sentence
+                       .count()
+                       .reset_index()
+                       .rename({"Topic": "Topic", "Sentence": "Size"}, axis='columns')
+                       .sort_values("Size", ascending=False))
+        return topic_sizes
+
+    @staticmethod
+    def visualize_topics(cluster, embeddings):
+        # Prepare data
+        umap_data = umap.UMAP(n_neighbors=15, n_components=2, min_dist=0.0, metric='cosine').fit_transform(embeddings)
+        result = pd.DataFrame(umap_data, columns=['x', 'y'])
+        result['labels'] = cluster.labels_
+
+        # Visualize clusters
+        # fig, ax = plt.subplots(figsize=(20, 10))
+        plt.subplots(figsize=(20, 10))
+        outliers = result.loc[result.labels == -1, :]
+        clustered = result.loc[result.labels != -1, :]
+        plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
+        plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
+        plt.colorbar()
