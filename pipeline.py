@@ -11,7 +11,7 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 
-from classifiers import AduModel, RelationsModel, TopicModel
+from models import AduModel, RelationsModel, TopicModel
 from utils import AppConfig
 
 
@@ -110,15 +110,21 @@ class ArgumentMining:
     def predict(self, document):
         self.app_logger.info(f"Extracting topics for document with title: {document['title']}")
         document["topics"] = self._get_topics(content=document["content"])
+        self.app_logger.info("Extracting named entities")
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
+        self.app_logger.info("Predicting ADUs from document")
         segments = self._predict_adus(document=document)
         major_claims, claims, premises = self._get_adus(segments)
+        self.app_logger.info(
+            f"Found {len(major_claims)} major claims, {len(claims)} claims and {len(premises)} premises")
+        self.app_logger.info("Predicting relations between ADUs")
         relations = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises)
         document["annotations"] = {
             "ADUs": segments,
             "Relations": relations,
             "entities": entities
         }
+        self.app_logger.info("Predicting stance between major claim and claims")
         document = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return document
 
