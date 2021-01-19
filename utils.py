@@ -133,7 +133,7 @@ class AppConfig:
             mkdir(self.output_path)
         if not exists(self.logs_path):
             mkdir(self.logs_path)
-        if "train" in self.properties["tasks"] and not exists(self.tensorboard_path):
+        if not exists(self.tensorboard_path):
             mkdir(self.tensorboard_path)
 
     def _get_base_path(self, base_name):
