@@ -10,10 +10,10 @@ from sklearn.feature_extraction.text import CountVectorizer
 from ellogon import tokeniser
 
 
-def c_tf_idf(documents, m, ngram_range=(1, 1)):
+def c_tf_idf(sentences, m, ngram_range=(1, 1)):
     greek_stopwords = tokeniser.stop_words()
-    count = CountVectorizer(ngram_range=ngram_range, stop_words=greek_stopwords).fit(documents)
-    t = count.transform(documents).toarray()
+    count = CountVectorizer(ngram_range=ngram_range, stop_words=greek_stopwords).fit(sentences)
+    t = count.transform(sentences).toarray()
     w = t.sum(axis=1)
     tf = np.divide(t.T, w)
     sum_t = t.sum(axis=0)
@@ -34,10 +34,10 @@ def extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=20):
 
 def extract_topic_sizes(df):
     topic_sizes = (df.groupby(['Topic'])
-                   .Doc
+                   .Sentence
                    .count()
                    .reset_index()
-                   .rename({"Topic": "Topic", "Doc": "Size"}, axis='columns')
+                   .rename({"Topic": "Topic", "Sentence": "Size"}, axis='columns')
                    .sort_values("Size", ascending=False))
     return topic_sizes
 
@@ -59,12 +59,13 @@ def get_topics(sentences: List[str]):
     docs_df = pd.DataFrame(sentences, columns=["Sentence"])
     docs_df['Topic'] = cluster.labels_
     docs_df['Doc_ID'] = range(len(docs_df))
-    docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Doc': ' '.join})
-    tf_idf, count = c_tf_idf(docs_per_topic.Doc.values, m=len(sentences))
+    docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Sentence': ' '.join})
+    tf_idf, count = c_tf_idf(docs_per_topic.Sentence.values, m=len(sentences))
     top_n_words = extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=5)
     topic_sizes = extract_topic_sizes(docs_df).head(5)
+    topic_ids = topic_sizes["Topic"]
     topics = []
-    for topic in topic_sizes:
+    for topic in topic_ids:
         topics.append(top_n_words[topic])
     return topics
 
