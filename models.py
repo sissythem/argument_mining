@@ -207,8 +207,8 @@ class TopicModel:
         self.device_name = app_config.device_name
 
     def get_topics(self, sentences: List[str]):
-        if not sentences:
-            return {}
+        if not sentences or len(sentences) <= 6:
+            return []
         model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
         embeddings = model.encode(sentences, show_progress_bar=True)
         self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
