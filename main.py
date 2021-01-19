@@ -1,9 +1,39 @@
 import traceback
+from os.path import join
+
+import numpy as np
+import pandas as pd
 
 from models import AduModel, RelationsModel
 from pipeline import ArgumentMining
-from data import DataLoader
+from preprocessing import DataLoader
 from utils import AppConfig
+
+
+def error_analysis(path_to_resources):
+    path_to_results = join(path_to_resources, "test.tsv")
+    results = pd.read_csv(path_to_results, sep=" ", index_col=None, header=None, skip_blank_lines=False)
+    df_list = np.split(results, results[results.isnull().all(1)].index)
+    sentences = []
+    for df in df_list:
+        df = df[df[0].notna()]
+        df[3] = np.where(df[1] == df[2], 0, 1)
+        sentences.append(df)
+    sentences_df = pd.concat(sentences)
+    sentences_df.to_csv(join(path_to_resources, "results.csv"), sep="\t", index=False, header=False)
+    error_sentences = []
+    for sentence_df in sentences:
+        if 1 in sentence_df[3].values:
+            total_text = ""
+            for index, row in sentence_df.iterrows():
+                text, true_lbl, pred_lbl, diff = row
+                total_text += f"{text} <{true_lbl}> " if diff == 0 else \
+                    f"{text} <{true_lbl}> <{pred_lbl}> "
+            print(total_text.strip())
+            print("==============================================================================")
+            error_sentences.append(total_text + "\n\n")
+    with open(join(path_to_resources, "errors.txt"), "w") as f:
+        f.writelines(error_sentences)
 
 
 def preprocess(app_config):
