@@ -10,9 +10,8 @@ import yaml
 from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
-from gensim import corpora, models
-# from nltk.corpus import stopwords
 
+import topics
 from classifiers import AduModel, RelationsModel
 from utils import AppConfig
 
@@ -125,30 +124,10 @@ class ArgumentMining:
 
     @staticmethod
     def _get_topics(content):
-        sentences = tokeniser.tokenise_no_punc(content)
+        sentences = tokeniser.tokenise(content)
         sentences = [" ".join(s) for s in sentences]
-        # greek_stopwords = stopwords.words("greek")
-        greek_stopwords = tokeniser.stop_words()
-        texts = [
-            [word for word in sentence.lower().split() if word not in greek_stopwords]
-            for sentence in sentences
-        ]
-        dictionary = corpora.Dictionary(texts)
-        corpus = [dictionary.doc2bow(text) for text in texts]
-        tfidf = models.TfidfModel(corpus)
-        corpus_tfidf = tfidf[corpus]
-        # lda_model = models.LdaModel(corpus, id2word=dictionary, num_topics=10)
-        lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
-                                              workers=4)
-        topics = []
-        topics_words = lda_model_tfidf.show_topics(num_topics=5, num_words=5, formatted=False)
-        topics_words = [(tp[0], [wd[0] for wd in tp[1]]) for tp in topics_words]
-        for topic, words in topics_words:
-            topics += words
-        # for idx, topic in lda_model_tfidf.print_topics(-1):
-        #     topics.append(topic)
-        #     self.app_logger.debug(f'Topic: {idx} Word: {topic}')
-        return topics
+        topics_list = topics.get_topics(sentences=sentences)
+        return topics_list
 
     def _get_named_entities(self, doc_id, content):
         entities = []

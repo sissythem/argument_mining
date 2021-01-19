@@ -14,4 +14,6 @@ nltk==3.5
 gensim==3.8.3
 sentence-transformers==0.4.1.2
 umap-learn==0.5.0
-hdbscan
+hdbscan==0.8.26
+matplotlib==3.3.3
+scikit-learn==0.24.0
