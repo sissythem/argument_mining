@@ -1,6 +1,6 @@
 import traceback
 
-from classifiers import AduModel, RelationsModel
+from models import AduModel, RelationsModel
 from pipeline import ArgumentMining
 from data import DataLoader
 from utils import AppConfig

@@ -121,8 +121,8 @@ class AduModel(Classifier):
         trainer: ModelTrainer = ModelTrainer(tagger, corpus, use_tensorboard=self.use_tensorboard,
                                              optimizer=self.optimizer)
 
-        self.app_logger.debug("Starting training with ModelTrainer")
-        self.app_logger.debug("Model configuration properties: {}".format(self.model_properties))
+        self.app_logger.info("Starting training with ModelTrainer")
+        self.app_logger.info("Model configuration properties: {}".format(self.model_properties))
         # 7. start training
         trainer.train(self.base_path, patience=self.patience, learning_rate=self.learning_rate,
                       mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
@@ -184,8 +184,8 @@ class RelationsModel(Classifier):
         trainer: ModelTrainer = ModelTrainer(classifier, corpus, use_tensorboard=self.use_tensorboard,
                                              optimizer=self.optimizer)
 
-        self.app_logger.debug("Starting training with ModelTrainer")
-        self.app_logger.debug("Model configuration properties: {}".format(self.model_properties))
+        self.app_logger.info("Starting training with ModelTrainer")
+        self.app_logger.info("Model configuration properties: {}".format(self.model_properties))
         # 7. start training
         trainer.train(self.base_path, learning_rate=self.learning_rate, patience=self.patience,
                       mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
