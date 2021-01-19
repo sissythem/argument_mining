@@ -108,6 +108,7 @@ class ArgumentMining:
             self.app_logger.error(f"Request to ICS failed: {e}")
 
     def predict(self, document):
+        self.app_logger.info(f"Extracting topics for document with title: {document['title']}")
         document["topics"] = self._get_topics(content=document["content"])
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
         segments = self._predict_adus(document=document)
@@ -124,6 +125,7 @@ class ArgumentMining:
     def _get_topics(self, content):
         sentences = tokeniser.tokenise(content)
         sentences = [" ".join(s) for s in sentences]
+        self.app_logger.debug(f"Sentences fed to TopicModel: {sentences}")
         topic_model = TopicModel(app_config=self.app_config)
         topics = topic_model.get_topics(sentences=sentences)
         return topics
