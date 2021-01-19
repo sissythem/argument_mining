@@ -11,8 +11,7 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 
-import topics
-from classifiers import AduModel, RelationsModel
+from classifiers import AduModel, RelationsModel, TopicModel
 from utils import AppConfig
 
 
@@ -122,12 +121,12 @@ class ArgumentMining:
         document = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return document
 
-    @staticmethod
-    def _get_topics(content):
+    def _get_topics(self, content):
         sentences = tokeniser.tokenise(content)
         sentences = [" ".join(s) for s in sentences]
-        topics_list = topics.get_topics(sentences=sentences)
-        return topics_list
+        topic_model = TopicModel(app_config=self.app_config)
+        topics = topic_model.get_topics(sentences=sentences)
+        return topics
 
     def _get_named_entities(self, doc_id, content):
         entities = []
