@@ -11,7 +11,7 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 from gensim import corpora, models
-from nltk.corpus import stopwords
+# from nltk.corpus import stopwords
 
 from classifiers import AduModel, RelationsModel
 from utils import AppConfig
@@ -137,7 +137,7 @@ class ArgumentMining:
         corpus = [dictionary.doc2bow(text) for text in texts]
         tfidf = models.TfidfModel(corpus)
         corpus_tfidf = tfidf[corpus]
-        lda_model = models.LdaModel(corpus, id2word=dictionary, num_topics=10)
+        # lda_model = models.LdaModel(corpus, id2word=dictionary, num_topics=10)
         lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
                                               workers=4)
         topics = []
