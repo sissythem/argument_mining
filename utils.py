@@ -126,14 +126,11 @@ class AppConfig:
         self.logs_path = join(self.output_path, "logs")
         self.model_path = join(self.output_path, "model")
         self.tensorboard_path = join(self.app_path, "runs")
-        self.out_files_path = join(self.output_path, "output_files")
         self._create_output_dirs()
 
     def _create_output_dirs(self):
         if not exists(self.output_path):
             mkdir(self.output_path)
-        if not exists(self.out_files_path):
-            mkdir(self.out_files_path)
         if not exists(self.logs_path):
             mkdir(self.logs_path)
         if not exists(self.tensorboard_path):
