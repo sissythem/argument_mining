@@ -209,14 +209,14 @@ class TopicModel:
     def get_topics(self, sentences: List[str]):
         model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
         embeddings = model.encode(sentences, show_progress_bar=True)
-
+        self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
         # reduce document dimensionality
-        umap_embeddings = umap.UMAP(n_neighbors=5,
+        umap_embeddings = umap.UMAP(n_neighbors=15,
                                     n_components=5,
                                     metric='cosine').fit_transform(embeddings)
 
         # clustering
-        cluster = hdbscan.HDBSCAN(min_cluster_size=5,
+        cluster = hdbscan.HDBSCAN(min_cluster_size=15,
                                   metric='euclidean',
                                   cluster_selection_method='eom').fit(umap_embeddings)
 
@@ -228,9 +228,9 @@ class TopicModel:
         top_n_words = self._extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=5)
         topic_sizes = self._extract_topic_sizes(docs_df).head(5)
         topic_ids = topic_sizes["Topic"]
-        topics = []
+        topics = {}
         for topic in topic_ids:
-            topics.append(top_n_words[topic])
+            topics[topic] = top_n_words[topic]
         return topics
 
     @staticmethod
