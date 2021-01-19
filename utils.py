@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import os
 import random
@@ -23,38 +22,34 @@ from elasticsearch_dsl import Search
 from sshtunnel import SSHTunnelForwarder
 
 
-def name_exceeds_bytes(name):
-    return utf8len(name) >= 255
+def topic_backup(content):
+    from ellogon import tokeniser
+    from gensim import corpora, models
 
-
-def utf8len(s):
-    return len(s.encode('utf-8'))
-
-
-def create_document_id(text):
-    hash_id = hashlib.md5(text.encode())
-    return hash_id.hexdigest()
-
-
-def get_initial_json(name, text):
-    return {
-        "id": create_document_id(text=name),
-        "title": name,
-        "link": "",
-        "description": "",
-        "date": "",
-        "tags": [],
-        "document_link": "",
-        "publishedAt": "",
-        "crawledAt": "",
-        "domain": "",
-        "netloc": "",
-        "content": text,
-        "annotations": {
-            "ADUs": [],
-            "Relations": []
-        }
-    }
+    sentences = tokeniser.tokenise(content)
+    sentences = [" ".join(s) for s in sentences]
+    # greek_stopwords = stopwords.words("greek")
+    greek_stopwords = tokeniser.stop_words()
+    texts = [
+        [word for word in sentence.lower().split() if word not in greek_stopwords]
+        for sentence in sentences
+    ]
+    dictionary = corpora.Dictionary(texts)
+    corpus = [dictionary.doc2bow(text) for text in texts]
+    tfidf = models.TfidfModel(corpus)
+    corpus_tfidf = tfidf[corpus]
+    # lda_model = models.LdaModel(corpus, id2word=dictionary, num_topics=10)
+    lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
+                                          workers=4)
+    topics = []
+    topics_words = lda_model_tfidf.show_topics(num_topics=5, num_words=5, formatted=False)
+    topics_words = [(tp[0], [wd[0] for wd in tp[1]]) for tp in topics_words]
+    for topic, words in topics_words:
+        topics += words
+    # for idx, topic in lda_model_tfidf.print_topics(-1):
+    #     topics.append(topic)
+    #     self.app_logger.debug(f'Topic: {idx} Word: {topic}')
+    return topics
 
 
 class AppConfig:
