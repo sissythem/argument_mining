@@ -5,10 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import umap
-from sentence_transformers import SentenceTransformer
-from transformers import BertModel
-from sklearn.feature_extraction.text import CountVectorizer
 from ellogon import tokeniser
+from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import CountVectorizer
 
 
 def c_tf_idf(sentences, m, ngram_range=(1, 1)):
@@ -44,8 +43,7 @@ def extract_topic_sizes(df):
 
 
 def get_topics(sentences: List[str]):
-    # model = SentenceTransformer("nlpaueb/bert-base-greek-uncased-v1")
-    model = BertModel.from_pretrained('nlpaueb/bert-base-greek-uncased-v1')
+    model = SentenceTransformer("distiluse-base-multilingual-cased-v2")
     embeddings = model.encode(sentences, show_progress_bar=True)
 
     # reduce document dimensionality
