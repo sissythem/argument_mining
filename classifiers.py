@@ -207,16 +207,19 @@ class TopicModel:
         self.device_name = app_config.device_name
 
     def get_topics(self, sentences: List[str]):
+        if not sentences:
+            return {}
         model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
         embeddings = model.encode(sentences, show_progress_bar=True)
         self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
         # reduce document dimensionality
-        umap_embeddings = umap.UMAP(n_neighbors=15,
+        k = int(len(sentences) / 2)
+        umap_embeddings = umap.UMAP(n_neighbors=k,
                                     n_components=5,
                                     metric='cosine').fit_transform(embeddings)
 
         # clustering
-        cluster = hdbscan.HDBSCAN(min_cluster_size=15,
+        cluster = hdbscan.HDBSCAN(min_cluster_size=k,
                                   metric='euclidean',
                                   cluster_selection_method='eom').fit(umap_embeddings)
 
