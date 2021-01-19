@@ -233,7 +233,10 @@ class TopicModel:
         topic_ids = topic_sizes["Topic"]
         topics = {}
         for topic in topic_ids:
-            topics[topic] = top_n_words[topic]
+            words = []
+            for word_score_tuple in top_n_words[topic]:
+                words.append(word_score_tuple[0])
+            topics[topic] = words
         return topics
 
     @staticmethod
