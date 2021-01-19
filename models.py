@@ -231,12 +231,10 @@ class TopicModel:
         top_n_words = self._extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=5)
         topic_sizes = self._extract_topic_sizes(docs_df).head(5)
         topic_ids = topic_sizes["Topic"]
-        topics = {}
+        topics = []
         for topic in topic_ids:
-            words = []
             for word_score_tuple in top_n_words[topic]:
-                words.append(word_score_tuple[0])
-            topics[topic] = words
+                topics.append(word_score_tuple[0])
         return topics
 
     @staticmethod
