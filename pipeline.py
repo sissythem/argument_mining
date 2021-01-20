@@ -89,16 +89,15 @@ class ArgumentMining:
         url = properties["url"]
         username = properties["username"]
         password = properties["password"]
-        data = {"properties": {"delivery_mode": 2}, "routing_key": "dlabqueue", "payload": document_ids,
+        data = {"properties": {"delivery_mode": 2}, "routing_key": "dlabqueue", "payload": json.dumps(document_ids),
                 "payload_encoding": "string"}
-        data = json.dumps(data)
         creds = f"{username}:{password}"
         creds_bytes = creds.encode("ascii")
         base64_bytes = base64.b64encode(creds_bytes)
         base64_msg = base64_bytes.decode("ascii")
-        headers = {"Content-Type": "application/json", "Authorization": base64_msg}
+        headers = {"Content-Type": "application/json", "Authorization": f"Basic {base64_msg}"}
         try:
-            response = requests.post(url, data=data, headers=headers)
+            response = requests.post(url, json=data, headers=headers)
             if response.status_code == 200:
                 self.app_logger.info("Request to ICS was successful!")
             else:
