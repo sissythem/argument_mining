@@ -228,12 +228,14 @@ class TopicModel:
         docs_df['Doc_ID'] = range(len(docs_df))
         docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Sentence': ' '.join})
         tf_idf, count = self._c_tf_idf(docs_per_topic.Sentence.values, m=len(sentences))
-        top_n_words = self._extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=5)
-        topic_sizes = self._extract_topic_sizes(docs_df).head(5)
+        top_n_words = self._extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=10)
+        topic_sizes = self._extract_topic_sizes(docs_df).head(2)
         topic_ids = topic_sizes["Topic"]
         topics = []
         for topic in topic_ids:
             for word_score_tuple in top_n_words[topic]:
+                if word_score_tuple[0].isdigit():
+                    continue
                 topics.append(word_score_tuple[0])
         return topics
 
