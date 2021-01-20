@@ -96,7 +96,7 @@ class ArgumentMining:
         creds_bytes = creds.encode("ascii")
         base64_bytes = base64.b64encode(creds_bytes)
         base64_msg = base64_bytes.decode("ascii")
-        headers = {"Content-type": "application/json", "Authorization": base64_msg}
+        headers = {"Content-Type": "application/json", "Authorization": base64_msg}
         try:
             response = requests.post(url, data=data, headers=headers)
             if response.status_code == 200:
