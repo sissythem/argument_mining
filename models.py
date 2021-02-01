@@ -10,14 +10,16 @@ import pandas as pd
 import torch
 import umap
 from ellogon import tokeniser
-from flair.data import Corpus
+from flair.data import Corpus, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings, \
+    TransformerDocumentEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.nn import Model
 from flair.trainers import ModelTrainer
 from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.cluster import KMeans
 from torch.optim.optimizer import Optimizer
 
 from utils import AppConfig
@@ -86,10 +88,9 @@ class AduModel(Classifier):
     def train(self):
         # define columns
         columns = {0: 'text', 1: 'ner'}
+        data_folder = join(self.resources_path, "data")
         # 1. get the corpus
-        corpus: Corpus = ColumnCorpus(self.resources_path, columns,
-                                      train_file=self.train_file,
-                                      test_file=self.test_file,
+        corpus: Corpus = ColumnCorpus(data_folder, columns, train_file=self.train_file, test_file=self.test_file,
                                       dev_file=self.dev_file)
 
         self.app_logger.info("Corpus created")
@@ -156,10 +157,11 @@ class RelationsModel(Classifier):
         self.shuffle: bool = self.model_properties["shuffle"]
 
     def train(self):
+        data_folder = join(self.resources_path, "data")
         # define columns
         column_name_map = {0: "text", 1: "label_topic"}
         # 1. create Corpus
-        corpus: Corpus = CSVClassificationCorpus(data_folder=self.resources_path, column_name_map=column_name_map,
+        corpus: Corpus = CSVClassificationCorpus(data_folder=data_folder, column_name_map=column_name_map,
                                                  skip_header=True, delimiter="\t", train_file=self.train_file,
                                                  test_file=self.test_file, dev_file=self.dev_file)
         self.app_logger.info("Corpus created")
@@ -286,3 +288,24 @@ class TopicModel:
         plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
         plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
         plt.colorbar()
+
+
+class Clustering:
+
+    def __init__(self, app_config):
+        self.app_config = app_config
+        self.app_logger = app_config.app_logger
+        self.properties = app_config.properties
+
+    def cluster_arguments(self, sentences):
+        document_embeddings = TransformerDocumentEmbeddings("nlpaueb/bert-base-greek-uncased-v1")
+        embeded_sentences = []
+        for sentence in sentences:
+            sentence = Sentence(sentence)
+            embeded_sentences.append(document_embeddings.embed(sentence))
+        embeddings = np.asarray(embeded_sentences)
+        length = np.sqrt((embeddings ** 2).sum(axis=1))[:, None]
+        embeddings = embeddings / length
+        n_clusters = self.properties["clustering"]["n_clusters"]
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0)
+        labels = kmeans.fit_predict(embeddings)

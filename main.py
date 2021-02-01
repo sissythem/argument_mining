@@ -11,7 +11,7 @@ from utils import AppConfig
 
 
 def error_analysis(path_to_resources):
-    path_to_results = join(path_to_resources, "test.tsv")
+    path_to_results = join(path_to_resources, "results", "test.tsv")
     results = pd.read_csv(path_to_results, sep=" ", index_col=None, header=None, skip_blank_lines=False)
     df_list = np.split(results, results[results.isnull().all(1)].index)
     sentences = []

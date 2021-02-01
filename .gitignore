@@ -4,6 +4,8 @@ venv/
 output/
 runs/
 test/
+data/
+results/
 __pycache__/
 resources/
 !resources/example_properties.yaml
