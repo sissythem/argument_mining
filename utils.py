@@ -135,6 +135,10 @@ class AppConfig:
             mkdir(self.logs_path)
         if not exists(self.tensorboard_path):
             mkdir(self.tensorboard_path)
+        if not exists(join(self.resources_path, "data")):
+            mkdir(join(self.resources_path, "data"))
+        if not exists(join(self.resources_path, "results")):
+            mkdir(join(self.resources_path, "results"))
 
     def _get_base_path(self, base_name):
         # Create a base path:

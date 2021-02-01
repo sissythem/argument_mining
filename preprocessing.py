@@ -206,7 +206,7 @@ class DataLoader:
                 df.loc[row_counter] = ["", "", "", "", "", ""]
                 row_counter += 1
         self.app_logger.debug("Finished building dataframe. Saving...")
-        out_file_path = join(resources, "train_adu.csv")
+        out_file_path = join(resources, "data", "train_adu.csv")
         df.to_csv(out_file_path, sep='\t', index=False, header=None)
         self.app_logger.debug("Dataframe saved!")
 
@@ -250,7 +250,7 @@ class DataLoader:
             df.loc[row_counter] = [final_text, relation, sentence_counter_str]
             row_counter += 1
             sentence_counter += 1
-        output_filepath = join(resources_path, filename)
+        output_filepath = join(resources_path, "data", filename)
         df.to_csv(output_filepath, sep='\t', index=False, header=None)
         self.app_logger.debug("Dataframe saved!")
 
