@@ -300,7 +300,7 @@ class Clustering:
     def cluster_arguments(self, sentences):
         document_embeddings = TransformerDocumentEmbeddings("nlpaueb/bert-base-greek-uncased-v1")
         embeded_sentences = []
-        for sentence in sentences:
+        for sentence, segment_id in sentences:
             sentence = Sentence(sentence)
             embeded_sentences.append(document_embeddings.embed(sentence))
         embeddings = np.asarray(embeded_sentences)
