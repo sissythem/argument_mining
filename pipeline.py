@@ -11,7 +11,7 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 
-from models import AduModel, RelationsModel, TopicModel
+from models import AduModel, RelationsModel, TopicModel, Clustering
 from utils import AppConfig
 
 
@@ -114,6 +114,9 @@ class ArgumentMining:
         self.app_logger.info("Predicting ADUs from document")
         segments = self._predict_adus(document=document)
         major_claims, claims, premises = self._get_adus(segments)
+        all_segments = major_claims + claims + premises
+        self.app_logger.info("Extracting clusters for major claims, claims and premises")
+        self._get_clusters(sentences=all_segments)
         self.app_logger.info(
             f"Found {len(major_claims)} major claims, {len(claims)} claims and {len(premises)} premises")
         self.app_logger.info("Predicting relations between ADUs")
@@ -126,6 +129,10 @@ class ArgumentMining:
         self.app_logger.info("Predicting stance between major claim and claims")
         document = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
         return document
+
+    def _get_clusters(self, sentences):
+        clustering_model = Clustering(app_config=self.app_config)
+        clustering_model.cluster_arguments(sentences=sentences)
 
     def _get_topics(self, content):
         sentences = tokeniser.tokenise(content)
