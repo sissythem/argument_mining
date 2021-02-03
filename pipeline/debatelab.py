@@ -12,7 +12,7 @@ from ellogon import tokeniser
 from flair.data import Sentence, Label
 
 from utils import utils
-from training.models import AduModel, RelationsModel, TopicModel
+from training.models import AduModel, RelationsModel, TopicModel, Clustering
 from utils.config import AppConfig
 from pipeline.validation import JsonValidator, JsonCorrector
 
