@@ -22,7 +22,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.cluster import KMeans
 from torch.optim.optimizer import Optimizer
 
-from utils import AppConfig
+from utils.config import AppConfig
 
 
 class Classifier:
@@ -217,7 +217,6 @@ class TopicModel:
         # reduce document dimensionality
         k = int(len(sentences) / 2)
         umap_embeddings = umap.UMAP(n_neighbors=k,
-                                    n_components=5,
                                     metric='cosine').fit_transform(embeddings)
 
         # clustering

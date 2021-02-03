@@ -4,10 +4,10 @@ from os.path import join
 import numpy as np
 import pandas as pd
 
-from models import AduModel, RelationsModel
-from pipeline import ArgumentMining
-from preprocessing import DataLoader
-from utils import AppConfig
+from training.models import AduModel, RelationsModel
+from pipeline.debatelab import ArgumentMining
+from training.preprocessing import DataLoader
+from utils.config import AppConfig
 
 
 def error_analysis(path_to_resources):

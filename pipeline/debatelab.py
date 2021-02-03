@@ -11,8 +11,10 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 
-from models import AduModel, RelationsModel, TopicModel
-from utils import AppConfig
+from utils import utils
+from training.models import AduModel, RelationsModel, TopicModel
+from utils.config import AppConfig
+from pipeline.validation import JsonValidator, JsonCorrector
 
 
 class ArgumentMining:
@@ -46,15 +48,36 @@ class ArgumentMining:
 
     def run_pipeline(self):
         client = self.app_config.elastic_retrieve.elasticsearch_client
+        validator = JsonValidator(app_config=self.app_config)
         documents = self._retrieve(client=client)
+        document_ids = []
         for idx, document in enumerate(documents):
-            document = self.predict(document=document)
-            self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
-                                                                    doc_type='docket', id=document["id"],
-                                                                    body=document)
-        documents_ids = [document["id"] for document in documents]
-        self.notify_ics(document_ids=documents_ids)
+            document, segment_counter, rel_counter, stance_counter = self.predict(document=document)
+            validation_errors = self.run_validation(validator=validator, document=document,
+                                                    segment_counter=segment_counter, rel_counter=rel_counter,
+                                                    stance_counter=stance_counter)
+            if not validation_errors:
+                self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
+                                                                        doc_type='docket', id=document["id"],
+                                                                        body=document)
+                document_ids.append(document["id"])
+        validator.export_json_schema(document_ids=document_ids)
+        self.notify_ics(document_ids=document_ids)
         self.app_logger.info("Evaluation is finished!")
+
+    def run_validation(self, validator, document, segment_counter, rel_counter, stance_counter):
+        validation_errors = validator.validate(document=document)
+        if validation_errors:
+            counter = self.app_config.properties["eval"]["max_correction_tries"]
+            corrector = JsonCorrector(app_config=self.app_config, segment_counter=segment_counter,
+                                      rel_counter=rel_counter, stance_counter=stance_counter)
+            while counter > 0 and validation_errors:
+                if not corrector.can_document_be_corrected(validation_errors=validation_errors):
+                    break
+                document = corrector.correction(document=document)
+                validation_errors = validator.validate(document=document)
+                counter -= 1
+        return validation_errors
 
     def _retrieve(self, client):
         retrieve_kind = self.app_config.properties["eval"]["retrieve"]
@@ -112,20 +135,20 @@ class ArgumentMining:
         self.app_logger.info("Extracting named entities")
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
         self.app_logger.info("Predicting ADUs from document")
-        segments = self._predict_adus(document=document)
+        segments, segment_counter = self._predict_adus(document=document)
         major_claims, claims, premises = self._get_adus(segments)
         self.app_logger.info(
             f"Found {len(major_claims)} major claims, {len(claims)} claims and {len(premises)} premises")
         self.app_logger.info("Predicting relations between ADUs")
-        relations = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises)
+        relations, rel_counter = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises)
         document["annotations"] = {
             "ADUs": segments,
             "Relations": relations,
             "entities": entities
         }
         self.app_logger.info("Predicting stance between major claim and claims")
-        document = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
-        return document
+        document, stance_counter = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
+        return document, segment_counter, rel_counter, stance_counter
 
     def _get_topics(self, content):
         sentences = tokeniser.tokenise(content)
@@ -189,7 +212,7 @@ class ArgumentMining:
                             "confidence": segment.mean_conf
                         }
                         adus.append(seg)
-        return adus
+        return adus, segment_counter
 
     @staticmethod
     def _get_adus(segments):
@@ -246,7 +269,7 @@ class ArgumentMining:
                             "confidence": conf
                         }
                         relations.append(rel_dict)
-        return relations
+        return relations, rel_counter
 
     def _predict_stance(self, major_claims, claims, json_obj):
         stance_counter = 0
@@ -269,7 +292,7 @@ class ArgumentMining:
                         for segment in json_obj["annotations"]["ADUs"]:
                             if segment["id"] == claim[1]:
                                 segment["stance"] = stance_list
-        return json_obj
+        return json_obj, stance_counter
 
     @staticmethod
     def _get_label_with_max_conf(labels: List[Label]):
