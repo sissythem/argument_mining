@@ -11,7 +11,6 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 
-from utils import utils
 from training.models import AduModel, RelationsModel, TopicModel, Clustering
 from utils.config import AppConfig
 from pipeline.validation import JsonValidator, JsonCorrector
@@ -61,6 +60,7 @@ class ArgumentMining:
                                                                         doc_type='docket', id=document["id"],
                                                                         body=document)
                 document_ids.append(document["id"])
+        # TODO clustering arguments
         validator.export_json_schema(document_ids=document_ids)
         self.notify_ics(document_ids=document_ids)
         self.app_logger.info("Evaluation is finished!")
