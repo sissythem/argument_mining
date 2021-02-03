@@ -22,39 +22,14 @@ from elasticsearch_dsl import Search
 from sshtunnel import SSHTunnelForwarder
 
 
-def topic_backup(content):
-    from ellogon import tokeniser
-    from gensim import corpora, models
-
-    sentences = tokeniser.tokenise(content)
-    sentences = [" ".join(s) for s in sentences]
-    # greek_stopwords = stopwords.words("greek")
-    greek_stopwords = tokeniser.stop_words()
-    texts = [
-        [word for word in sentence.lower().split() if word not in greek_stopwords]
-        for sentence in sentences
-    ]
-    dictionary = corpora.Dictionary(texts)
-    corpus = [dictionary.doc2bow(text) for text in texts]
-    tfidf = models.TfidfModel(corpus)
-    corpus_tfidf = tfidf[corpus]
-    # lda_model = models.LdaModel(corpus, id2word=dictionary, num_topics=10)
-    lda_model_tfidf = models.LdaMulticore(corpus_tfidf, num_topics=10, id2word=dictionary, passes=2,
-                                          workers=4)
-    topics = []
-    topics_words = lda_model_tfidf.show_topics(num_topics=5, num_words=5, formatted=False)
-    topics_words = [(tp[0], [wd[0] for wd in tp[1]]) for tp in topics_words]
-    for topic, words in topics_words:
-        topics += words
-    # for idx, topic in lda_model_tfidf.print_topics(-1):
-    #     topics.append(topic)
-    #     self.app_logger.debug(f'Topic: {idx} Word: {topic}')
-    return topics
-
-
 class AppConfig:
 
     def __init__(self):
+        """
+        Constructor for the Argument Mining application configuration. It configures the names of the project's folders
+        and data files, reads the dynamic configuration from a yaml file, initializes two Elasticsearch clients, i.e.
+        one for the social observatory and one for the debatelab elasticsearch and sets some configuration
+        """
         random.seed(2020)
         self.documents_pickle = "documents.pkl"
         self._configure()
@@ -121,10 +96,11 @@ class AppConfig:
         curr_dir = str(curr_dir)
         self.app_path = curr_dir if curr_dir.endswith("mining") else parent
 
-        self.resources_path = join(self.app_path, "resources")
-        self.output_path = join(self.app_path, "output")
+        self.resources_path = join(self.app_path, "../resources")
+        self.output_path = join(self.app_path, "../output")
         self.logs_path = join(self.output_path, "logs")
         self.model_path = join(self.output_path, "model")
+        self.output_files = join(self.output_path, "output_files")
         self.tensorboard_path = join(self.app_path, "runs")
         self._create_output_dirs()
 
@@ -135,6 +111,8 @@ class AppConfig:
             mkdir(self.logs_path)
         if not exists(self.tensorboard_path):
             mkdir(self.tensorboard_path)
+        if not exists(self.output_files):
+            mkdir(self.output_files)
         if not exists(join(self.resources_path, "data")):
             mkdir(join(self.resources_path, "data"))
         if not exists(join(self.resources_path, "results")):

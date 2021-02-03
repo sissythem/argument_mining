@@ -38,8 +38,7 @@ class Document:
                 idx_min = diffs.index(min_diff)
                 segment.char_start = indices[idx_min]
                 segment.char_end = segment.char_start + len(segment.text)
-                tmp_txt = tmp_txt[:segment.char_start] + repl_char * \
-                          len(segment.text) + tmp_txt[segment.char_end:]
+                tmp_txt = tmp_txt[:segment.char_start] + repl_char * len(segment.text) + tmp_txt[segment.char_end:]
             else:
                 tmp_txt = tmp_txt.replace(
                     segment.text, repl_char * len(segment.text), 1)
@@ -207,7 +206,7 @@ class DataLoader:
                 row_counter += 1
         self.app_logger.debug("Finished building dataframe. Saving...")
         out_file_path = join(resources, "data", "train_adu.csv")
-        df.to_csv(out_file_path, sep='\t', index=False, header=None)
+        df.to_csv(out_file_path, sep='\t', index=False, header=False)
         self.app_logger.debug("Dataframe saved!")
 
     def load_relations(self):
@@ -251,7 +250,7 @@ class DataLoader:
             row_counter += 1
             sentence_counter += 1
         output_filepath = join(resources_path, "data", filename)
-        df.to_csv(output_filepath, sep='\t', index=False, header=None)
+        df.to_csv(output_filepath, sep='\t', index=False, header=False)
         self.app_logger.debug("Dataframe saved!")
 
     def _collect_segments(self, document):
