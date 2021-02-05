@@ -24,6 +24,10 @@ from sshtunnel import SSHTunnelForwarder
 
 class AppConfig:
 
+    """
+    Class to initialize the application properties
+    """
+
     def __init__(self):
         """
         Constructor for the Argument Mining application configuration. It configures the names of the project's folders
@@ -37,6 +41,9 @@ class AppConfig:
         self.elastic_save = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="save")
 
     def _configure(self):
+        """
+        Initialize the application configuration
+        """
         self.run = uuid.uuid4().hex
         self._configure_device()
         self._create_paths()
@@ -55,6 +62,10 @@ class AppConfig:
         self._configure_training_data_and_model_path()
 
     def _configure_device(self):
+        """
+        Reads the environmental variable CUDA_VISIBLE_DEVICES in order to initialize the device to be used
+        in the training
+        """
         if torch.cuda.is_available():
             devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
             if type(devices) == str:
@@ -66,6 +77,12 @@ class AppConfig:
             self.device_name = "cpu"
 
     def _config_logger(self):
+        """
+        Configures the application logger
+
+        Returns
+            logger: the initialized logger
+        """
         self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
         log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
         program_logger = logging.getLogger("flair")
@@ -81,6 +98,12 @@ class AppConfig:
         return program_logger
 
     def _load_properties(self):
+        """
+        Loads the configuration file from the resources folder
+
+        Returns
+            dict: the application properties
+        """
         self.properties_file = "properties.yaml"
         self.example_properties = "example_properties.yaml"
         path_to_properties = join(self.resources_path, self.properties_file)
@@ -91,13 +114,16 @@ class AppConfig:
         return properties
 
     def _create_paths(self):
+        """
+        Creates the various paths to application directories, e.g. output, resources, logs etc
+        """
         curr_dir = Path(getcwd())
         parent = str(curr_dir.parent)
         curr_dir = str(curr_dir)
         self.app_path = curr_dir if curr_dir.endswith("mining") else parent
 
-        self.resources_path = join(self.app_path, "../resources")
-        self.output_path = join(self.app_path, "../output")
+        self.resources_path = join(self.app_path, "resources")
+        self.output_path = join(self.app_path, "output")
         self.logs_path = join(self.output_path, "logs")
         self.model_path = join(self.output_path, "model")
         self.output_files = join(self.output_path, "output_files")
@@ -105,6 +131,9 @@ class AppConfig:
         self._create_output_dirs()
 
     def _create_output_dirs(self):
+        """
+        Create missing directories (e.g. logs, output etc)
+        """
         if not exists(self.output_path):
             mkdir(self.output_path)
         if not exists(self.logs_path):
@@ -119,6 +148,15 @@ class AppConfig:
             mkdir(join(self.resources_path, "results"))
 
     def _get_base_path(self, base_name):
+        """
+        Create the base full path to the directory where each model will be saved
+
+        Args
+            base_name (str): the name of the model
+
+        Returns
+            str: the path to the directory of the model
+        """
         # Create a base path:
         embedding_names = 'bert-greek'
         properties = self.properties["adu_model"] if base_name == "adu_model" else self.properties["rel_model"]
@@ -140,6 +178,9 @@ class AppConfig:
         return base_path
 
     def _configure_training_data_and_model_path(self):
+        """
+        Reads the application properties to find for each model the train, test and dev datasets
+        """
         self.adu_base_path = self._get_base_path(base_name="adu_model")
         self.rel_base_path = self._get_base_path(base_name="rel_model")
         self.stance_base_path = self._get_base_path(base_name="stance_model")
@@ -160,12 +201,25 @@ class AppConfig:
         self.stance_test_csv = config["test_csv"]
 
     def _config_email(self, config):
+        """
+        Email configuration in order to get notification when the program has finished
+
+        Args
+            config (dict): configuration parameters for email
+        """
         config_email = config["email"]
         self.sender_email = config_email.get("sender", "skthemeli@gmail.com")
         self.receiver_email = config_email.get("receiver", "skthemeli@gmail.com")
         self.password = config_email["password"]
 
     def send_email(self, body, subject=None):
+        """
+        Function to send a notification email upon completion of the program
+
+        Args
+            body (str): the body message
+            subject (str): the subject of the email
+        """
         if not subject:
             subject = "Argument mining run"
 
@@ -207,7 +261,20 @@ class AppConfig:
 
 class ElasticSearchConfig:
 
+    """
+    Class to configure an Elasticsearch Client
+    """
+
     def __init__(self, properties, elasticsearch):
+        """
+        Constructor of the ElasticSearchConfig class
+
+        Args
+            | properties (dict): a dictionary with the configuration parameters
+            | elasticsearch (str): valid values are save or retrieve in order to determine which parameters to use
+            The elastic_save parameters are configurations for the debatelab elasticsearch while the elastic_retrieve
+            properties are the configurations, credentials etc of the socialobservatory elasticsearch.
+        """
         properties = properties["elastic_save"] if elasticsearch == "save" else properties["elastic_retrieve"]
         self.username = properties["username"]
         self.password = properties["password"]
@@ -222,6 +289,12 @@ class ElasticSearchConfig:
         self._init_elasticsearch_client()
 
     def _init_elasticsearch_client(self, timeout=60):
+        """
+        Initialization of the Elasticsearch client
+
+        Args
+            timeout (int): optional parameter to define the timeout for the connection
+        """
         self.elasticsearch_client = Elasticsearch([{
             'host': "localhost",
             'port': self.tunnel.local_bind_port,
@@ -229,6 +302,9 @@ class ElasticSearchConfig:
         }], timeout=timeout)
 
     def _init_ssh_tunnel(self):
+        """
+        Initialization of ssh tunnel connection in order to use it to create the Elasticsearch client
+        """
         if self.connect == "key":
             self.tunnel = SSHTunnelForwarder(
                 ssh_address=self.host,
@@ -250,9 +326,15 @@ class ElasticSearchConfig:
         self.tunnel.start()
 
     def stop(self):
+        """
+        Stop the ssh tunneling
+        """
         del self.elasticsearch_client
         [t.close() for t in threading.enumerate() if t.__class__.__name__ == "Transport"]
         self.tunnel.stop()
 
     def truncate_elasticsearch(self):
+        """
+        Delete all entries in the elasticsearch
+        """
         Search(using=self.elasticsearch_client, index="httpresponses").query("match_all").delete()

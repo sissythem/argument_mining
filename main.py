@@ -11,6 +11,12 @@ from utils.config import AppConfig
 
 
 def error_analysis(path_to_resources):
+    """
+    Function to perform error analysis on the results. Saves the incorrect predictions into a file
+
+    Args
+        path_to_resources (str): the full path to the resources folder
+    """
     path_to_results = join(path_to_resources, "results", "test.tsv")
     results = pd.read_csv(path_to_results, sep=" ", index_col=None, header=None, skip_blank_lines=False)
     df_list = np.split(results, results[results.isnull().all(1)].index)
@@ -37,6 +43,12 @@ def error_analysis(path_to_resources):
 
 
 def preprocess(app_config):
+    """
+    Preprocess the data into CONLL format
+
+    Args
+        app_config (AppConfig): the application configuration
+    """
     logger = app_config.app_logger
     data_loader = DataLoader(app_config=app_config)
     logger.info("Creating CSV file in CONLL format for ADUs classification")
@@ -46,6 +58,12 @@ def preprocess(app_config):
 
 
 def train(app_config):
+    """
+    Train the selected models. In the application properties, the models to be trained are indicated.
+
+    Args
+        app_config (AppConfig): the application configuration
+    """
     logger = app_config.app_logger
     models_to_train = app_config.properties["train"]["models"]
     if "adu" in models_to_train:
@@ -70,11 +88,23 @@ def train(app_config):
 
 
 def evaluate(app_config):
+    """
+    Execute the DebateLab pipeline
+
+    Args
+        app_config (AppConfig): the application configuration
+    """
     arg_mining = ArgumentMining(app_config=app_config)
     arg_mining.run_pipeline()
 
 
 def main():
+    """
+    The main function of the program. Initializes the AppConfig class to load the application properties and
+    configurations and based on the tasks in the properties executes the necessary steps (preprocessing, training,
+    debatelab pipeline, error analysis)
+    :return:
+    """
     app_config: AppConfig = AppConfig()
     try:
         properties = app_config.properties
@@ -85,6 +115,8 @@ def main():
             train(app_config=app_config)
         if "eval" in properties["tasks"]:
             evaluate(app_config=app_config)
+        if "error" in properties["tasks"]:
+            error_analysis(path_to_resources=app_config.resources_path)
         app_config.send_email(body="Argument mining pipeline finished successfully",
                               subject="Argument mining run: {}".format(app_config.run))
     except(BaseException, Exception):
