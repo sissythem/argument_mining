@@ -1,0 +1,24 @@
+image: python:3.8
+
+test:
+  stage: test
+  script:
+  - sudo apt-get install tk
+  - pip install -r requirements.txt
+  - sphinx-build -b html -a ./docs/source public
+  only:
+  - branches
+  except:
+  - master
+
+pages:
+  stage: deploy
+  script:
+  - sudo apt-get install tk
+  - pip install -r requirements.txt
+  - sphinx-build -b html -a ./docs/source public
+  artifacts:
+    paths:
+    - public
+  only:
+  - master

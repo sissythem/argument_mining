@@ -1,0 +1,6 @@
+Training
+========
+
+.. toctree::
+        preprocessing
+        models
