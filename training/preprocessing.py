@@ -8,7 +8,9 @@ from ellogon import tokeniser
 
 
 class Document:
-
+    """
+    Class representing a document. Contains the sentences, segments, annotations, relations etc
+    """
     def __init__(self, app_logger, document_id, name, content, annotations):
         self.app_logger = app_logger
         self.document_id: int = document_id

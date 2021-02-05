@@ -7,7 +7,6 @@ from typing import List
 
 from genson import SchemaBuilder
 
-from utils import utils
 from utils.config import AppConfig
 
 
@@ -30,35 +29,53 @@ class ValidationError(Enum):
 class JsonValidator:
 
     def __init__(self, app_config: AppConfig):
+        """
+        Constructor for JsonValidator class
+
+        Args
+            app_config (AppConfig): configuration parameters
+        """
         self.app_config = app_config
         self.app_logger = app_config.app_logger
 
     def validate(self, document):
         """
         Gets a document (in json format) and validates it based on specific rules:
-            1. topics list must not be empty
-            2. relations list must not be empty
-            3. ADUs list must not be empty
-            4. All ADU types should be present, i.e. major_claim, claim, premise
-            5. All ADU segments should be associated in a relation
+        |    1. topics list must not be empty
+        |    2. relations list must not be empty
+        |    3. ADUs list must not be empty
+        |    4. All ADU types should be present, i.e. major_claim, claim, premise
+        |    5. All ADU segments should be associated in a relation
+
+        Args
+            document (dict): the document in json format to be validated
+
+        Returns
+            list: a list of validation errors found in the document - if the document is valid, the list is empty
         """
+        self.app_logger.info(f"Validating document with id {document['id']} and title {document['title']}")
         validation_errors = []
         # check topics, relations and ADUs lists are not empty
         if not document["topics"]:
+            self.app_logger.warning("Document does not contain topics")
             validation_errors.append(ValidationError.empty_topics)
         if not document["annotations"]["Relations"]:
+            self.app_logger.warning("Document has an empty relations list")
             validation_errors.append(ValidationError.empty_relations)
         if not document["annotations"]["ADUs"]:
+            self.app_logger.warning("Document has empty ADUs list")
             validation_errors.append(ValidationError.empty_adus)
 
         # if relations or ADUs are empty there is no need to continue the following validations
         if ValidationError.empty_relations in validation_errors or ValidationError.empty_adus in validation_errors:
+            self.app_logger.info("Relations or ADUs are empty - Stopping validation")
             return validation_errors
 
         adus = document["annotations"]["ADUs"]
         relations = document["annotations"]["Relations"]
 
         # check major claim, claim and premise types exist
+        self.app_logger.debug("Collecting major claim, claims and premises")
         major_claims, claims, premises = [], [], []
         for adu in adus:
             adu_type = adu["type"]
@@ -72,28 +89,36 @@ class JsonValidator:
         if not major_claims or not claims or not premises:
             # if any type is missing, no need to check for relations
             if not major_claims:
+                self.app_logger.warning("The document does not contain major claim")
                 validation_errors.append(ValidationError.empty_major_claims)
             if not claims:
+                self.app_logger.warning("The document does not contain any claims")
                 validation_errors.append(ValidationError.empty_claims)
             if not premises:
+                self.app_logger.warning("The document does not contain any premises")
                 validation_errors.append(ValidationError.empty_premises)
             return validation_errors
 
-        major_claims_rel = self._check_relation_exists(relations=relations, adus=major_claims, position="target")
-        claims_rel_source = self._check_relation_exists(relations=relations, adus=claims, position="source")
-        claims_rel_target = self._check_relation_exists(relations=relations, adus=claims, position="target")
-        premises_rel = self._check_relation_exists(relations=relations, adus=premises, position="source")
+        major_claims_rel = self._relation_exists(relations=relations, adus=major_claims, position="target")
+        claims_rel_source = self._relation_exists(relations=relations, adus=claims, position="source")
+        claims_rel_target = self._relation_exists(relations=relations, adus=claims, position="target")
+        premises_rel = self._relation_exists(relations=relations, adus=premises, position="source")
 
         if not major_claims_rel or (not claims_rel_target and not claims_rel_source) or not premises_rel:
             if not major_claims_rel:
+                self.app_logger.warning("Missing relations for major claim")
                 validation_errors.append(ValidationError.major_claim_missing_relations)
             if not claims_rel_source:
+                self.app_logger.warning("Missing relations for some claims towards the major claim")
                 validation_errors.append(ValidationError.claims_missing_relations_source)
             if not claims_rel_target:
+                self.app_logger.warning("Missing relations for some relations of some claims with premises")
                 validation_errors.append(ValidationError.claims_missing_relations_target)
             if not premises_rel:
+                self.app_logger.warning("Missing relations for some premises")
                 validation_errors.append(ValidationError.premises_missing_relations)
         if validation_errors:
+            self.app_logger.debug("Writing invalid document into file")
             timestamp = datetime.now()
             filename = f"{document['id']}_{timestamp}.json"
             file_path = join(self.app_config.output_files, filename)
@@ -120,19 +145,43 @@ class JsonValidator:
             f.write(json.dumps(schema, indent=4, sort_keys=False))
 
     @staticmethod
-    def _check_relation_exists(relations, adus, position):
-        found_relation = False
+    def _relation_exists(relations, adus, position):
+        """
+        For each ADU (source or target) find if there are any relations
+
+        Args
+            | relations (list): a list of all the predicted relations
+            | adus (list): list of all the predicted ADUs
+            | position (str): string with values source or target indicating the ADU position
+
+        Returns
+            bool: True/False based on whether all ADUs are present in the Relations list
+        """
+        found_relations = []
         for adu in adus:
             for relation in relations:
                 arg_id = relation["arg1"] if position == "source" else relation["arg2"]
                 if arg_id == adu["id"]:
-                    found_relation = True
-        return found_relation
+                    found_relations.append(relation)
+        return True if len(found_relations) == len(adus) else False
 
 
 class JsonCorrector:
 
+    """
+    Component that performs corrections based on the validation errors
+    """
+
     def __init__(self, app_config: AppConfig, segment_counter: int, rel_counter: int, stance_counter: int):
+        """
+        Constructor for the JsonCorrector class
+
+        Args
+            | app_config (AppConfig): the configuration parameters of the application
+            | segment_counter (int): the counter for ADUs
+            | rel_counter (int): the counter of relations in the list
+            | stance_counter (int): the counter of stance in the relevant list
+        """
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.segment_counter = segment_counter
@@ -141,12 +190,34 @@ class JsonCorrector:
 
     @staticmethod
     def can_document_be_corrected(validation_errors: List[ValidationError]):
+        """
+        Function to check if a document can be corrected. If there are errors such as empty lists - topics, relations,
+        ADUs - or empty ADU types (no major claim, claim or premise), then the document cannot be corrected. However,
+        if an ADU does not have any relation, the document can be corrected and the ADU without relations should be
+        removed
+
+        Args
+            validation_errors (list): validation errors for a specific document
+
+        Returns
+            bool: True/False indicating if the document can be corrected
+        """
         unaccepted_errors = [ValidationError.empty_topics, ValidationError.empty_adus, ValidationError.empty_relations,
                              ValidationError.empty_major_claims, ValidationError.empty_claims,
                              ValidationError.empty_premises]
         return False if any(error in validation_errors for error in unaccepted_errors) else True
 
     def correction(self, document):
+        """
+        Function to perform corrections to a document - only to the documents that the function
+        ```can_document_be_corrected()``` returned True
+
+        Args
+            document (dict): the document in json format to be corrected
+
+        Returns
+            dict: the corrected document
+        """
         adus = document["annotations"]["ADUs"]
         relations = document["annotations"]["Relations"]
         major_claims = [adu for adu in adus if adu["type"] == "major_claim"]
@@ -169,9 +240,13 @@ class JsonCorrector:
     def handle_multiple_major_claims(adus, major_claims):
         """
         Concatenates the text of major claims (predictions were on sentence-level)
-        :param adus: a list of all ADUs of the document
-        :param major_claims: list of the predicted major claims
-        :return: updated list of ADUs with one major claim
+
+        Args
+            | adus (list): a list of all ADUs of the document
+            | major_claims (list): a list with the major claims (split into multiple segments)
+
+        Returns
+            list: updated list of ADUs with one major claim
         """
         major_claim_txt = " ".join([major_claim["segment"] for major_claim in major_claims])
         re.sub(' +', ' ', major_claim_txt)
@@ -186,6 +261,16 @@ class JsonCorrector:
         return new_adus
 
     def update_premises_with_relations(self, premises, relations):
+        """
+        Function to keep only the premises that have relations with claims
+
+        Args
+            | premises (list): a list of the premises
+            | relations (list): a list with the predicted relations
+
+        Returns
+            list: a list with the premises to be kept
+        """
         new_premises = []
         for premise in premises:
             premise_rel = self._get_adu_relations(adu_id=premise["id"], relations=relations, position="source")
@@ -197,6 +282,20 @@ class JsonCorrector:
         return new_premises
 
     def update_claims_with_relations(self, claims, relations, major_claim):
+        """
+        Get the updated list of claims and relations. Claims kept are those that have stance towards the major claim
+        and have at least one relation where they are the source ADU. In case that a claim does not have a stance
+        and there is no relation with the claim as source, but there are relations with the claim as target, the
+        relevant relations are removed.
+
+        Args
+            | claims (list): a list with all the predicted claims
+            | relations (list): a list with all the predicted relations
+            | major_claim (dict): the major claim of the document
+
+        Returns
+            tuple: the updated lists of claims and relations
+        """
         new_claims = []
         for claim in claims:
             source_relations = self._get_adu_relations(adu_id=claim["id"], relations=relations,
@@ -207,7 +306,7 @@ class JsonCorrector:
             source_rel_exists = True if source_relations is not None and len(source_relations) > 0 else False
             target_rel_exists = True if target_relations is not None and len(target_relations) > 0 else False
             if stance and not source_rel_exists:
-                stance_type = stance["type"]
+                stance_type = stance[0]["type"]
                 rel_type = "support" if stance_type == "for" else "attack"
                 self.rel_counter += 1
                 relation = {
@@ -215,7 +314,7 @@ class JsonCorrector:
                     "type": rel_type,
                     "arg0": claim["id"],
                     "arg1": major_claim["id"],
-                    "confidence": stance["confidence"]
+                    "confidence": stance[0]["confidence"]
                 }
                 relations.append(relation)
                 source_rel_exists = True
@@ -246,10 +345,14 @@ class JsonCorrector:
     def _get_adu_relations(adu_id, relations, position):
         """
         Based on an ADU and the position (source or target), the function searches for associated relations
-        :param adu_id: the id of the ADU
-        :param relations: the list of relations
-        :param position: string with value source or target
-        :return: a list with the relations associated with an ADU
+
+        Args
+            | adu_id (str): the id of the ADU
+            | relations (list): the list of all the predicted relations
+            | position (str): valid values are source and target
+
+        Returns
+            list: relations associated with the ADU and the position requested
         """
         relations_found = []
         for relation in relations:

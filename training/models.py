@@ -15,19 +15,32 @@ from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings, \
     TransformerDocumentEmbeddings
 from flair.models import SequenceTagger, TextClassifier
-from flair.nn import Model
 from flair.trainers import ModelTrainer
 from sentence_transformers import SentenceTransformer
-from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.cluster import KMeans
-from torch.optim.optimizer import Optimizer
+from sklearn.feature_extraction.text import CountVectorizer
 
 from utils.config import AppConfig
 
 
 class Classifier:
+    """
+    Abstract class representing a classification model
+    """
 
-    def __init__(self, app_config, dev_csv, train_csv, test_csv, base_path, model_name):
+    def __init__(self, app_config: AppConfig, dev_csv: str, train_csv: str, test_csv: str, base_path: str,
+                 model_name: str):
+        """
+        Classifier class constructor
+
+        Args
+            | app_config (AppConfig): the application configuration object
+            | dev_csv (str): the name of the dev csv file
+            | train_csv (str): the name of the train csv file
+            | test_csv (str): the name of the test csv file
+            | base_path (str): full path to the folder where the model will be stored
+            | model_name (str): the name of the model
+        """
         random.seed(2020)
         self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
@@ -38,8 +51,8 @@ class Classifier:
         self.test_file: str = test_csv
         self.base_path: str = base_path
         self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
-        self.model: Model = None
-        self.optimizer: Optimizer = self.get_optimizer()
+        self.model = None
+        self.optimizer: torch.optim.Optimizer = self.get_optimizer()
         flair.device = torch.device(app_config.device_name)
 
         if model_name == "adu":
@@ -48,6 +61,12 @@ class Classifier:
             self.model_properties: dict = self.properties["rel_model"]
 
     def get_optimizer(self):
+        """
+        Define the model's optimizer based on the application properties
+
+        Returns
+            optimizer: the optimizer class
+        """
         optimizer_name = self.properties["adu_model"]["optimizer"]
         if optimizer_name == "Adam":
             optimizer = torch.optim.Adam
@@ -58,15 +77,30 @@ class Classifier:
         return optimizer
 
     def train(self):
+        """
+        Define the training process of the model. All subclasses should implement this method
+        """
         raise NotImplementedError
 
     def load(self):
+        """
+        Define the way to load the trained model. All subclasses should implement this method
+        """
         raise NotImplementedError
 
 
 class AduModel(Classifier):
+    """
+    Class for the ADU sequence model
+    """
 
     def __init__(self, app_config):
+        """
+        Constructor for the AduModel class
+
+        Args
+            app_config (AppConfig): the application configuration object
+        """
         super(AduModel, self).__init__(app_config=app_config, dev_csv=app_config.adu_dev_csv,
                                        train_csv=app_config.adu_train_csv, test_csv=app_config.adu_test_csv,
                                        base_path=app_config.adu_base_path, model_name="adu")
@@ -86,6 +120,9 @@ class AduModel(Classifier):
         self.shuffle: bool = self.model_properties["shuffle"]
 
     def train(self):
+        """
+        ADU training method. It uses the flair library.
+        """
         # define columns
         columns = {0: 'text', 1: 'ner'}
         data_folder = join(self.resources_path, "data")
@@ -131,6 +168,9 @@ class AduModel(Classifier):
                       num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
 
     def load(self):
+        """
+        Loads the trained ADU model for the folder specified during the training
+        """
         model_path = join(self.base_path, self.model_file)
         self.app_logger.info("Loading ADU model from path: {}".format(model_path))
         self.model = SequenceTagger.load(model_path)
@@ -138,8 +178,22 @@ class AduModel(Classifier):
 
 
 class RelationsModel(Classifier):
+    """
+    Class representing the model for relations and stance prediction
+    """
 
     def __init__(self, app_config, dev_csv, train_csv, test_csv, base_path, model_name):
+        """
+        Constructor of the RelationsModel class
+
+        Args
+            | app_config (AppConfig): the application configuration object
+            | dev_csv (str): the name of the dev csv file
+            | train_csv (str): the name of the train csv file
+            | test_csv (str): the name of the test csv file
+            | base_path (str): full path to the folder where the model will be stored
+            | model_name (str): the name of the model
+        """
         super(RelationsModel, self).__init__(app_config=app_config, dev_csv=dev_csv, train_csv=train_csv,
                                              test_csv=test_csv, base_path=base_path, model_name=model_name)
 
@@ -157,6 +211,9 @@ class RelationsModel(Classifier):
         self.shuffle: bool = self.model_properties["shuffle"]
 
     def train(self):
+        """
+        Function to train a relations or stance prediction model. Uses the flair library
+        """
         data_folder = join(self.resources_path, "data")
         # define columns
         column_name_map = {0: "text", 1: "label_topic"}
@@ -195,6 +252,9 @@ class RelationsModel(Classifier):
                       num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
 
     def load(self):
+        """
+        Load the relations or stance model
+        """
         model_path = join(self.base_path, self.model_file)
         self.app_logger.info("Loading Relations model from path: {}".format(model_path))
         self.model = TextClassifier.load(model_path)
@@ -202,13 +262,31 @@ class RelationsModel(Classifier):
 
 
 class TopicModel:
+    """
+    Class for topic modeling
+    """
 
     def __init__(self, app_config: AppConfig):
+        """
+        Constructor of the TopicModel class
+
+        Args
+            app_config (AppConfig): the application configuration object
+        """
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.device_name = app_config.device_name
 
     def get_topics(self, sentences: List[str]):
+        """
+        Function that uses BERT model and clustering to find the topics of the document
+
+        Args
+            sentences (list): the list of sentences of the document
+
+        Returns
+            list: a list of topics
+        """
         if not sentences or len(sentences) <= 6:
             return []
         model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
@@ -308,3 +386,4 @@ class Clustering:
         n_clusters = self.properties["clustering"]["n_clusters"]
         kmeans = KMeans(n_clusters=n_clusters, random_state=0)
         labels = kmeans.fit_predict(embeddings)
+        print(labels)

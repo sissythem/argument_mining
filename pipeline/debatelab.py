@@ -11,7 +11,7 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 
-from training.models import AduModel, RelationsModel, TopicModel, Clustering
+from training.models import AduModel, RelationsModel, TopicModel
 from utils.config import AppConfig
 from pipeline.validation import JsonValidator, JsonCorrector
 
