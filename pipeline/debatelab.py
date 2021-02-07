@@ -50,19 +50,26 @@ class ArgumentMining:
         validator = JsonValidator(app_config=self.app_config)
         documents = self._retrieve(client=client)
         document_ids = []
+        invalid_document_ids = []
         for idx, document in enumerate(documents):
             document, segment_counter, rel_counter, stance_counter = self.predict(document=document)
-            validation_errors = self.run_validation(validator=validator, document=document,
-                                                    segment_counter=segment_counter, rel_counter=rel_counter,
-                                                    stance_counter=stance_counter)
+            # TODO correction?
+            # validation_errors = self.run_validation(validator=validator, document=document,
+            #                                         segment_counter=segment_counter, rel_counter=rel_counter,
+            #                                         stance_counter=stance_counter)
+            validation_errors = validator.validate(document=document)
             if not validation_errors:
                 self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
                                                                         doc_type='docket', id=document["id"],
                                                                         body=document)
                 document_ids.append(document["id"])
+            else:
+                invalid_document_ids.append(document["id"])
         # TODO clustering arguments
         validator.export_json_schema(document_ids=document_ids)
-        self.notify_ics(document_ids=document_ids)
+        # TODO uncomment notification
+        # self.notify_ics(document_ids=document_ids)
+        self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
         self.app_logger.info("Evaluation is finished!")
 
     def run_validation(self, validator, document, segment_counter, rel_counter, stance_counter):
