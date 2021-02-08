@@ -53,6 +53,7 @@ class ArgumentMining:
         document_ids = [document["id"] for document in documents]
         documents = self.app_config.elastic_save.elasticsearch_client.mget(index="debatelab",
                                                                            body={"ids": document_ids})
+        documents = documents["docs"]
         documents = [document["_source"] for document in documents]
         # documents, document_ids, invalid_document_ids = self.run_argument_mining(documents=documents)
         self.run_clustering(documents=documents, document_ids=document_ids)
