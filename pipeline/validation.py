@@ -20,6 +20,7 @@ class ValidationError(Enum):
     empty_major_claims = "empty-major-claims"
     empty_claims = "empty-claims"
     empty_premises = "empty-premises"
+    claim_without_stance = "claim_without_stance"
     source_premise_target_claim_invalid = "source-premise-target-claim-invalid"
     source_claim_target_major_claim_invalid = "source-premise-target-claim-invalid"
     premise_source_invalid = "premise-source-invalid"
@@ -105,6 +106,7 @@ class JsonValidator:
                 validation_errors.append(ValidationError.empty_premises)
             return validation_errors
 
+        validation_errors += self._validate_stance(claims=claims)
         validation_errors += self._validate_relations(relations=relations, adus=adus)
 
         major_claims_rel = self._relation_exists(relations=relations, adus=major_claims, position="target")
@@ -125,13 +127,6 @@ class JsonValidator:
             if not premises_rel:
                 self.app_logger.warning("Missing relations for some premises")
                 validation_errors.append(ValidationError.premises_missing_relations)
-        if validation_errors:
-            self.app_logger.debug("Writing invalid document into file")
-            timestamp = datetime.now()
-            filename = f"{document['id']}_{timestamp}.json"
-            file_path = join(self.app_config.output_files, filename)
-            with open(file_path, "w", encoding='utf8') as f:
-                f.write(json.dumps(document, indent=4, sort_keys=False, ensure_ascii=False))
         return validation_errors
 
     def export_json_schema(self, document_ids):
@@ -155,7 +150,9 @@ class JsonValidator:
     @staticmethod
     def _validate_relations(relations, adus):
         validation_errors = []
-        for relation in relations:
+        idx = 0
+        while idx < len(relations):
+            relation = relations[idx]
             source = relation["arg1"]
             target = relation["arg2"]
             confidence = relation.get("confidence", None)
@@ -178,6 +175,23 @@ class JsonValidator:
             if (source["type"] == "claim" and target["type"] != "major_claim") or (
                     target["type"] == "major_claim" and source["type"] != "claim"):
                 validation_errors.append(ValidationError.source_claim_target_major_claim_invalid)
+            if validation_errors:
+                break
+            else:
+                idx += 1
+        return validation_errors
+
+    @staticmethod
+    def _validate_stance(claims):
+        validation_errors = []
+        claim_idx = 0
+        while claim_idx < len(claims):
+            claim = claims[claim_idx]
+            stance = claim.get("stance", None)
+            if not stance:
+                validation_errors.append(ValidationError.claim_without_stance)
+                break
+        return validation_errors
 
     @staticmethod
     def _relation_exists(relations, adus, position):

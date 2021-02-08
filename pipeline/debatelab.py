@@ -65,9 +65,17 @@ class ArgumentMining:
                 document_ids.append(document["id"])
             else:
                 invalid_document_ids.append(document["id"])
+                self.app_logger.debug("Writing invalid document into file")
+                timestamp = datetime.now()
+                filename = f"{document['id']}_{timestamp}.json"
+                file_path = join(self.app_config.output_files, filename)
+                with open(file_path, "w", encoding='utf8') as f:
+                    f.write(json.dumps(document, indent=4, sort_keys=False, ensure_ascii=False))
+                with open(f"{file_path}.txt", "r") as f:
+                    for validation_error in validation_errors:
+                        f.write(validation_error.value + "\n")
         # TODO clustering arguments
-
-        validator.export_json_schema(document_ids=document_ids)
+        # validator.export_json_schema(document_ids=document_ids)
         # TODO uncomment notification
         # self.notify_ics(document_ids=document_ids)
         self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
