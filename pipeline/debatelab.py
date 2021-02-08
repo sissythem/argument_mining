@@ -11,7 +11,7 @@ from elasticsearch_dsl import Search
 from ellogon import tokeniser
 from flair.data import Sentence, Label
 
-from training.models import AduModel, RelationsModel, TopicModel
+from training.models import AduModel, RelationsModel, TopicModel, Clustering
 from utils.config import AppConfig
 from pipeline.validation import JsonValidator, JsonCorrector
 
@@ -66,6 +66,7 @@ class ArgumentMining:
             else:
                 invalid_document_ids.append(document["id"])
         # TODO clustering arguments
+
         validator.export_json_schema(document_ids=document_ids)
         # TODO uncomment notification
         # self.notify_ics(document_ids=document_ids)
@@ -85,6 +86,18 @@ class ArgumentMining:
                 validation_errors = validator.validate(document=document)
                 counter -= 1
         return validation_errors
+
+    def get_document_clusters(self, documents, document_ids):
+        claims, doc_ids = [], []
+        for document in documents:
+            if document["id"] in document_ids:
+                for adu in document["annotations"]["ADUs"]:
+                    if adu["type"] == "claim":
+                        claims.append(adu["segment"])
+                        doc_ids.append(document["id"])
+        clustering = Clustering(app_config=self.app_config)
+        n_clusters = self.app_config.properties["clustering"]["n_clusters"]
+        clusters = clustering.get_clusters(claims=claims, doc_ids=doc_ids, n_clusters=n_clusters)
 
     def _retrieve(self, client):
         retrieve_kind = self.app_config.properties["eval"]["retrieve"]
