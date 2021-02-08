@@ -47,10 +47,18 @@ class ArgumentMining:
 
     def run_pipeline(self):
         client = self.app_config.elastic_retrieve.elasticsearch_client
-        validator = JsonValidator(app_config=self.app_config)
         documents = self._retrieve(client=client)
+        documents, document_ids, invalid_document_ids = self.run_argument_mining(documents=documents)
+        self.run_clustering(documents=documents, document_ids=document_ids)
+        # TODO uncomment notification
+        # self.notify_ics(document_ids=document_ids)
+        self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
+        self.app_logger.info("Evaluation is finished!")
+
+    def run_argument_mining(self, documents):
         document_ids = []
         invalid_document_ids = []
+        validator = JsonValidator(app_config=self.app_config)
         for idx, document in enumerate(documents):
             document, segment_counter, rel_counter, stance_counter = self.predict(document=document)
             # TODO correction?
@@ -74,12 +82,8 @@ class ArgumentMining:
                 with open(f"{file_path}.txt", "r") as f:
                     for validation_error in validation_errors:
                         f.write(validation_error.value + "\n")
-        # TODO clustering arguments
         # validator.export_json_schema(document_ids=document_ids)
-        # TODO uncomment notification
-        # self.notify_ics(document_ids=document_ids)
-        self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
-        self.app_logger.info("Evaluation is finished!")
+        return documents, document_ids, invalid_document_ids
 
     def run_validation(self, validator, document, segment_counter, rel_counter, stance_counter):
         validation_errors = validator.validate(document=document)
@@ -95,14 +99,15 @@ class ArgumentMining:
                 counter -= 1
         return validation_errors
 
-    def get_document_clusters(self, documents, document_ids):
+    def run_clustering(self, documents, document_ids):
+        # TODO clustering arguments
         claims, doc_ids = [], []
         for document in documents:
-            if document["id"] in document_ids:
-                for adu in document["annotations"]["ADUs"]:
-                    if adu["type"] == "claim":
-                        claims.append(adu["segment"])
-                        doc_ids.append(document["id"])
+            # if document["id"] in document_ids:
+            for adu in document["annotations"]["ADUs"]:
+                if adu["type"] == "claim":
+                    claims.append(adu["segment"])
+                    doc_ids.append(document["id"])
         clustering = Clustering(app_config=self.app_config)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
         clusters = clustering.get_clusters(claims=claims, doc_ids=doc_ids, n_clusters=n_clusters)
