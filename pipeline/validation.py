@@ -251,7 +251,11 @@ class JsonCorrector:
         """
         unaccepted_errors = [ValidationError.empty_topics, ValidationError.empty_adus, ValidationError.empty_relations,
                              ValidationError.empty_major_claims, ValidationError.empty_claims,
-                             ValidationError.empty_premises]
+                             ValidationError.empty_premises, ValidationError.missing_adus,
+                             ValidationError.source_claim_target_major_claim_invalid,
+                             ValidationError.source_premise_target_claim_invalid,
+                             ValidationError.premise_source_invalid, ValidationError.relation_confidence_empty,
+                             ValidationError.major_claim_target_invalid]
         return False if any(error in validation_errors for error in unaccepted_errors) else True
 
     def correction(self, document):
