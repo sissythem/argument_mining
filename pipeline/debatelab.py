@@ -48,18 +48,11 @@ class ArgumentMining:
     def run_pipeline(self):
         client = self.app_config.elastic_retrieve.elasticsearch_client
         documents = self._retrieve(client=client)
-
-        # TODO remove the below
-        document_ids = [document["id"] for document in documents]
-        documents = self.app_config.elastic_save.elasticsearch_client.mget(index="debatelab",
-                                                                           body={"ids": document_ids})
-        documents = documents["docs"]
-        documents = [document["_source"] for document in documents]
-        # documents, document_ids, invalid_document_ids = self.run_argument_mining(documents=documents)
+        documents, document_ids, invalid_document_ids = self.run_argument_mining(documents=documents)
         self.run_clustering(documents=documents, document_ids=document_ids)
         # TODO uncomment notification
         # self.notify_ics(document_ids=document_ids)
-        # self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
+        self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
         self.app_logger.info("Evaluation is finished!")
 
     def run_argument_mining(self, documents):
@@ -68,11 +61,9 @@ class ArgumentMining:
         validator = JsonValidator(app_config=self.app_config)
         for idx, document in enumerate(documents):
             document, segment_counter, rel_counter, stance_counter = self.predict(document=document)
-            # TODO correction?
-            # validation_errors = self.run_validation(validator=validator, document=document,
-            #                                         segment_counter=segment_counter, rel_counter=rel_counter,
-            #                                         stance_counter=stance_counter)
-            validation_errors = validator.validate(document=document)
+            validation_errors = self.run_validation(validator=validator, document=document,
+                                                    segment_counter=segment_counter, rel_counter=rel_counter,
+                                                    stance_counter=stance_counter)
             if not validation_errors:
                 self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
                                                                         doc_type='docket', id=document["id"],
@@ -107,14 +98,20 @@ class ArgumentMining:
         return validation_errors
 
     def run_clustering(self, documents, document_ids):
-        # TODO clustering arguments
+        # TODO remove the below
+        # document_ids = [document["id"] for document in documents]
+        # documents = self.app_config.elastic_save.elasticsearch_client.mget(index="debatelab",
+        #                                                                    body={"ids": document_ids})
+        # documents = documents["docs"]
+        # documents = [document["_source"] for document in documents]
+
         claims, doc_ids = [], []
         for document in documents:
-            # if document["id"] in document_ids:
-            for adu in document["annotations"]["ADUs"]:
-                if adu["type"] == "claim":
-                    claims.append(adu["segment"])
-                    doc_ids.append(document["id"])
+            if document["id"] in document_ids:
+                for adu in document["annotations"]["ADUs"]:
+                    if adu["type"] == "claim":
+                        claims.append(adu["segment"])
+                        doc_ids.append(document["id"])
         clustering = Clustering(app_config=self.app_config)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
         clusters = clustering.get_clusters(claims=claims, doc_ids=doc_ids, n_clusters=n_clusters)
