@@ -12,8 +12,7 @@ import umap
 from ellogon import tokeniser
 from flair.data import Corpus, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings, \
-    TransformerDocumentEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sentence_transformers import SentenceTransformer
@@ -387,10 +386,10 @@ class Clustering:
                                         metric='cosine').fit_transform(embeddings)
 
             # clustering
-            cluster = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
-                                      metric='euclidean',
-                                      cluster_selection_method='eom').fit(umap_embeddings)
-
+            clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
+                                       metric='euclidean',
+                                       cluster_selection_method='eom').fit_predict(umap_embeddings)
+            return clusters
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 

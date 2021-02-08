@@ -20,6 +20,12 @@ class ValidationError(Enum):
     empty_major_claims = "empty-major-claims"
     empty_claims = "empty-claims"
     empty_premises = "empty-premises"
+    source_premise_target_claim_invalid = "source-premise-target-claim-invalid"
+    source_claim_target_major_claim_invalid = "source-premise-target-claim-invalid"
+    premise_source_invalid = "premise-source-invalid"
+    major_claim_target_invalid = "major-claim-target-invalid"
+    relation_confidence_empty = "relation-confidence-empty"
+    missing_adus = "missing-adus"
     major_claim_missing_relations = "major-claim-missing-relations"
     claims_missing_relations_source = "claims-missing-relations-source"
     claims_missing_relations_target = "claims-missing-relations-target"
@@ -99,6 +105,8 @@ class JsonValidator:
                 validation_errors.append(ValidationError.empty_premises)
             return validation_errors
 
+        validation_errors += self._validate_relations(relations=relations, adus=adus)
+
         major_claims_rel = self._relation_exists(relations=relations, adus=major_claims, position="target")
         claims_rel_source = self._relation_exists(relations=relations, adus=claims, position="source")
         claims_rel_target = self._relation_exists(relations=relations, adus=claims, position="target")
@@ -145,13 +153,39 @@ class JsonValidator:
             f.write(json.dumps(schema, indent=4, sort_keys=False))
 
     @staticmethod
+    def _validate_relations(relations, adus):
+        validation_errors = []
+        for relation in relations:
+            source = relation["arg1"]
+            target = relation["arg2"]
+            confidence = relation.get("confidence", None)
+            for adu in adus:
+                if adu["id"] == source:
+                    source = adu
+                elif adu["id"] == target:
+                    target = adu
+            if type(target) != dict or type(source) != dict:
+                validation_errors.append(ValidationError.missing_adus)
+            if target["type"] == "premise":
+                validation_errors.append(ValidationError.premise_source_invalid)
+            if source["type"] == "major_claim":
+                validation_errors.append(ValidationError.major_claim_target_invalid)
+            if not confidence:
+                validation_errors.append(ValidationError.relation_confidence_empty)
+            if (source["type"] == "premise" and target["type"] != "claim") or (
+                    target["type"] == "claim" and source["type"] != "premise"):
+                validation_errors.append(ValidationError.source_premise_target_claim_invalid)
+            if (source["type"] == "claim" and target["type"] != "major_claim") or (
+                    target["type"] == "major_claim" and source["type"] != "claim"):
+                validation_errors.append(ValidationError.source_claim_target_major_claim_invalid)
+
+    @staticmethod
     def _relation_exists(relations, adus, position):
         """
         For each ADU (source or target) find if there are any relations
 
         Args
-            | relations (list): a list of all the predicted relations
-            | adus (list): list of all the predicted ADUs
+            | relations (list): a list of all the predicted relations | adus (list): list of all the predicted ADUs
             | position (str): string with values source or target indicating the ADU position
 
         Returns
@@ -167,7 +201,6 @@ class JsonValidator:
 
 
 class JsonCorrector:
-
     """
     Component that performs corrections based on the validation errors
     """
