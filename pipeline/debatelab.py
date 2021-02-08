@@ -48,11 +48,17 @@ class ArgumentMining:
     def run_pipeline(self):
         client = self.app_config.elastic_retrieve.elasticsearch_client
         documents = self._retrieve(client=client)
-        documents, document_ids, invalid_document_ids = self.run_argument_mining(documents=documents)
+
+        # TODO remove the below
+        document_ids = [document["id"] for document in documents]
+        documents = self.app_config.elastic_save.elasticsearch_client.mget(index="debatelab",
+                                                                           body={"ids": document_ids})
+        documents = [document["_source"] for document in documents]
+        # documents, document_ids, invalid_document_ids = self.run_argument_mining(documents=documents)
         self.run_clustering(documents=documents, document_ids=document_ids)
         # TODO uncomment notification
         # self.notify_ics(document_ids=document_ids)
-        self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
+        # self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
         self.app_logger.info("Evaluation is finished!")
 
     def run_argument_mining(self, documents):
