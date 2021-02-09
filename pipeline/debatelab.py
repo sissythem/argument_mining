@@ -86,15 +86,15 @@ class ArgumentMining:
     def run_validation(self, validator, document, segment_counter, rel_counter, stance_counter):
         validation_errors = validator.validate(document=document)
         if validation_errors:
-            # counter = self.app_config.properties["eval"]["max_correction_tries"]
+            counter = self.app_config.properties["eval"]["max_correction_tries"]
             corrector = JsonCorrector(app_config=self.app_config, segment_counter=segment_counter,
                                       rel_counter=rel_counter, stance_counter=stance_counter)
-            # while counter > 0 and validation_errors:
-                # if not corrector.can_document_be_corrected(validation_errors=validation_errors):
-                    # break
-            document = corrector.correction(document=document)
-            validation_errors = validator.validate(document=document)
-                # counter -= 1
+            while counter > 0 and validation_errors:
+                if not corrector.can_document_be_corrected(validation_errors=validation_errors):
+                    break
+                document = corrector.correction(document=document)
+                validation_errors = validator.validate(document=document)
+                counter -= 1
         return validation_errors
 
     def run_clustering(self, documents, document_ids):
