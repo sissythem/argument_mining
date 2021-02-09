@@ -77,7 +77,7 @@ class ArgumentMining:
                 file_path = join(self.app_config.output_files, filename)
                 with open(file_path, "w", encoding='utf8') as f:
                     f.write(json.dumps(document, indent=4, sort_keys=False, ensure_ascii=False))
-                with open(f"{file_path}.txt", "r") as f:
+                with open(f"{file_path}.txt", "w") as f:
                     for validation_error in validation_errors:
                         f.write(validation_error.value + "\n")
         # validator.export_json_schema(document_ids=document_ids)
