@@ -268,21 +268,20 @@ class Clustering:
         self.app_logger = app_config.app_logger
         self.device_name = app_config.device_name
         model_id = "nlpaueb/bert-base-greek-uncased-v1"
-        self.bert_model = AutoModel.from_pretrained(model_id)
-        self.model_path = join(self.app_config.model_path, "clustering")
-        if not exists(self.model_path):
-            mkdir(self.model_path)
-        self.bert_model.save_pretrained(self.model_path)
-        self.bert_model = SentenceTransformer(self.model_path).to(self.device_name)
+        self.bert_model = AutoModel.from_pretrained(model_id, output_hidden_states=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
 
     def get_clusters(self, sentences, n_clusters):
         try:
-            # import transformers
-            # tokenizer = AutoTokenizer.from_pretrained(model_id)
-            # tokens = tokenizer.encode()
+            for sentence in sentences:
+                tokens = self.tokenizer.encode(sentence)
+            tokens = self.tokenizer.encode()
+            input_ids = torch.tensor(tokens).unsqueeze(0)
+            outputs = self.bert_model(input_ids)
+            embeddings = outputs[1][-1]
             # embeddings = outputs[1]
             # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
-            embeddings = self.bert_model.encode(sentences, show_progress_bar=True)
+            # embeddings = model.encode(sentences, show_progress_bar=True)
             self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
             # reduce document dimensionality
             umap_embeddings = umap.UMAP(n_neighbors=n_clusters,
