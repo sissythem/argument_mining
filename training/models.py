@@ -273,16 +273,18 @@ class Clustering:
 
     def get_clusters(self, sentences, n_clusters):
         try:
-            for sentence in sentences:
-                tokens = self.tokenizer.encode(sentence)
-            tokens = self.tokenizer.encode()
-            input_ids = torch.tensor(tokens).unsqueeze(0)
-            outputs = self.bert_model(input_ids)
-            embeddings = outputs[1][-1]
-            # embeddings = outputs[1]
             # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
             # embeddings = model.encode(sentences, show_progress_bar=True)
-            self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
+            sentence_embeddings = []
+            for sentence in sentences:
+                tokens = self.tokenizer.encode(sentence)
+                tokens = self.tokenizer.encode()
+                input_ids = torch.tensor(tokens).unsqueeze(0)
+                outputs = self.bert_model(input_ids)
+                embeddings = outputs[1][-1].numpy()
+                sentence_embeddings.append(embeddings)
+                self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
+            embeddings = np.asarray(sentence_embeddings)
             # reduce document dimensionality
             umap_embeddings = umap.UMAP(n_neighbors=n_clusters,
                                         metric='cosine').fit_transform(embeddings)
