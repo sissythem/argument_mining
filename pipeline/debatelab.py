@@ -61,9 +61,10 @@ class ArgumentMining:
         validator = JsonValidator(app_config=self.app_config)
         for idx, document in enumerate(documents):
             document, segment_counter, rel_counter, stance_counter = self.predict(document=document)
-            validation_errors = self.run_validation(validator=validator, document=document,
-                                                    segment_counter=segment_counter, rel_counter=rel_counter,
-                                                    stance_counter=stance_counter)
+            validation_errors, invalid_adus = self.run_validation(validator=validator, document=document,
+                                                                  segment_counter=segment_counter,
+                                                                  rel_counter=rel_counter,
+                                                                  stance_counter=stance_counter)
             if not validation_errors:
                 self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
                                                                         doc_type='docket', id=document["id"],
@@ -80,11 +81,13 @@ class ArgumentMining:
                 with open(f"{file_path}.txt", "w") as f:
                     for validation_error in validation_errors:
                         f.write(validation_error.value + "\n")
+                    for invalid_adu in invalid_adus:
+                        f.write(invalid_adu + "\n")
         # validator.export_json_schema(document_ids=document_ids)
         return documents, document_ids, invalid_document_ids
 
     def run_validation(self, validator, document, segment_counter, rel_counter, stance_counter):
-        validation_errors = validator.validate(document=document)
+        validation_errors, invalid_adus = validator.validate(document=document)
         if validation_errors:
             counter = self.app_config.properties["eval"]["max_correction_tries"]
             corrector = JsonCorrector(app_config=self.app_config, segment_counter=segment_counter,
@@ -93,9 +96,9 @@ class ArgumentMining:
                 if not corrector.can_document_be_corrected(validation_errors=validation_errors):
                     break
                 document = corrector.correction(document=document)
-                validation_errors = validator.validate(document=document)
+                validation_errors, invalid_adus = validator.validate(document=document)
                 counter -= 1
-        return validation_errors
+        return validation_errors, invalid_adus
 
     def run_clustering(self, documents, document_ids):
         # TODO remove the below
