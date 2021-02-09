@@ -11,6 +11,7 @@ class Document:
     """
     Class representing a document. Contains the sentences, segments, annotations, relations etc
     """
+
     def __init__(self, app_logger, document_id, name, content, annotations):
         self.app_logger = app_logger
         self.document_id: int = document_id
@@ -26,7 +27,7 @@ class Document:
     def update_segments(self, repl_char="=", other_label="O"):
         tmp_txt = self.content
         for segment in self.segments:
-            self.app_logger.debug("Processing segment: {}".format(segment.text))
+            self.app_logger.debug(f"Processing segment: {segment.text}")
             try:
                 indices = [m.start() for m in re.finditer(segment.text, tmp_txt)]
             except (BaseException, Exception):
@@ -49,7 +50,7 @@ class Document:
         i = 0
         while i < len(tmp_txt):
             if tmp_txt[i] == repl_char:
-                self.app_logger.debug("Found argument: {}".format(self.segments[arg_counter].text))
+                self.app_logger.debug(f"Found argument: {self.segments[arg_counter].text}")
                 self.segments[arg_counter].char_start = i
                 i += len(self.segments[arg_counter].text)
                 self.segments[arg_counter].char_end = i
@@ -64,7 +65,7 @@ class Document:
                     if i >= len(tmp_txt):
                         break
                 end = i
-                self.app_logger.debug("Creating non argument segment for phrase: {}".format(rem))
+                self.app_logger.debug(f"Creating non argument segment for phrase: {rem}")
                 segment = Segment(segment_id=i, document_id=self.document_id, text=rem, char_start=start,
                                   char_end=end, arg_type=other_label)
                 segment.sentences = tokeniser.tokenise_no_punc(segment.text)
@@ -74,7 +75,7 @@ class Document:
 
     def update_document(self):
         self.app_logger.debug("Update document sentences with labels")
-        self.app_logger.debug("Updating document with id {}".format(self.document_id))
+        self.app_logger.debug(f"Updating document with id {self.document_id}")
         segment_tokens = []
         segment_labels = []
         sentences = []
@@ -86,10 +87,10 @@ class Document:
             for labels in segment.sentences_labels:
                 for label in labels:
                     segment_labels.append(label)
-        self.app_logger.debug("All labels: {}".format(len(segment_labels)))
+        self.app_logger.debug(f"All labels: {len(segment_labels)}")
         label_idx = 0
         for s in self.sentences:
-            self.app_logger.debug("Processing sentence: {}".format(s))
+            self.app_logger.debug(f"Processing sentence: {s}")
             sentence = []
             labels = []
             for token in s:
@@ -97,7 +98,7 @@ class Document:
                     sentence.append(token)
                     labels.append(segment_labels[label_idx])
                     label_idx += 1
-            self.app_logger.debug("Labels for sentence: {}".format(labels))
+            self.app_logger.debug(f"Labels for sentence: {labels}")
             if sentence:
                 sentences.append(sentence)
                 sentences_labels.append(labels)
@@ -129,11 +130,9 @@ class Segment:
                         sentence_labels.append(self.arg_type)
                     else:
                         if sentence.index(token) == 0:
-                            sentence_labels.append(
-                                "B-{}".format(self.arg_type))
+                            sentence_labels.append(f"B-{self.arg_type}")
                         else:
-                            sentence_labels.append(
-                                "I-{}".format(self.arg_type))
+                            sentence_labels.append(f"I-{self.arg_type}")
             sentences.append(tokens)
             self.sentences_labels.append(sentence_labels)
         self.sentences = sentences
@@ -190,16 +189,16 @@ class DataLoader:
         row_counter = 0
         sentence_counter = 0
         for document in documents:
-            self.app_logger.debug("Processing document with id: {}".format(document.document_id))
+            self.app_logger.debug(f"Processing document with id: {document.document_id}")
             doc_sentence_counter = 0
             for idx, sentence in enumerate(document.sentences):
-                self.app_logger.debug("Processing sentence: {}".format(sentence))
+                self.app_logger.debug(f"Processing sentence: {sentence}")
                 labels = document.sentences_labels[idx]
                 for token, label in zip(sentence, labels):
                     is_arg = "Y" if label != "O" else "N"
-                    sp = "SP: {}".format(doc_sentence_counter)
-                    sentence_counter_str = "Sentence: {}".format(sentence_counter)
-                    document_str = "Doc: {}".format(document.document_id)
+                    sp = f"SP: {doc_sentence_counter}"
+                    sentence_counter_str = f"Sentence: {sentence_counter}"
+                    document_str = f"Doc: {document.document_id}"
                     df.loc[row_counter] = [token, label, is_arg, sp, sentence_counter_str, document_str]
                     row_counter += 1
                     sentence_counter += 1
@@ -225,7 +224,7 @@ class DataLoader:
         self.app_logger.debug("Documents are loaded")
         relations, stances = [], []
         for document in documents:
-            self.app_logger.debug("Processing relations for document: {}".format(document.document_id))
+            self.app_logger.debug(f"Processing relations for document: {document.document_id}")
             major_claims, claims, premises, relation_pairs, stance_pairs = self._collect_segments(document)
             relations += self._collect_relation_pairs(parents=major_claims, children=claims,
                                                       relation_pairs=relation_pairs)
@@ -243,11 +242,11 @@ class DataLoader:
             text2 = pair[1]
             relation = pair[2]
             self.app_logger.debug("Processing pair:")
-            self.app_logger.debug("Text 1: {}".format(text1))
-            self.app_logger.debug("Text 2: {}".format(text2))
-            self.app_logger.debug("Pair label: {}".format(relation))
-            final_text = "[CLS] " + text1 + " [SEP] " + text2
-            sentence_counter_str = "Pair: {}".format(sentence_counter)
+            self.app_logger.debug(f"Text 1: {text1}")
+            self.app_logger.debug(f"Text 2: {text2}")
+            self.app_logger.debug(f"Pair label: {relation}")
+            final_text = f"[CLS] {text1} [SEP] {text2}"
+            sentence_counter_str = f"Pair: {sentence_counter}"
             df.loc[row_counter] = [final_text, relation, sentence_counter_str]
             row_counter += 1
             sentence_counter += 1
@@ -262,13 +261,13 @@ class DataLoader:
         stances = document.stance
         for relation in relations:
             if relation.arg1 is None or relation.arg2 is None:
-                self.app_logger.error("None segment for relation: {} and document {}".format(relation.relation_id,
-                                                                                             relation.document_id))
+                self.app_logger.error(
+                    f"None segment for relation: {relation.relation_id} and document {relation.document_id}")
             relation_pairs[(relation.arg1.segment_id, relation.arg2.segment_id)] = relation.relation_type
         for stance in stances:
             if stance.arg1 is None or stance.arg2 is None:
-                self.app_logger.error("None segment for relation: {} and document {}".format(stance.relation_id,
-                                                                                             stance.document_id))
+                self.app_logger.error(
+                    f"None segment for relation: {stance.relation_id} and document {stance.document_id}")
             stance_pairs[(stance.arg1.segment_id, stance.arg2.segment_id)] = stance.relation_type
         for segment in document.segments:
             if segment.arg_type == "major_claim":
@@ -291,7 +290,7 @@ class DataLoader:
                     count_relations += 1
                 relation = relation_pairs.get(key, "other")
                 new_relation_pairs.append((c_text, p_text, relation))
-        self.app_logger.debug("Found {} relations".format(count_relations))
+        self.app_logger.debug(f"Found {count_relations} relations")
         return new_relation_pairs
 
     def _create_document(self, doc):
@@ -299,7 +298,7 @@ class DataLoader:
                             content=doc["text"], annotations=doc["annotations"])
         document.sentences = tokeniser.tokenise_no_punc(document.content)
         self.app_logger.debug(
-            "Processing document with id {}".format(document.document_id))
+            f"Processing document with id {document.document_id}")
         for annotation in document.annotations:
             annotation_id = annotation["_id"]
             spans = annotation["spans"]

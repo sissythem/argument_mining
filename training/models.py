@@ -1,5 +1,6 @@
 import random
-from os.path import join
+from os import mkdir
+from os.path import join, exists
 from typing import List
 
 import flair
@@ -16,9 +17,9 @@ from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmb
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sentence_transformers import SentenceTransformer
-from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import CountVectorizer
 
+from transformers import AutoModel, AutoTokenizer
 from utils.config import AppConfig
 
 
@@ -130,7 +131,7 @@ class AduModel(Classifier):
                                       dev_file=self.dev_file)
 
         self.app_logger.info("Corpus created")
-        self.app_logger.info("First training sentence: {}".format(corpus.train[0]))
+        self.app_logger.info(f"First training sentence: {corpus.train[0]}")
         # 2. what tag do we want to predict?
         tag_type = 'ner'
 
@@ -159,7 +160,7 @@ class AduModel(Classifier):
                                              optimizer=self.optimizer)
 
         self.app_logger.info("Starting training with ModelTrainer")
-        self.app_logger.info("Model configuration properties: {}".format(self.model_properties))
+        self.app_logger.info(f"Model configuration properties: {self.model_properties}")
         # 7. start training
         trainer.train(self.base_path, patience=self.patience, learning_rate=self.learning_rate,
                       mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
@@ -171,7 +172,7 @@ class AduModel(Classifier):
         Loads the trained ADU model for the folder specified during the training
         """
         model_path = join(self.base_path, self.model_file)
-        self.app_logger.info("Loading ADU model from path: {}".format(model_path))
+        self.app_logger.info(f"Loading ADU model from path: {model_path}")
         self.model = SequenceTagger.load(model_path)
         self.model.eval()
 
@@ -221,7 +222,7 @@ class RelationsModel(Classifier):
                                                  skip_header=True, delimiter="\t", train_file=self.train_file,
                                                  test_file=self.test_file, dev_file=self.dev_file)
         self.app_logger.info("Corpus created")
-        self.app_logger.info("First training sentence: {}".format(corpus.train[0]))
+        self.app_logger.info(f"First training sentence: {corpus.train[0]}")
 
         # 2. make label dictionary
         label_dictionary = corpus.make_label_dictionary()
@@ -243,7 +244,7 @@ class RelationsModel(Classifier):
                                              optimizer=self.optimizer)
 
         self.app_logger.info("Starting training with ModelTrainer")
-        self.app_logger.info("Model configuration properties: {}".format(self.model_properties))
+        self.app_logger.info(f"Model configuration properties: {self.model_properties}")
         # 7. start training
         trainer.train(self.base_path, learning_rate=self.learning_rate, patience=self.patience,
                       mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
@@ -255,12 +256,64 @@ class RelationsModel(Classifier):
         Load the relations or stance model
         """
         model_path = join(self.base_path, self.model_file)
-        self.app_logger.info("Loading Relations model from path: {}".format(model_path))
+        self.app_logger.info(f"Loading Relations model from path: {model_path}")
         self.model = TextClassifier.load(model_path)
         self.model.eval()
 
 
-class TopicModel:
+class Clustering:
+
+    def __init__(self, app_config: AppConfig):
+        self.app_config = app_config
+        self.app_logger = app_config.app_logger
+        self.device_name = app_config.device_name
+        model_id = "nlpaueb/bert-base-greek-uncased-v1"
+        self.bert_model = AutoModel.from_pretrained(model_id)
+        self.model_path = join(self.app_config.model_path, "clustering")
+        if not exists(self.model_path):
+            mkdir(self.model_path)
+        self.bert_model.save_pretrained(self.model_path)
+        self.bert_model = SentenceTransformer(self.model_path).to(self.device_name)
+
+    def get_clusters(self, sentences, n_clusters):
+        try:
+            # import transformers
+            # tokenizer = AutoTokenizer.from_pretrained(model_id)
+            # tokens = tokenizer.encode()
+            # embeddings = outputs[1]
+            # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
+            embeddings = self.bert_model.encode(sentences, show_progress_bar=True)
+            self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
+            # reduce document dimensionality
+            umap_embeddings = umap.UMAP(n_neighbors=n_clusters,
+                                        metric='cosine').fit_transform(embeddings)
+
+            # clustering
+            clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
+                                       metric='euclidean',
+                                       cluster_selection_method='eom').fit_predict(umap_embeddings)
+            return clusters
+        except (BaseException, Exception) as e:
+            self.app_logger.error(e)
+
+    def get_content_per_cluster(self, n_clusters: int, clusters, sentences, doc_ids):
+        cluster_lists = []
+        for i in range(n_clusters):
+            cluster_lists.append([])
+        for idx, cluster in enumerate(clusters):
+            sentence = sentences[idx]
+            doc_id = doc_ids[idx]
+            cluster_lists[idx].append((sentence, doc_id))
+        self.print_clusters(cluster_lists=cluster_lists)
+
+    def print_clusters(self, cluster_lists):
+        for idx, cluster in enumerate(cluster_lists):
+            self.app_logger.debug(f"Content of Cluster {idx}")
+            for pair in cluster:
+                self.app_logger.debug(f"Sentence {pair[0]} in document with id {pair[1]}")
+
+
+class TopicModel(Clustering):
     """
     Class for topic modeling
     """
@@ -272,9 +325,7 @@ class TopicModel:
         Args
             app_config (AppConfig): the application configuration object
         """
-        self.app_config = app_config
-        self.app_logger = app_config.app_logger
-        self.device_name = app_config.device_name
+        super(TopicModel, self).__init__(app_config=app_config)
 
     def get_topics(self, sentences: List[str]):
         """
@@ -288,21 +339,10 @@ class TopicModel:
         """
         topics = []
         try:
-            model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
-            embeddings = model.encode(sentences, show_progress_bar=True)
-            self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
-            # reduce document dimensionality
-            k = int(len(sentences) / 2)
-            umap_embeddings = umap.UMAP(n_neighbors=k,
-                                        metric='cosine').fit_transform(embeddings)
-
-            # clustering
-            cluster = hdbscan.HDBSCAN(min_cluster_size=k,
-                                      metric='euclidean',
-                                      cluster_selection_method='eom').fit(umap_embeddings)
-
+            n_clusters = int(len(sentences) / 2)
+            clusters = self.get_clusters(sentences=sentences, n_clusters=n_clusters)
             docs_df = pd.DataFrame(sentences, columns=["Sentence"])
-            docs_df['Topic'] = cluster.labels_
+            docs_df['Topic'] = clusters.labels_
             docs_df['Doc_ID'] = range(len(docs_df))
             docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Sentence': ' '.join})
             tf_idf, count = self._c_tf_idf(docs_per_topic.Sentence.values, m=len(sentences))
@@ -366,43 +406,3 @@ class TopicModel:
         plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
         plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
         plt.colorbar()
-
-
-class Clustering:
-
-    def __init__(self, app_config: AppConfig):
-        self.app_config = app_config
-        self.app_logger = app_config.app_logger
-        self.properties = app_config.properties
-        self.device_name = app_config.device_name
-
-    def get_clusters(self, claims, doc_ids, n_clusters):
-        try:
-            model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
-            embeddings = model.encode(claims, show_progress_bar=True)
-            self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
-            # reduce document dimensionality
-            umap_embeddings = umap.UMAP(n_neighbors=n_clusters,
-                                        metric='cosine').fit_transform(embeddings)
-
-            # clustering
-            clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
-                                       metric='euclidean',
-                                       cluster_selection_method='eom').fit_predict(umap_embeddings)
-            return clusters
-        except (BaseException, Exception) as e:
-            self.app_logger.error(e)
-
-    # def cluster_arguments(self, sentences):
-    #     document_embeddings = TransformerDocumentEmbeddings("nlpaueb/bert-base-greek-uncased-v1")
-    #     embeded_sentences = []
-    #     for sentence, segment_id in sentences:
-    #         sentence = Sentence(sentence)
-    #         embeded_sentences.append(document_embeddings.embed(sentence))
-    #     embeddings = np.asarray(embeded_sentences)
-    #     length = np.sqrt((embeddings ** 2).sum(axis=1))[:, None]
-    #     embeddings = embeddings / length
-    #     n_clusters = self.properties["clustering"]["n_clusters"]
-    #     kmeans = KMeans(n_clusters=n_clusters, random_state=0)
-    #     labels = kmeans.fit_predict(embeddings)
-    #     print(labels)

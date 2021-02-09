@@ -49,10 +49,10 @@ class ArgumentMining:
         client = self.app_config.elastic_retrieve.elasticsearch_client
         documents = self._retrieve(client=client)
         documents, document_ids, invalid_document_ids = self.run_argument_mining(documents=documents)
+        self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
         self.run_clustering(documents=documents, document_ids=document_ids)
         # TODO uncomment notification
         # self.notify_ics(document_ids=document_ids)
-        self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
         self.app_logger.info("Evaluation is finished!")
 
     def run_argument_mining(self, documents):
@@ -114,7 +114,8 @@ class ArgumentMining:
                         doc_ids.append(document["id"])
         clustering = Clustering(app_config=self.app_config)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
-        clusters = clustering.get_clusters(claims=claims, doc_ids=doc_ids, n_clusters=n_clusters)
+        clusters = clustering.get_clusters(sentences=claims, n_clusters=n_clusters)
+        clustering.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=claims, doc_ids=doc_ids)
 
     def _retrieve(self, client):
         retrieve_kind = self.app_config.properties["eval"]["retrieve"]
@@ -211,23 +212,21 @@ class ArgumentMining:
         # init document id & annotations
         adus = []
 
-        self.app_logger.debug(
-            "Processing document with id: {} and name: {}".format(document["id"], document["title"]))
-
+        self.app_logger.debug(f"Processing document with id: {document['id']} and name: {document}")
         segment_counter = 0
         sentences = tokeniser.tokenise_no_punc(document["content"])
         for sentence in sentences:
-            self.app_logger.debug("Predicting labels for sentence: {}".format(sentence))
+            self.app_logger.debug(f"Predicting labels for sentence: {sentence}")
             sentence = " ".join(list(sentence))
             sentence = Sentence(sentence)
             self.adu_model.model.predict(sentence, all_tag_prob=True)
-            self.app_logger.debug("Output: {}".format(sentence.to_tagged_string()))
+            self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
             segments = self._get_args_from_sentence(sentence)
             if segments:
                 for segment in segments:
                     if segment.text and segment.label:
-                        self.app_logger.debug("Segment text: {}".format(segment.text))
-                        self.app_logger.debug("Segment type: {}".format(segment.label))
+                        self.app_logger.debug(f"Segment text: {segment.text}")
+                        self.app_logger.debug(f"Segment type: {segment.label}")
                         segment_counter += 1
                         try:
                             start_idx = document["content"].index(segment.text)
@@ -241,7 +240,7 @@ class ArgumentMining:
                         else:
                             start_idx, end_idx = "", ""
                         seg = {
-                            "id": "T{}".format(segment_counter),
+                            "id": f"T{segment_counter}",
                             "type": segment.label,
                             "starts": str(start_idx),
                             "ends": str(end_idx),
@@ -272,7 +271,7 @@ class ArgumentMining:
             for major_claim in major_claims:
                 for claim in claims:
                     sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
-                    self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
+                    self.app_logger.debug(f"Predicting relation for sentence pair: {sentence_pair}")
                     sentence = Sentence(sentence_pair)
                     self.rel_model.model.predict(sentence)
                     labels = sentence.get_labels()
@@ -280,7 +279,7 @@ class ArgumentMining:
                     if label and label != "other":
                         rel_counter += 1
                         rel_dict = {
-                            "id": "R{}".format(rel_counter),
+                            "id": f"R{rel_counter}",
                             "type": label,
                             "arg1": claim[1],
                             "arg2": major_claim[1],
@@ -290,8 +289,8 @@ class ArgumentMining:
         if claims and premises:
             for claim in claims:
                 for premise in premises:
-                    sentence_pair = "[CLS] " + premise[0] + " [SEP] " + claim[0]
-                    self.app_logger.debug("Predicting relation for sentence pair: {}".format(sentence_pair))
+                    sentence_pair = f"[CLS] {premise[0]} [SEP] {claim[0]}"
+                    self.app_logger.debug(f"Predicting relation for sentence pair: {sentence_pair}")
                     sentence = Sentence(sentence_pair)
                     self.rel_model.model.predict(sentence)
                     labels = sentence.get_labels()
@@ -299,7 +298,7 @@ class ArgumentMining:
                     if label and label != "other":
                         rel_counter += 1
                         rel_dict = {
-                            "id": "R{}".format(rel_counter),
+                            "id": f"R{rel_counter}",
                             "type": label,
                             "arg1": premise[1],
                             "arg2": claim[1],
@@ -314,7 +313,7 @@ class ArgumentMining:
             for major_claim in major_claims:
                 for claim in claims:
                     sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
-                    self.app_logger.debug("Predicting stance for sentence pair: {}".format(sentence_pair))
+                    self.app_logger.debug(f"Predicting stance for sentence pair: {sentence_pair}")
                     sentence = Sentence(sentence_pair)
                     self.stance_model.model.predict(sentence)
                     labels = sentence.get_labels()
@@ -322,7 +321,7 @@ class ArgumentMining:
                     if label and label != "other":
                         stance_counter += 1
                         stance_list = [{
-                            "id": "A{}".format(stance_counter),
+                            "id": f"A{stance_counter}",
                             "type": label,
                             "confidence": conf
                         }]
@@ -382,7 +381,7 @@ class ArgumentMining:
             else:
                 # new segment, different than the current one
                 # next function call should start at the current_idx
-                self.app_logger.debug("Returning completed segment: {}".format(segment.text))
+                self.app_logger.debug(f"Returning completed segment: {segment.text}")
                 return segment, current_idx
         else:
             # only care about B-tags to start a segment

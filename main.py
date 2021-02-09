@@ -118,12 +118,12 @@ def main():
         if "error" in properties["tasks"]:
             error_analysis(path_to_resources=app_config.resources_path)
         app_config.send_email(body="Argument mining pipeline finished successfully",
-                              subject="Argument mining run: {}".format(app_config.run))
+                              subject=f"Argument mining run: {app_config.run}")
     except(BaseException, Exception):
         app_config.app_logger.error(traceback.format_exc())
         app_config.send_email(
-            body="Argument mining pipeline finished with errors".format(traceback.format_exc(limit=100)),
-            subject="Error in argument mining run: {}".format(app_config.run))
+            body=f"Argument mining pipeline finished with errors {traceback.format_exc(limit=100)}",
+            subject=f"Error in argument mining run: {app_config.run}")
     finally:
         try:
             app_config.elastic_save.stop()
