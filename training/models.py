@@ -280,7 +280,7 @@ class Clustering:
                 tokens = self.tokenizer.encode(sentence)
                 input_ids = torch.tensor(tokens).unsqueeze(0)
                 outputs = self.bert_model(input_ids)
-                embeddings = outputs[1][-1].numpy()
+                embeddings = outputs[1][-1].detach().numpy()
                 sentence_embeddings.append(embeddings)
                 self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
             embeddings = np.asarray(sentence_embeddings)
