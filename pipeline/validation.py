@@ -95,25 +95,30 @@ class JsonValidator:
         if not major_claims or not claims or not premises:
             # if any type is missing, no need to check for relations
             if not major_claims:
-                self.app_logger.warning("The document does not contain major claim")
+                self.app_logger.warning("The document does not contain major claim - Stopping validation")
                 validation_errors.append(ValidationError.empty_major_claims)
             if not claims:
-                self.app_logger.warning("The document does not contain any claims")
+                self.app_logger.warning("The document does not contain any claims - Stopping validation")
                 validation_errors.append(ValidationError.empty_claims)
             if not premises:
-                self.app_logger.warning("The document does not contain any premises")
+                self.app_logger.warning("The document does not contain any premises - Stopping validation")
                 validation_errors.append(ValidationError.empty_premises)
             return validation_errors
 
-        validation_errors += self._validate_stance(claims=claims)
+        val_errors, invalid_claims = self._validate_stance(claims=claims)
+        validation_errors += val_errors
         validation_errors += self._validate_relations(relations=relations, adus=adus)
 
         self.app_logger.info("Checking if all ADUs are present in the relations list")
-        major_claims_rel = self._relation_exists(relations=relations, adus=major_claims, position="target")
-        claims_rel_source = self._relation_exists(relations=relations, adus=claims, position="source")
-        claims_rel_target = self._relation_exists(relations=relations, adus=claims, position="target")
-        premises_rel = self._relation_exists(relations=relations, adus=premises, position="source")
-
+        major_claims_rel, invalid_major_claims = self._relation_exists(relations=relations, adus=major_claims,
+                                                                       position="target")
+        claims_rel_source, invalid_claims_rel_source = self._relation_exists(relations=relations, adus=claims,
+                                                                             position="source")
+        claims_rel_target, invalid_claims_rel_target = self._relation_exists(relations=relations, adus=claims,
+                                                                             position="target")
+        premises_rel, invalid_premises = self._relation_exists(relations=relations, adus=premises, position="source")
+        invalid_adus = invalid_claims + invalid_major_claims + invalid_claims_rel_source + invalid_claims_rel_target
+        invalid_adus += invalid_premises
         if not major_claims_rel or (not claims_rel_target and not claims_rel_source) or not premises_rel:
             if not major_claims_rel:
                 self.app_logger.warning("Missing relations for major claim")
@@ -128,7 +133,7 @@ class JsonValidator:
                 self.app_logger.warning("Missing relations for some premises")
                 validation_errors.append(ValidationError.premises_missing_relations)
         self.app_logger.info(f"Validation finished! Found {len(validation_errors)} errors")
-        return validation_errors
+        return validation_errors, invalid_adus
 
     def export_json_schema(self, document_ids):
         """
@@ -185,15 +190,16 @@ class JsonValidator:
     def _validate_stance(self, claims):
         self.app_logger.info("Claim validation for stance")
         validation_errors = []
-        claim_idx = 0
-        while claim_idx < len(claims):
-            claim = claims[claim_idx]
+        invalid_claims = []
+        found_invalid = False
+        for claim in claims:
             stance = claim.get("stance", None)
             if not stance:
-                validation_errors.append(ValidationError.claim_without_stance)
-                break
-            claim_idx += 1
-        return validation_errors
+                if not found_invalid:
+                    validation_errors.append(ValidationError.claim_without_stance)
+                    found_invalid = True
+                invalid_claims.append(claim)
+        return validation_errors, invalid_claims
 
     @staticmethod
     def _relation_exists(relations, adus, position):
@@ -208,12 +214,18 @@ class JsonValidator:
             bool: True/False based on whether all ADUs are present in the Relations list
         """
         found_relations = []
+        invalid_adus = []
         for adu in adus:
+            found = False
             for relation in relations:
                 arg_id = relation["arg1"] if position == "source" else relation["arg2"]
                 if arg_id == adu["id"]:
                     found_relations.append(relation)
-        return True if len(found_relations) == len(adus) else False
+                    found = True
+                if not found:
+                    invalid_adus.append(adu)
+        flag = True if not invalid_adus else False
+        return flag, invalid_adus
 
 
 class JsonCorrector:
