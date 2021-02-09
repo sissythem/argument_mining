@@ -115,6 +115,7 @@ class ArgumentMining:
         clustering = Clustering(app_config=self.app_config)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
         clusters = clustering.get_clusters(sentences=claims, n_clusters=n_clusters)
+        clusters = list(clusters.labels_)
         clustering.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=claims, doc_ids=doc_ids)
 
     def _retrieve(self, client):
