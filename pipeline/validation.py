@@ -1,6 +1,5 @@
 import json
 import re
-from datetime import datetime
 from enum import Enum
 from os.path import join
 from typing import List
@@ -109,6 +108,7 @@ class JsonValidator:
         validation_errors += self._validate_stance(claims=claims)
         validation_errors += self._validate_relations(relations=relations, adus=adus)
 
+        self.app_logger.info("Checking if all ADUs are present in the relations list")
         major_claims_rel = self._relation_exists(relations=relations, adus=major_claims, position="target")
         claims_rel_source = self._relation_exists(relations=relations, adus=claims, position="source")
         claims_rel_target = self._relation_exists(relations=relations, adus=claims, position="target")
@@ -127,6 +127,7 @@ class JsonValidator:
             if not premises_rel:
                 self.app_logger.warning("Missing relations for some premises")
                 validation_errors.append(ValidationError.premises_missing_relations)
+        self.app_logger.info(f"Validation finished! Found {len(validation_errors)} errors")
         return validation_errors
 
     def export_json_schema(self, document_ids):
@@ -147,8 +148,8 @@ class JsonValidator:
         with open(file_path, "w") as f:
             f.write(json.dumps(schema, indent=4, sort_keys=False))
 
-    @staticmethod
-    def _validate_relations(relations, adus):
+    def _validate_relations(self, relations, adus):
+        self.app_logger.info("Validation of relations regarding the ADU positions & the existence of confidence")
         validation_errors = []
         idx = 0
         while idx < len(relations):
@@ -181,8 +182,8 @@ class JsonValidator:
                 idx += 1
         return validation_errors
 
-    @staticmethod
-    def _validate_stance(claims):
+    def _validate_stance(self, claims):
+        self.app_logger.info("Claim validation for stance")
         validation_errors = []
         claim_idx = 0
         while claim_idx < len(claims):
@@ -191,6 +192,7 @@ class JsonValidator:
             if not stance:
                 validation_errors.append(ValidationError.claim_without_stance)
                 break
+            claim_idx += 1
         return validation_errors
 
     @staticmethod
