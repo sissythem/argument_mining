@@ -282,8 +282,8 @@ class Clustering:
                 outputs = self.bert_model(input_ids)
                 embeddings = outputs[1][-1].detach().numpy()
                 sentence_embeddings.append(embeddings)
-                self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
             embeddings = np.asarray(sentence_embeddings)
+            self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
             # reduce document dimensionality
             umap_embeddings = umap.UMAP(n_neighbors=n_clusters,
                                         metric='cosine').fit_transform(embeddings)
@@ -291,7 +291,7 @@ class Clustering:
             # clustering
             clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
                                        metric='euclidean',
-                                       cluster_selection_method='eom').fit_predict(umap_embeddings)
+                                       cluster_selection_method='eom').fit(umap_embeddings)
             return clusters
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
