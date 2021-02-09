@@ -365,8 +365,8 @@ class JsonCorrector:
                 relation = {
                     "id": f"R{self.rel_counter}",
                     "type": rel_type,
-                    "arg0": claim["id"],
-                    "arg1": major_claim["id"],
+                    "arg1": claim["id"],
+                    "arg2": major_claim["id"],
                     "confidence": stance[0]["confidence"]
                 }
                 relations.append(relation)
