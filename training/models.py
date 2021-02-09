@@ -278,7 +278,6 @@ class Clustering:
             sentence_embeddings = []
             for sentence in sentences:
                 tokens = self.tokenizer.encode(sentence)
-                tokens = self.tokenizer.encode()
                 input_ids = torch.tensor(tokens).unsqueeze(0)
                 outputs = self.bert_model(input_ids)
                 embeddings = outputs[1][-1].numpy()
