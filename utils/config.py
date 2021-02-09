@@ -51,7 +51,7 @@ class AppConfig:
 
         # logging
         self.app_logger = self._config_logger()
-        self.app_logger.info("Run id: {}".format(self.run))
+        self.app_logger.info(f"Run id: {self.run}")
 
         # training data
         self._configure_training_data_and_model_path()
@@ -70,9 +70,9 @@ class AppConfig:
             devices = environ.get("CUDA_VISIBLE_DEVICES", 0)
             if type(devices) == str:
                 devices = devices.split(",")
-                self.device_name = "cuda:{}".format(devices[0].strip())
+                self.device_name = f"cuda:{devices[0].strip()}"
             else:
-                self.device_name = "cuda:{}".format(devices)
+                self.device_name = f"cuda:{devices}"
         else:
             self.device_name = "cpu"
 
@@ -83,12 +83,13 @@ class AppConfig:
         Returns
             logger: the initialized logger
         """
-        self.log_filename = 'logs_%s' % datetime.now().strftime('%Y%m%d-%H%M%S')
+        timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
+        self.log_filename = f"logs_{timestamp}.log"
         log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
         program_logger = logging.getLogger("flair")
 
         program_logger.setLevel(logging.DEBUG)
-        file_handler = logging.FileHandler("{0}/{1}.log".format(self.logs_path, self.log_filename))
+        file_handler = logging.FileHandler(f"{self.logs_path}/{self.log_filename}")
         file_handler.setFormatter(log_formatter)
         program_logger.addHandler(file_handler)
 
@@ -125,7 +126,7 @@ class AppConfig:
         self.resources_path = join(self.app_path, "resources")
         self.output_path = join(self.app_path, "output")
         self.logs_path = join(self.output_path, "logs")
-        self.model_path = join(self.output_path, "model")
+        self.model_path = join(self.output_path, "models")
         self.output_files = join(self.output_path, "output_files")
         self.tensorboard_path = join(self.app_path, "runs")
         self._create_output_dirs()
@@ -138,6 +139,8 @@ class AppConfig:
             mkdir(self.output_path)
         if not exists(self.logs_path):
             mkdir(self.logs_path)
+        if not exists(self.model_path):
+            mkdir(self.model_path)
         if not exists(self.tensorboard_path):
             mkdir(self.tensorboard_path)
         if not exists(self.output_files):
@@ -161,7 +164,7 @@ class AppConfig:
         embedding_names = 'bert-greek'
         properties = self.properties["adu_model"] if base_name == "adu_model" else self.properties["rel_model"]
         layers = properties["rnn_layers"] if base_name == "adu_model" else properties["layers"]
-        base_path = "{}-".format(base_name) + '-'.join([
+        base_path = f"{base_name}-" + '-'.join([
             str(embedding_names),
             'hs=' + str(properties["hidden_size"]),
             'hl=' + str(layers),
@@ -170,7 +173,7 @@ class AppConfig:
             'lr=' + str(properties["learning_rate"]),
             'bs=' + str(properties["mini_batch_size"])
         ])
-        base_path = join(self.output_path, base_path)
+        base_path = join(self.model_path, base_path)
         try:
             os.makedirs(base_path)
         except (OSError, Exception):
@@ -231,9 +234,8 @@ class AppConfig:
 
         # Add body to email
         message.attach(MIMEText(body, "plain"))
-        filename = "{}.log".format(self.log_filename)
         # Open PDF file in binary mode
-        with open(join(self.logs_path, filename), "rb") as attachment:
+        with open(join(self.logs_path, self.log_filename), "rb") as attachment:
             # Add file as application/octet-stream
             # Email client can usually download this automatically as attachment
             part = MIMEBase("application", "octet-stream")
@@ -245,7 +247,7 @@ class AppConfig:
         # Add header as key/value pair to attachment part
         part.add_header(
             "Content-Disposition",
-            f"attachment; filename= {filename}",
+            f"attachment; filename= {self.log_filename}",
         )
 
         # Add attachment to message and convert message to string
