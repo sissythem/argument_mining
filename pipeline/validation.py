@@ -285,7 +285,7 @@ class JsonCorrector:
                                                               major_claim=major_claims[0])
         premises = self.update_premises_with_relations(premises=premises, relations=relations)
         adus = major_claims + claims + premises
-        document["annotatiosn"]["ADUs"] = adus
+        document["annotations"]["ADUs"] = adus
         document["annotations"]["Relations"] = relations
         return document
 
