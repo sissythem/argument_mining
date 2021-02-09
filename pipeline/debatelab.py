@@ -82,7 +82,7 @@ class ArgumentMining:
                     for validation_error in validation_errors:
                         f.write(validation_error.value + "\n")
                     for invalid_adu in invalid_adus:
-                        f.write(invalid_adu + "\n")
+                        f.write(str(invalid_adu) + "\n")
         # validator.export_json_schema(document_ids=document_ids)
         return documents, document_ids, invalid_document_ids
 
