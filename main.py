@@ -8,8 +8,13 @@ from training.models import AduModel, RelationsModel
 from pipeline.debatelab import ArgumentMining
 from training.preprocessing import DataLoader
 from utils.config import AppConfig
+from utils.utils import Utilities
 
 
+# ADU labels: B-major_claims --> 38, I-major_claims --> 257, B-claim --> 380, I-claim --> 6389, B-premise -->615,
+# I-premise --> 8906, O --> 19401
+# relation labels: support --> 781, attack --> 84, other --> 8705
+# stance labels: for --> 289, against --> 42
 def error_analysis(path_to_resources):
     """
     Function to perform error analysis on the results. Saves the incorrect predictions into a file
@@ -51,6 +56,7 @@ def preprocess(app_config):
     """
     logger = app_config.app_logger
     data_loader = DataLoader(app_config=app_config)
+    data_loader.load()
     logger.info("Creating CSV file in CONLL format for ADUs classification")
     data_loader.load_adus()
     logger.info("Creating CSV file in CONLL format for relations/stance classification")
@@ -106,6 +112,9 @@ def main():
     :return:
     """
     app_config: AppConfig = AppConfig()
+    utility = Utilities(app_config=app_config)
+    utility.oversample(task_kind="rel", file_kind="train", total_num=8705)
+    utility.oversample(task_kind="stance", file_kind="train", total_num=289)
     try:
         properties = app_config.properties
         tasks = properties["tasks"]
