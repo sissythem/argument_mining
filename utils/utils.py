@@ -70,9 +70,14 @@ class Utilities:
         sampler = RandomOverSampler(sampling_strategy=sampling_strategy)
         data, labels = sampler.fit_resample(data.reshape(-1, 1), labels)
         data = data.squeeze()
+        labels = labels.squeeze()
+        data = list(data)
+        labels = list(labels)
+        labels = [lbl_dict[lbl] for lbl in labels]
+        data = [texts[x] for x in data]
         new_df = pd.DataFrame(columns=["text", "label"])
-        new_df["text"] = list(data)
-        new_df["label"] = list(labels)
+        new_df["text"] = data
+        new_df["label"] = labels
         return new_df
 
     def name_exceeds_bytes(self, name):
