@@ -6,6 +6,7 @@ from typing import List
 import pandas as pd
 from ellogon import tokeniser
 
+from utils.utils import Utilities
 
 class Document:
     """
@@ -210,10 +211,15 @@ class DataLoader:
         df.to_csv(out_file_path, sep='\t', index=False, header=False)
         self.app_logger.debug("Dataframe saved!")
 
-    def load_relations(self):
+    def load_relations(self, do_oversample=True):
         relations, stances = self._get_relations()
         self._save_rel_df(rel_list=relations, filename=self.app_config.rel_train_csv)
         self._save_rel_df(rel_list=stances, filename=self.app_config.stance_train_csv)
+        if do_oversample:
+            utility = Utilities(app_config=self.app_config)
+            # TODO oversampling in a dynamic way
+            utility.oversample(task_kind="rel", file_kind="train", total_num=8705)
+            utility.oversample(task_kind="stance", file_kind="train", total_num=289)
 
     def _get_relations(self):
         resources = self.app_config.resources_path
