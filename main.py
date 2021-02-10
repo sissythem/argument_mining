@@ -112,9 +112,6 @@ def main():
     :return:
     """
     app_config: AppConfig = AppConfig()
-    utilities = Utilities(app_config=app_config)
-    utilities.oversample(task_kind="rel", file_kind="train", total_num=8705)
-    utilities.oversample(task_kind="stance", file_kind="train", total_num=289)
     try:
         properties = app_config.properties
         tasks = properties["tasks"]
