@@ -1,3 +1,4 @@
+import re
 from os.path import join
 
 import numpy as np
@@ -75,6 +76,9 @@ class Utilities:
         labels = list(labels)
         labels = [lbl_dict[lbl] for lbl in labels]
         data = [texts[x] for x in data]
+        for idx, text in enumerate(data):
+            text = text.replace("\t", " ")
+            text = re.sub(' +', ' ', text)
         new_df = pd.DataFrame(columns=["text", "label"])
         new_df["text"] = data
         new_df["label"] = labels
