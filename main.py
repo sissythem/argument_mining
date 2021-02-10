@@ -4,11 +4,10 @@ from os.path import join
 import numpy as np
 import pandas as pd
 
-from training.models import AduModel, RelationsModel
 from pipeline.debatelab import ArgumentMining
+from training.models import AduModel, RelationsModel
 from training.preprocessing import DataLoader
 from utils.config import AppConfig
-from utils.utils import Utilities
 
 
 # ADU labels: B-major_claims --> 38, I-major_claims --> 257, B-claim --> 380, I-claim --> 6389, B-premise -->615,
