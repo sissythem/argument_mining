@@ -32,14 +32,14 @@ class Utilities:
     def oversample(self, task_kind, file_kind, total_num):
         filename = eval(f"self.{task_kind}_{file_kind}_csv")
         file_path = join(self.data_folder, filename)
-        df = pd.read_csv(join(file_path, filename), sep="\t", index_col=None, header=None)
+        df = pd.read_csv(file_path, sep="\t", index_col=None, header=None)
         if task_kind == "adu":
             pass
         else:
             df = self._relation_oversampling(df=df, rel=task_kind, total_num=total_num)
         filename = filename.replace(".csv", "")
         new_file = f"{filename}_oversample.csv"
-        output_filepath = join(file_path, new_file)
+        output_filepath = join(self.data_folder, new_file)
         df.to_csv(output_filepath, sep='\t', index=False, header=0)
 
     @staticmethod
