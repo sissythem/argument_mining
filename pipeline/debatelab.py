@@ -261,6 +261,8 @@ class ArgumentMining:
         return adus, segment_counter
 
     def _concat_major_claim(self, segments: List[Segment]):
+        if not segments:
+            return []
         new_segments = []
         major_claim_txt = ""
         major_claims = [mc for mc in segments if mc.label == "major_claim"]
