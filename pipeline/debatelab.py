@@ -51,13 +51,12 @@ class ArgumentMining:
         client = self.app_config.elastic_retrieve.elasticsearch_client
         documents = self._retrieve(client=client)
         documents, document_ids, invalid_document_ids = self.run_argument_mining(documents=documents)
-        self.app_logger.info(f"Invalid documents: {invalid_document_ids}")
         self.run_clustering(documents=documents, document_ids=document_ids)
         # TODO uncomment notification
         # self.notify_ics(document_ids=document_ids)
         self.app_logger.info("Evaluation is finished!")
 
-    def run_argument_mining(self, documents):
+    def run_argument_mining(self, documents, export_schema=False):
         document_ids = []
         invalid_document_ids = []
         validator = JsonValidator(app_config=self.app_config)
@@ -88,7 +87,8 @@ class ArgumentMining:
         self.app_logger.info(f"Total valid documents: {len(document_ids)}")
         self.app_logger.info(f"Total invalid documents: {len(invalid_document_ids)}")
         self.app_logger.warn(f"Invalid document ids: {invalid_document_ids}")
-        # validator.export_json_schema(document_ids=document_ids)
+        if export_schema:
+            validator.export_json_schema(document_ids=document_ids)
         return documents, document_ids, invalid_document_ids
 
     def run_validation(self, validator, document, segment_counter, rel_counter, stance_counter, do_correction=False):
@@ -106,13 +106,6 @@ class ArgumentMining:
         return validation_errors, invalid_adus
 
     def run_clustering(self, documents, document_ids):
-        # TODO remove the below
-        # document_ids = [document["id"] for document in documents]
-        # documents = self.app_config.elastic_save.elasticsearch_client.mget(index="debatelab",
-        #                                                                    body={"ids": document_ids})
-        # documents = documents["docs"]
-        # documents = [document["_source"] for document in documents]
-
         claims, doc_ids = [], []
         for document in documents:
             if document["id"] in document_ids:
@@ -231,7 +224,7 @@ class ArgumentMining:
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
             segments = self._get_args_from_sentence(sentence)
-            segments = self._concat_major_claim(segments=segments)
+            segments = self._concat_major_claim(segments=segments, title=document["title"])
             if segments:
                 for segment in segments:
                     if segment.text and segment.label:
@@ -260,18 +253,27 @@ class ArgumentMining:
                         adus.append(seg)
         return adus, segment_counter
 
-    def _concat_major_claim(self, segments: List[Segment]):
+    def _concat_major_claim(self, segments: List[Segment], title):
         if not segments:
             return []
         new_segments = []
         major_claim_txt = ""
         major_claims = [mc for mc in segments if mc.label == "major_claim"]
+        mc_exists = False
         if major_claims:
+            mc_exists = True
             for mc in major_claims:
                 major_claim_txt += f" {mc.text}"
+        else:
+            major_claim_txt = title
         major_claim_txt = self.utilities.replace_multiple_spaces_with_single_space(text=major_claim_txt)
         already_found_mc = False
         for segment in segments:
+            if not mc_exists and not already_found_mc:
+                major_claim = ArgumentMining.Segment(text=major_claim_txt, label="major_claim")
+                major_claim.mean_conf = 0.99
+                new_segments.append(major_claim)
+                already_found_mc = True
             if segment.label == "major_claim":
                 if not already_found_mc:
                     segment.text = major_claim_txt
