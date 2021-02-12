@@ -169,18 +169,19 @@ class JsonValidator:
                     target = adu
             if type(target) != dict or type(source) != dict:
                 validation_errors.append(ValidationError.missing_adus)
-            if target["type"] == "premise":
-                validation_errors.append(ValidationError.premise_source_invalid)
-            if source["type"] == "major_claim":
-                validation_errors.append(ValidationError.major_claim_target_invalid)
-            if not confidence:
-                validation_errors.append(ValidationError.relation_confidence_empty)
-            if (source["type"] == "premise" and target["type"] != "claim") or (
-                    target["type"] == "claim" and source["type"] != "premise"):
-                validation_errors.append(ValidationError.source_premise_target_claim_invalid)
-            if (source["type"] == "claim" and target["type"] != "major_claim") or (
-                    target["type"] == "major_claim" and source["type"] != "claim"):
-                validation_errors.append(ValidationError.source_claim_target_major_claim_invalid)
+            else:
+                if target["type"] == "premise":
+                    validation_errors.append(ValidationError.premise_source_invalid)
+                if source["type"] == "major_claim":
+                    validation_errors.append(ValidationError.major_claim_target_invalid)
+                if not confidence:
+                    validation_errors.append(ValidationError.relation_confidence_empty)
+                if (source["type"] == "premise" and target["type"] != "claim") or (
+                        target["type"] == "claim" and source["type"] != "premise"):
+                    validation_errors.append(ValidationError.source_premise_target_claim_invalid)
+                if (source["type"] == "claim" and target["type"] != "major_claim") or (
+                        target["type"] == "major_claim" and source["type"] != "claim"):
+                    validation_errors.append(ValidationError.source_claim_target_major_claim_invalid)
             if validation_errors:
                 break
             else:
