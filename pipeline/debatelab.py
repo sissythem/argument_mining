@@ -14,6 +14,7 @@ from flair.data import Sentence, Label
 from training.models import AduModel, RelationsModel, TopicModel, Clustering
 from utils.config import AppConfig
 from pipeline.validation import JsonValidator, JsonCorrector
+from utils.utils import Utilities
 
 
 class ArgumentMining:
@@ -27,6 +28,7 @@ class ArgumentMining:
     def __init__(self, app_config):
         self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
+        self.utilities = Utilities(app_config=self.app_config)
 
         # load ADU model
         self.adu_model = AduModel(app_config=self.app_config)
@@ -229,6 +231,7 @@ class ArgumentMining:
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
             segments = self._get_args_from_sentence(sentence)
+            segments = self._concat_major_claim(segments=segments)
             if segments:
                 for segment in segments:
                     if segment.text and segment.label:
@@ -256,6 +259,27 @@ class ArgumentMining:
                         }
                         adus.append(seg)
         return adus, segment_counter
+
+    def _concat_major_claim(self, segments: List[Segment]):
+        new_segments = []
+        major_claim_txt = ""
+        major_claims = [mc for mc in segments if mc.label == "major_claim"]
+        if major_claims:
+            for mc in major_claims:
+                major_claim_txt += f" {mc.text}"
+        major_claim_txt = self.utilities.replace_multiple_spaces_with_single_space(text=major_claim_txt)
+        already_found_mc = False
+        for segment in segments:
+            if segment.label == "major_claim":
+                if not already_found_mc:
+                    segment.text = major_claim_txt
+                    new_segments.append(segment)
+                    already_found_mc = True
+                else:
+                    continue
+            else:
+                new_segments.append(segment)
+        return new_segments
 
     @staticmethod
     def _get_adus(segments):

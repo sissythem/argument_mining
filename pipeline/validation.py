@@ -1,5 +1,4 @@
 import json
-import re
 from enum import Enum
 from os.path import join
 from typing import List
@@ -7,6 +6,7 @@ from typing import List
 from genson import SchemaBuilder
 
 from utils.config import AppConfig
+from utils.utils import Utilities
 
 
 class ValidationError(Enum):
@@ -249,6 +249,7 @@ class JsonCorrector:
         self.segment_counter = segment_counter
         self.rel_counter = rel_counter
         self.stance_counter = stance_counter
+        self.utilities = Utilities(app_config=self.app_config)
 
     @staticmethod
     def can_document_be_corrected(validation_errors: List[ValidationError]):
@@ -302,8 +303,7 @@ class JsonCorrector:
         document["annotations"]["Relations"] = relations
         return document
 
-    @staticmethod
-    def handle_multiple_major_claims(adus, major_claims):
+    def handle_multiple_major_claims(self, adus, major_claims):
         """
         Concatenates the text of major claims (predictions were on sentence-level)
 
@@ -315,7 +315,7 @@ class JsonCorrector:
             list: updated list of ADUs with one major claim
         """
         major_claim_txt = " ".join([major_claim["segment"] for major_claim in major_claims])
-        re.sub(' +', ' ', major_claim_txt)
+        major_claim_txt = self.utilities.replace_multiple_spaces_with_single_space(text=major_claim_txt)
         major_claim = major_claims[0]
         major_claim["segment"] = major_claim_txt
         if major_claim["starts"] is None or major_claim["starts"] == "":
