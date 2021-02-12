@@ -223,8 +223,8 @@ class JsonValidator:
                 if arg_id == adu["id"]:
                     found_relations.append(relation)
                     found = True
-                if not found:
-                    invalid_adus.append(adu)
+            if not found:
+                invalid_adus.append(adu)
         flag = True if not invalid_adus else False
         return flag, invalid_adus
 
