@@ -91,9 +91,9 @@ class ArgumentMining:
         # validator.export_json_schema(document_ids=document_ids)
         return documents, document_ids, invalid_document_ids
 
-    def run_validation(self, validator, document, segment_counter, rel_counter, stance_counter):
+    def run_validation(self, validator, document, segment_counter, rel_counter, stance_counter, do_correction=False):
         validation_errors, invalid_adus = validator.validate(document=document)
-        if validation_errors:
+        if do_correction and validation_errors:
             counter = self.app_config.properties["eval"]["max_correction_tries"]
             corrector = JsonCorrector(app_config=self.app_config, segment_counter=segment_counter,
                                       rel_counter=rel_counter, stance_counter=stance_counter)
