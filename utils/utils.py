@@ -43,8 +43,7 @@ class Utilities:
         output_filepath = join(self.data_folder, new_file)
         df.to_csv(output_filepath, sep='\t', index=False, header=0)
 
-    @staticmethod
-    def _relation_oversampling(df, rel, total_num):
+    def _relation_oversampling(self, df, rel, total_num):
         texts = list(df[0])
         indices = [texts.index(x) for x in texts]
         labels = list(df[1])
@@ -78,11 +77,15 @@ class Utilities:
         data = [texts[x] for x in data]
         for idx, text in enumerate(data):
             text = text.replace("\t", " ")
-            text = re.sub(' +', ' ', text)
+            text = self.replace_multiple_spaces_with_single_space(text)
         new_df = pd.DataFrame(columns=["text", "label"])
         new_df["text"] = data
         new_df["label"] = labels
         return new_df
+
+    @staticmethod
+    def replace_multiple_spaces_with_single_space(text):
+        return re.sub(' +', ' ', text)
 
     def name_exceeds_bytes(self, name):
         """
