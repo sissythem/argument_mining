@@ -28,7 +28,6 @@ class ValidationError(Enum):
     missing_adus = "missing-adus"
     major_claim_missing_relations = "major-claim-missing-relations"
     claims_missing_relations_source = "claims-missing-relations-source"
-    claims_missing_relations_target = "claims-missing-relations-target"
     premises_missing_relations = "premises-missing-relations"
 
 
@@ -60,7 +59,7 @@ class JsonValidator:
             list: a list of validation errors found in the document - if the document is valid, the list is empty
         """
         self.app_logger.info(f"Validating document with id {document['id']} and title {document['title']}")
-        validation_errors, invalid_adus = [], []
+        validation_errors, invalid_adus = [], {}
         # check topics, relations and ADUs lists are not empty
         if not document["topics"]:
             self.app_logger.warning("Document does not contain topics")
@@ -106,29 +105,26 @@ class JsonValidator:
             return validation_errors, invalid_adus
 
         val_errors, invalid_claims = self._validate_stance(claims=claims)
+        invalid_adus["stance"] = invalid_claims
         validation_errors += val_errors
         validation_errors += self._validate_relations(relations=relations, adus=adus)
 
         self.app_logger.info("Checking if all ADUs are present in the relations list")
         major_claims_rel, invalid_major_claims = self._relation_exists(relations=relations, adus=major_claims,
                                                                        position="target")
+        invalid_adus["major_claim"] = invalid_major_claims
         claims_rel_source, invalid_claims_rel_source = self._relation_exists(relations=relations, adus=claims,
                                                                              position="source")
-        claims_rel_target, invalid_claims_rel_target = self._relation_exists(relations=relations, adus=claims,
-                                                                             position="target")
+        invalid_adus["claims_source"] = invalid_claims_rel_source
         premises_rel, invalid_premises = self._relation_exists(relations=relations, adus=premises, position="source")
-        invalid_adus = invalid_claims + invalid_major_claims + invalid_claims_rel_source + invalid_claims_rel_target
-        invalid_adus += invalid_premises
-        if not major_claims_rel or (not claims_rel_target and not claims_rel_source) or not premises_rel:
+        invalid_adus["premises"] = invalid_premises
+        if not major_claims_rel or not claims_rel_source or not premises_rel:
             if not major_claims_rel:
                 self.app_logger.warning("Missing relations for major claim")
                 validation_errors.append(ValidationError.major_claim_missing_relations)
             if not claims_rel_source:
                 self.app_logger.warning("Missing relations for some claims towards the major claim")
                 validation_errors.append(ValidationError.claims_missing_relations_source)
-            if not claims_rel_target:
-                self.app_logger.warning("Missing relations for some relations of some claims with premises")
-                validation_errors.append(ValidationError.claims_missing_relations_target)
             if not premises_rel:
                 self.app_logger.warning("Missing relations for some premises")
                 validation_errors.append(ValidationError.premises_missing_relations)
@@ -272,7 +268,7 @@ class JsonCorrector:
                              ValidationError.major_claim_target_invalid]
         return False if any(error in validation_errors for error in unaccepted_errors) else True
 
-    def correction(self, document):
+    def correction(self, document, invalid_adus):
         """
         Function to perform corrections to a document - only to the documents that the function
         ```can_document_be_corrected()``` returned True
@@ -286,144 +282,68 @@ class JsonCorrector:
         adus = document["annotations"]["ADUs"]
         relations = document["annotations"]["Relations"]
         major_claims = [adu for adu in adus if adu["type"] == "major_claim"]
-        claims = [adu for adu in adus if adu["type"] == "claim"]
-        premises = [adu for adu in adus if adu["type"] == "premise"]
-        # check if major claim is split - predictions on sentence level
-        if len(major_claims) > 1:
-            adus = document["annotations"]["ADUs"]
-            adus = self.handle_multiple_major_claims(adus=adus, major_claims=major_claims)
-            major_claims = [adu for adu in adus if adu["type"] == "major_claim"]
-        claims, relations = self.update_claims_with_relations(claims=claims, relations=relations,
-                                                              major_claim=major_claims[0])
-        premises = self.update_premises_with_relations(premises=premises, relations=relations)
-        adus = major_claims + claims + premises
-        document["annotations"]["ADUs"] = adus
-        document["annotations"]["Relations"] = relations
+
+        # fix stance
+        document = self.handle_claims_without_stance(document=document, claims=invalid_adus["stance"],
+                                                     relations=relations)
+        # fix claims as source in relations
+        document = self.handle_source_missing_claims(document=document, claims=invalid_adus["claims_source"],
+                                                     major_claim=major_claims[0])
+        # claims
+        # handle missing premises
+        document = self.handle_missing_premises(document=document, premises=invalid_adus["premises"])
         return document
 
-    def handle_multiple_major_claims(self, adus, major_claims):
-        """
-        Concatenates the text of major claims (predictions were on sentence-level)
-
-        Args
-            | adus (list): a list of all ADUs of the document
-            | major_claims (list): a list with the major claims (split into multiple segments)
-
-        Returns
-            list: updated list of ADUs with one major claim
-        """
-        major_claim_txt = " ".join([major_claim["segment"] for major_claim in major_claims])
-        major_claim_txt = self.utilities.replace_multiple_spaces_with_single_space(text=major_claim_txt)
-        major_claim = major_claims[0]
-        major_claim["segment"] = major_claim_txt
-        if major_claim["starts"] is None or major_claim["starts"] == "":
-            major_claim["ends"] = ""
-        else:
-            major_claim["ends"] = str(int(major_claim["starts"]) + len(major_claim_txt))
-        new_adus = [major_claim]
-        for adu in adus:
-            if adu["type"] == "major_claim":
-                continue
-            new_adus.append(adu)
-        return new_adus
-
-    def update_premises_with_relations(self, premises, relations):
-        """
-        Function to keep only the premises that have relations with claims
-
-        Args
-            | premises (list): a list of the premises
-            | relations (list): a list with the predicted relations
-
-        Returns
-            list: a list with the premises to be kept
-        """
-        new_premises = []
-        for premise in premises:
-            premise_rel = self._get_adu_relations(adu_id=premise["id"], relations=relations, position="source")
-            if premise_rel is not None and len(premise_rel) > 0:
-                new_premises.append(premise)
-            else:
-                self.app_logger.warning(
-                    f"Missing relation for premise with id {premise['id']} and text {premise['segment']}")
-        return new_premises
-
-    def update_claims_with_relations(self, claims, relations, major_claim):
-        """
-        Get the updated list of claims and relations. Claims kept are those that have stance towards the major claim
-        and have at least one relation where they are the source ADU. In case that a claim does not have a stance
-        and there is no relation with the claim as source, but there are relations with the claim as target, the
-        relevant relations are removed.
-
-        Args
-            | claims (list): a list with all the predicted claims
-            | relations (list): a list with all the predicted relations
-            | major_claim (dict): the major claim of the document
-
-        Returns
-            tuple: the updated lists of claims and relations
-        """
-        new_claims = []
+    def handle_claims_without_stance(self, document, claims, relations):
         for claim in claims:
-            source_relations = self._get_adu_relations(adu_id=claim["id"], relations=relations,
-                                                       position="source")
-            target_relations = self._get_adu_relations(adu_id=claim["id"], relations=relations,
-                                                       position="target")
-            stance = claim.get("stance", [])
-            source_rel_exists = True if source_relations is not None and len(source_relations) > 0 else False
-            target_rel_exists = True if target_relations is not None and len(target_relations) > 0 else False
-            if stance and not source_rel_exists:
-                stance_type = stance[0]["type"]
-                rel_type = "support" if stance_type == "for" else "attack"
-                self.rel_counter += 1
-                relation = {
-                    "id": f"R{self.rel_counter}",
-                    "type": rel_type,
-                    "arg1": claim["id"],
-                    "arg2": major_claim["id"],
-                    "confidence": stance[0]["confidence"]
-                }
-                relations.append(relation)
-                source_rel_exists = True
-            elif source_rel_exists and not stance:
-                self.stance_counter += 1
-                rel_type, confidence = None, None
-                for relation in relations:
-                    if relation["arg1"] == claim["id"] and relation["arg2"] == major_claim["id"]:
-                        rel_type = relation["type"]
-                        confidence = relation["confidence"]
-                if rel_type is not None and rel_type != "":
+            for rel in relations:
+                # assuming that we have only one major claim
+                if rel["arg1"] == claim["id"]:
+                    rel_type = rel["type"]
+                    confidence = rel["confidence"]
+                    self.stance_counter += 1
                     stance = {
                         "id": f"A{self.stance_counter}",
                         "type": rel_type,
                         "confidence": confidence
                     }
-                    claim["stance"] = [stance]
-            stance = claim.get("stance", [])
-            if stance and source_rel_exists:
-                new_claims.append(claim)
+                    for adu in document["annotations"]["ADUs"]:
+                        if adu["id"] == claim["id"]:
+                            adu["stance"] = [stance]
+        return document
+
+    def handle_source_missing_claims(self, document, claims, major_claim):
+        for invalid_claim in claims:
+            for adu in document["annotations"]["ADUs"]:
+                if invalid_claim["id"] == adu["id"]:
+                    stance = adu.get("stance", [])
+                    if stance:
+                        stance_type = stance[0]["type"]
+                        confidence = stance[0]["confidence"]
+                        rel_type = "support" if stance_type == "for" else "attack"
+                        self.rel_counter += 1
+                        relation = {
+                            "id": f"R{self.rel_counter}",
+                            "type": rel_type,
+                            "arg1": adu["id"],
+                            "arg2": major_claim["id"],
+                            "confidence": confidence
+                        }
+                        document["annotations"]["Relations"].append(relation)
+        return document
+
+    def handle_missing_premises(self, document, premises):
+        adus = document["annotations"]["ADUs"]
+        correct_premises = []
+        invalid_premise_ids = [premise["id"] for premise in premises]
+        for adu in adus:
+            if adu["id"] not in invalid_premise_ids:
+                correct_premises.append(adu)
             else:
-                if target_rel_exists:
-                    for target_relation in target_relations:
-                        relations.remove(target_relation)
-        return new_claims, relations
-
-    @staticmethod
-    def _get_adu_relations(adu_id, relations, position):
-        """
-        Based on an ADU and the position (source or target), the function searches for associated relations
-
-        Args
-            | adu_id (str): the id of the ADU
-            | relations (list): the list of all the predicted relations
-            | position (str): valid values are source and target
-
-        Returns
-            list: relations associated with the ADU and the position requested
-        """
-        relations_found = []
-        for relation in relations:
-            arg_id = relation["arg1"] if position == "source" else relation["arg2"]
-            if arg_id == adu_id:
-                relations_found.append(relation)
-        return relations_found
+                self.app_logger.warning(
+                    f"Missing relation for premise with id {adu['id']} and text {adu['segment']}")
+        major_claims = [adu for adu in adus if adu["type"] == "major_claim"]
+        claims = [adu for adu in adus if adu["type"] == "claim"]
+        adus = major_claims + claims + correct_premises
+        document["annotations"]["ADUs"] = adus
+        return document
