@@ -100,7 +100,7 @@ class ArgumentMining:
             while counter > 0 and validation_errors:
                 if not corrector.can_document_be_corrected(validation_errors=validation_errors):
                     break
-                document = corrector.correction(document=document)
+                document = corrector.correction(document=document, invalid_adus=invalid_adus)
                 validation_errors, invalid_adus = validator.validate(document=document)
                 counter -= 1
         return validation_errors, invalid_adus
