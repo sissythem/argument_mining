@@ -60,7 +60,7 @@ class JsonValidator:
             list: a list of validation errors found in the document - if the document is valid, the list is empty
         """
         self.app_logger.info(f"Validating document with id {document['id']} and title {document['title']}")
-        validation_errors = []
+        validation_errors, invalid_adus = [], []
         # check topics, relations and ADUs lists are not empty
         if not document["topics"]:
             self.app_logger.warning("Document does not contain topics")
@@ -75,7 +75,7 @@ class JsonValidator:
         # if relations or ADUs are empty there is no need to continue the following validations
         if ValidationError.empty_relations in validation_errors or ValidationError.empty_adus in validation_errors:
             self.app_logger.info("Relations or ADUs are empty - Stopping validation")
-            return validation_errors
+            return validation_errors, invalid_adus
 
         adus = document["annotations"]["ADUs"]
         relations = document["annotations"]["Relations"]
@@ -103,7 +103,7 @@ class JsonValidator:
             if not premises:
                 self.app_logger.warning("The document does not contain any premises - Stopping validation")
                 validation_errors.append(ValidationError.empty_premises)
-            return validation_errors
+            return validation_errors, invalid_adus
 
         val_errors, invalid_claims = self._validate_stance(claims=claims)
         validation_errors += val_errors
