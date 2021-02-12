@@ -303,7 +303,7 @@ class Clustering:
         for idx, cluster in enumerate(clusters):
             sentence = sentences[idx]
             doc_id = doc_ids[idx]
-            cluster_lists[idx].append((sentence, doc_id))
+            cluster_lists[cluster].append((sentence, doc_id))
         self.print_clusters(cluster_lists=cluster_lists)
 
     def print_clusters(self, cluster_lists):
