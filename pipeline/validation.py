@@ -317,7 +317,7 @@ class JsonCorrector:
         re.sub(' +', ' ', major_claim_txt)
         major_claim = major_claims[0]
         major_claim["segment"] = major_claim_txt
-        major_claim["ends"] = major_claim["starts"] + len(major_claim_txt)
+        major_claim["ends"] = str(int(major_claim["starts"]) + len(major_claim_txt))
         new_adus = [major_claim]
         for adu in adus:
             if adu["type"] == "major_claim":
