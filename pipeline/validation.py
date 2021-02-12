@@ -214,14 +214,12 @@ class JsonValidator:
         Returns
             bool: True/False based on whether all ADUs are present in the Relations list
         """
-        found_relations = []
         invalid_adus = []
         for adu in adus:
             found = False
             for relation in relations:
                 arg_id = relation["arg1"] if position == "source" else relation["arg2"]
                 if arg_id == adu["id"]:
-                    found_relations.append(relation)
                     found = True
             if not found:
                 invalid_adus.append(adu)
