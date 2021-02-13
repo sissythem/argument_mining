@@ -231,17 +231,7 @@ class ArgumentMining:
                         self.app_logger.debug(f"Segment text: {segment.text}")
                         self.app_logger.debug(f"Segment type: {segment.label}")
                         segment_counter += 1
-                        try:
-                            start_idx = document["content"].index(segment.text)
-                        except(Exception, BaseException):
-                            try:
-                                start_idx = document["content"].index(segment.text[:10])
-                            except(Exception, BaseException):
-                                start_idx = None
-                        if start_idx:
-                            end_idx = start_idx + len(segment.text)
-                        else:
-                            start_idx, end_idx = "", ""
+                        start_idx, end_idx = self.find_segment_in_text(content=document["content"], text=segment.text)
                         seg = {
                             "id": f"T{segment_counter}",
                             "type": segment.label,
@@ -253,30 +243,53 @@ class ArgumentMining:
                         adus.append(seg)
         return adus, segment_counter
 
-    def _concat_major_claim(self, segments, title):
+    @staticmethod
+    def find_segment_in_text(self, content, text):
+        try:
+            start_idx = content.index(text)
+        except(Exception, BaseException):
+            try:
+                start_idx = content.index(text[:10])
+            except(Exception, BaseException):
+                start_idx = None
+        if start_idx:
+            end_idx = start_idx + len(text)
+        else:
+            start_idx, end_idx = "", ""
+        return start_idx, end_idx
+
+    def _concat_major_claim(self, segments, title, content, counter):
         if not segments:
             return []
         new_segments = []
         major_claim_txt = ""
-        major_claims = [mc for mc in segments if mc.label == "major_claim"]
+        major_claims = [mc for mc in segments if mc["type"] == "major_claim"]
         mc_exists = False
         if major_claims:
             mc_exists = True
             for mc in major_claims:
-                major_claim_txt += f" {mc.text}"
+                major_claim_txt += f" {mc['segment']}"
         else:
             major_claim_txt = title
         major_claim_txt = self.utilities.replace_multiple_spaces_with_single_space(text=major_claim_txt)
         already_found_mc = False
         if not mc_exists:
-            major_claim = ArgumentMining.Segment(text=major_claim_txt, label="major_claim")
-            major_claim.mean_conf = 0.99
+            counter += 1
+            start_idx, end_idx = self.find_segment_in_text(content=content, text=major_claim_txt)
+            major_claim = {
+                            "id": f"T{counter}",
+                            "type": "major_claim",
+                            "starts": str(start_idx),
+                            "ends": str(end_idx),
+                            "segment": major_claim_txt,
+                            "confidence": 0.99
+                        }
             new_segments.append(major_claim)
             already_found_mc = True
         for adu in segments:
             if adu.label == "major_claim":
                 if not already_found_mc:
-                    adu.text = major_claim_txt
+                    adu["segment"] = major_claim_txt
                     new_segments.append(adu)
                     already_found_mc = True
                 else:
