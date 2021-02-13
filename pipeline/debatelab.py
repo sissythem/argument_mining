@@ -176,6 +176,7 @@ class ArgumentMining:
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
         self.app_logger.info("Predicting ADUs from document")
         segments, segment_counter = self._predict_adus(document=document)
+        segments = self._concat_major_claim(segments=segments, title=document["title"])
         major_claims, claims, premises = self._get_adus(segments)
         self.app_logger.info(
             f"Found {len(major_claims)} major claims, {len(claims)} claims and {len(premises)} premises")
@@ -224,7 +225,6 @@ class ArgumentMining:
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
             segments = self._get_args_from_sentence(sentence)
-            segments = self._concat_major_claim(segments=segments, title=document["title"])
             if segments:
                 for segment in segments:
                     if segment.text and segment.label:
@@ -253,7 +253,7 @@ class ArgumentMining:
                         adus.append(seg)
         return adus, segment_counter
 
-    def _concat_major_claim(self, segments: List[Segment], title):
+    def _concat_major_claim(self, segments, title):
         if not segments:
             return []
         new_segments = []
@@ -273,16 +273,16 @@ class ArgumentMining:
             major_claim.mean_conf = 0.99
             new_segments.append(major_claim)
             already_found_mc = True
-        for segment in segments:
-            if segment.label == "major_claim":
+        for adu in segments:
+            if adu.label == "major_claim":
                 if not already_found_mc:
-                    segment.text = major_claim_txt
-                    new_segments.append(segment)
+                    adu.text = major_claim_txt
+                    new_segments.append(adu)
                     already_found_mc = True
                 else:
                     continue
             else:
-                new_segments.append(segment)
+                new_segments.append(adu)
         return new_segments
 
     @staticmethod
