@@ -268,12 +268,12 @@ class ArgumentMining:
             major_claim_txt = title
         major_claim_txt = self.utilities.replace_multiple_spaces_with_single_space(text=major_claim_txt)
         already_found_mc = False
+        if not mc_exists:
+            major_claim = ArgumentMining.Segment(text=major_claim_txt, label="major_claim")
+            major_claim.mean_conf = 0.99
+            new_segments.append(major_claim)
+            already_found_mc = True
         for segment in segments:
-            if not mc_exists and not already_found_mc:
-                major_claim = ArgumentMining.Segment(text=major_claim_txt, label="major_claim")
-                major_claim.mean_conf = 0.99
-                new_segments.append(major_claim)
-                already_found_mc = True
             if segment.label == "major_claim":
                 if not already_found_mc:
                     segment.text = major_claim_txt
