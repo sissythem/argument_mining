@@ -176,7 +176,8 @@ class ArgumentMining:
         entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
         self.app_logger.info("Predicting ADUs from document")
         segments, segment_counter = self._predict_adus(document=document)
-        segments = self._concat_major_claim(segments=segments, title=document["title"])
+        segments = self._concat_major_claim(segments=segments, title=document["title"], content=document["content"],
+                                            counter=segment_counter)
         major_claims, claims, premises = self._get_adus(segments)
         self.app_logger.info(
             f"Found {len(major_claims)} major claims, {len(claims)} claims and {len(premises)} premises")
@@ -244,7 +245,7 @@ class ArgumentMining:
         return adus, segment_counter
 
     @staticmethod
-    def find_segment_in_text(self, content, text):
+    def find_segment_in_text(content, text):
         try:
             start_idx = content.index(text)
         except(Exception, BaseException):
@@ -277,13 +278,13 @@ class ArgumentMining:
             counter += 1
             start_idx, end_idx = self.find_segment_in_text(content=content, text=major_claim_txt)
             major_claim = {
-                            "id": f"T{counter}",
-                            "type": "major_claim",
-                            "starts": str(start_idx),
-                            "ends": str(end_idx),
-                            "segment": major_claim_txt,
-                            "confidence": 0.99
-                        }
+                "id": f"T{counter}",
+                "type": "major_claim",
+                "starts": str(start_idx),
+                "ends": str(end_idx),
+                "segment": major_claim_txt,
+                "confidence": 0.99
+            }
             new_segments.append(major_claim)
             already_found_mc = True
         for adu in segments:
