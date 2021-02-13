@@ -288,7 +288,7 @@ class ArgumentMining:
             new_segments.append(major_claim)
             already_found_mc = True
         for adu in segments:
-            if adu.label == "major_claim":
+            if adu["type"] == "major_claim":
                 if not already_found_mc:
                     adu["segment"] = major_claim_txt
                     new_segments.append(adu)
