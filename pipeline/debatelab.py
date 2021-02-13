@@ -82,8 +82,7 @@ class ArgumentMining:
                 with open(f"{file_path}.txt", "w") as f:
                     for validation_error in validation_errors:
                         f.write(validation_error.value + "\n")
-                    for invalid_adu in invalid_adus:
-                        f.write(str(invalid_adu) + "\n")
+                    f.write(str(invalid_adus) + "\n")
         self.app_logger.info(f"Total valid documents: {len(document_ids)}")
         self.app_logger.info(f"Total invalid documents: {len(invalid_document_ids)}")
         self.app_logger.warn(f"Invalid document ids: {invalid_document_ids}")
