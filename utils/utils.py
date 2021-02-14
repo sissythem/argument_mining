@@ -1,4 +1,6 @@
+import json
 import re
+from datetime import datetime
 from os.path import join
 
 import numpy as np
@@ -6,6 +8,7 @@ import pandas as pd
 from imblearn.over_sampling import RandomOverSampler
 
 from utils.config import AppConfig
+from pipeline.debatelab import ArgumentMining
 
 
 class Utilities:
@@ -30,7 +33,17 @@ class Utilities:
         self.stance_dev_csv = app_config.stance_dev_csv
         self.stance_test_csv = app_config.stance_test_csv
 
+    # ******************************* Oversampling **************************************************
     def oversample(self, task_kind, file_kind, total_num):
+        """
+        Oversampling of imbalanced datasets. For now it is implemented only for relations/stance datasets. The new
+        datasets are exported into a csv file.
+
+        Args
+            task_kind (str): can take values from --> adu, rel or stance
+            file_kind (str): possible values are --> train, test, dev
+            total_num(int): the total number to augment the minority classes
+        """
         filename = eval(f"self.{task_kind}_{file_kind}_csv")
         file_path = join(self.data_folder, filename)
         df = pd.read_csv(file_path, sep="\t", index_col=None, header=None)
@@ -78,11 +91,170 @@ class Utilities:
         for idx, text in enumerate(data):
             text = text.replace("\t", " ")
             text = self.replace_multiple_spaces_with_single_space(text)
+            data[idx] = text
         new_df = pd.DataFrame(columns=["text", "label"])
         new_df["text"] = data
         new_df["label"] = labels
         return new_df
 
+    # *********************** Validation **************************************
+    def save_invalid_json(self, document, validation_errors, invalid_adus):
+        """
+        Function to save an invalid json object into the output_files directory
+
+        Args
+            document (dict)
+        """
+        self.app_logger.debug("Writing invalid document into file")
+        timestamp = datetime.now()
+        filename = f"{document['id']}_{timestamp}.json"
+        file_path = join(self.app_config.output_files, filename)
+        with open(file_path, "w", encoding='utf8') as f:
+            f.write(json.dumps(document, indent=4, sort_keys=False, ensure_ascii=False))
+        with open(f"{file_path}.txt", "w") as f:
+            for validation_error in validation_errors:
+                f.write(validation_error.value + "\n")
+            f.write(str(invalid_adus) + "\n")
+
+    # **************************** Segment Extraction **************************************
+    @staticmethod
+    def get_label_with_max_conf(labels):
+        max_lbl, max_conf = "", 0.0
+        if labels:
+            for label in labels:
+                lbl = label.value
+                conf = label.score
+                if conf > max_conf:
+                    max_lbl = lbl
+                    max_conf = conf
+        return max_lbl, max_conf
+
+    @staticmethod
+    def find_segment_in_text(content, text):
+        try:
+            start_idx = content.index(text)
+        except(Exception, BaseException):
+            try:
+                start_idx = content.index(text[:10])
+            except(Exception, BaseException):
+                start_idx = None
+        if start_idx:
+            end_idx = start_idx + len(text)
+        else:
+            start_idx, end_idx = "", ""
+        return start_idx, end_idx
+
+    def get_args_from_sentence(self, sentence):
+        if sentence.tokens:
+            segments = []
+            idx = None
+            while True:
+                segment, idx = self._get_next_segment(sentence.tokens, current_idx=idx)
+                if segment:
+                    segment.mean_conf = np.mean(segment.confidences)
+                    segments.append(segment)
+                if idx is None:
+                    break
+            return segments
+
+    def _get_next_segment(self, tokens, current_idx=None, current_label=None, segment=None):
+        if current_idx is None:
+            current_idx = 0
+        if current_idx >= len(tokens):
+            self.app_logger.debug("Sequence ended")
+            return segment, None
+        token = tokens[current_idx]
+        raw_label = token.get_tag(label_type=None)
+        lbl_txt = raw_label.value
+        confidence = raw_label.score
+        label_parts = lbl_txt.split("-")
+        if len(label_parts) > 1:
+            label_type, label = label_parts[0], label_parts[1]
+        else:
+            label_type, label = None, lbl_txt
+
+        # if we're already tracking a contiguous segment:
+        if current_label is not None:
+            if label_type == "I" and current_label == label:
+                # append to the running collections
+                segment.text += " " + token.text
+                segment.confidences.append(confidence)
+                return self._get_next_segment(tokens, current_idx + 1, current_label, segment)
+            else:
+                # new segment, different than the current one
+                # next function call should start at the current_idx
+                self.app_logger.debug(f"Returning completed segment: {segment.text}")
+                return segment, current_idx
+        else:
+            # only care about B-tags to start a segment
+            if label_type == "B":
+                segment = ArgumentMining.Segment(text=token.text, label=label)
+                segment.confidences.append(confidence)
+                return self._get_next_segment(tokens, current_idx + 1, label, segment)
+            else:
+                return self._get_next_segment(tokens, current_idx + 1, None, segment)
+
+    @staticmethod
+    def get_adus(segments):
+        major_claims = [(segment["text"], segment["id"]) for segment in segments if segment["type"] == "major_claim"]
+        claims = [(segment["text"], segment["id"]) for segment in segments if segment["type"] == "claim"]
+        premises = [(segment["text"], segment["id"]) for segment in segments if segment["type"] == "premise"]
+        return major_claims, claims, premises
+
+    def concat_major_claim(self, segments, title, content, counter):
+        if not segments:
+            return []
+        new_segments = []
+        major_claim_txt = ""
+        major_claims = [mc for mc in segments if mc["type"] == "major_claim"]
+        mc_exists = False
+        if major_claims:
+            mc_exists = True
+            for mc in major_claims:
+                major_claim_txt += f" {mc['segment']}"
+        else:
+            major_claim_txt = title
+        major_claim_txt = self.replace_multiple_spaces_with_single_space(text=major_claim_txt)
+        already_found_mc = False
+        if not mc_exists:
+            counter += 1
+            start_idx, end_idx = self.find_segment_in_text(content=content, text=major_claim_txt)
+            major_claim = {
+                "id": f"T{counter}",
+                "type": "major_claim",
+                "starts": str(start_idx),
+                "ends": str(end_idx),
+                "segment": major_claim_txt,
+                "confidence": 0.99
+            }
+            new_segments.append(major_claim)
+            already_found_mc = True
+        for adu in segments:
+            if adu["type"] == "major_claim":
+                if not already_found_mc:
+                    adu["segment"] = major_claim_txt
+                    new_segments.append(adu)
+                    already_found_mc = True
+                else:
+                    continue
+            else:
+                new_segments.append(adu)
+        return new_segments
+
+    # ******************************* Clustering ******************************************
+    @staticmethod
+    def collect_adu_for_clustering(documents, document_ids):
+        # TODO uses only claims
+        adus, doc_ids = [], []
+        for document in documents:
+            if document["id"] in document_ids:
+                for adu in document["annotations"]["ADUs"]:
+                    if adu["type"] == "claim":
+                        adus.append(adu["segment"])
+                        doc_ids.append(document["id"])
+        return adus, doc_ids
+
+    # ***************************** Misc utilities functions ******************************
     @staticmethod
     def replace_multiple_spaces_with_single_space(text):
         return re.sub(' +', ' ', text)

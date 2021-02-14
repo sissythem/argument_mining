@@ -1,3 +1,5 @@
+import base64
+import json
 import logging
 import os
 import random
@@ -15,6 +17,7 @@ from os import mkdir
 from os.path import exists, join
 from pathlib import Path
 
+import requests
 import torch
 import yaml
 from elasticsearch import Elasticsearch
@@ -23,7 +26,6 @@ from sshtunnel import SSHTunnelForwarder
 
 
 class AppConfig:
-
     """
     Class to initialize the application properties
     """
@@ -215,6 +217,36 @@ class AppConfig:
         self.receiver_email = config_email.get("receiver", "skthemeli@gmail.com")
         self.password = config_email["password"]
 
+    def update_last_retrieve_date(self):
+        # update last search date
+        properties = self.properties
+        if properties["eval"]["retrieve"] == "date":
+            properties["eval"]["last_date"] = datetime.now()
+            with open(join(self.resources_path, self.properties_file), "w") as f:
+                yaml.dump(properties, f)
+
+    def notify_ics(self, document_ids):
+        properties = self.properties["eval"]["notify"]
+        url = properties["url"]
+        username = properties["username"]
+        password = properties["password"]
+        data = {"properties": {"delivery_mode": 2}, "routing_key": "dlabqueue", "payload": json.dumps(document_ids),
+                "payload_encoding": "string"}
+        creds = f"{username}:{password}"
+        creds_bytes = creds.encode("ascii")
+        base64_bytes = base64.b64encode(creds_bytes)
+        base64_msg = base64_bytes.decode("ascii")
+        headers = {"Content-Type": "application/json", "Authorization": f"Basic {base64_msg}"}
+        try:
+            response = requests.post(url, json=data, headers=headers)
+            if response.status_code == 200:
+                self.app_logger.info("Request to ICS was successful!")
+            else:
+                self.app_logger.error(
+                    f"Request to ICS failed with status code: {response.status_code} and message:{response.text}")
+        except(BaseException, Exception) as e:
+            self.app_logger.error(f"Request to ICS failed: {e}")
+
     def send_email(self, body, subject=None):
         """
         Function to send a notification email upon completion of the program
@@ -262,7 +294,6 @@ class AppConfig:
 
 
 class ElasticSearchConfig:
-
     """
     Class to configure an Elasticsearch Client
     """
@@ -340,3 +371,26 @@ class ElasticSearchConfig:
         Delete all entries in the elasticsearch
         """
         Search(using=self.elasticsearch_client, index="httpresponses").query("match_all").delete()
+
+    def retrieve(self, previous_date=None, retrieve_kind="file"):
+        if retrieve_kind == "file":
+            file_path = join(getcwd(), "resources", "kasteli_34_urls.txt")
+            # read the list of urls from the file:
+            with open(file_path, "r") as f:
+                urls = [line.rstrip() for line in f]
+            search_articles = Search(using=self.elasticsearch_client, index='articles').filter('terms', link=urls)
+        else:
+            # TODO retrieve previous day's articles, save now to properties
+            now = datetime.now()
+            search_articles = Search(using=self.elasticsearch_client, index='articles').filter('range',
+                                                                                               date={
+                                                                                                   'gt': previous_date,
+                                                                                                   'lte': now})
+        documents = []
+        for hit in search_articles.scan():
+            document = hit.to_dict()
+            document["id"] = hit.meta["id"]
+            if not document["content"].startswith(document["title"]):
+                document["content"] = document["title"] + "\r\n\r\n" + document["content"]
+            documents.append(document)
+        return documents
