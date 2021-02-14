@@ -3,8 +3,8 @@ import pickle
 import re
 from os.path import join, exists
 from typing import List
+
 import pandas as pd
-from ellogon import tokeniser
 
 from utils.utils import Utilities
 
@@ -14,8 +14,10 @@ class Document:
     Class representing a document. Contains the sentences, segments, annotations, relations etc
     """
 
-    def __init__(self, app_logger, document_id, name, content, annotations):
-        self.app_logger = app_logger
+    def __init__(self, app_config, document_id, name, content, annotations):
+        self.app_config = app_config
+        self.app_logger = app_config.app_logger
+        self.utilities = Utilities(app_config=app_config)
         self.document_id: int = document_id
         self.name: str = name
         self.content: str = content
@@ -70,7 +72,7 @@ class Document:
                 self.app_logger.debug(f"Creating non argument segment for phrase: {rem}")
                 segment = Segment(segment_id=i, document_id=self.document_id, text=rem, char_start=start,
                                   char_end=end, arg_type=other_label)
-                segment.sentences = tokeniser.tokenise_no_punc(segment.text)
+                segment.sentences = self.utilities.tokenize(text=segment.text, punct=False)
                 segment.bio_tagging(other_label=other_label)
                 segments.append(segment)
         self.segments = segments
@@ -156,10 +158,12 @@ class DataLoader:
     def __init__(self, app_config):
         self.app_config = app_config
         self.app_logger = app_config.app_logger
+        self.utilities = Utilities(app_config=app_config)
         self.resources_folder = app_config.resources_path
         self.pickle_file = app_config.documents_pickle
         self.load()
 
+    # **************************** Create document.pkl **********************************************
     def load(self, filename="kasteli.json"):
         path_to_pickle = join(self.resources_folder,
                               self.app_config.documents_pickle)
@@ -179,6 +183,72 @@ class DataLoader:
             pickle.dump(docs, f)
         return docs
 
+    def _create_document(self, doc):
+        document = Document(app_config=self.app_config, document_id=doc["id"], name=doc["name"],
+                            content=doc["text"], annotations=doc["annotations"])
+        document.sentences = self.utilities.tokenize(text=document.content, punct=False)
+        self.app_logger.debug(
+            f"Processing document with id {document.document_id}")
+        for annotation in document.annotations:
+            annotation_id = annotation["_id"]
+            spans = annotation["spans"]
+            segment_type = annotation["type"]
+            attributes = annotation["attributes"]
+            if self.utilities.is_old_annotation(attributes):
+                continue
+            if segment_type == "argument":
+                span = spans[0]
+                segment = self._create_segment(span=span, document_id=document.document_id,
+                                                        annotation_id=annotation_id, attributes=attributes)
+                document.segments.append(segment)
+            elif segment_type == "argument_relation":
+                relation = self._create_relation(segments=document.segments, attributes=attributes,
+                                                          annotation_id=annotation_id, document_id=document.document_id)
+                if relation.kind == "relation":
+                    document.relations.append(relation)
+                else:
+                    document.stance.append(relation)
+        document.segments.sort(key=lambda x: x.char_start)
+        document.update_segments(repl_char=self.app_config.properties["preprocessing"]["repl_char"],
+                                 other_label=self.app_config.properties["preprocessing"]["other_label"])
+        document.update_document()
+        document.segments.sort(key=lambda x: x.char_start)
+        return document
+
+    @staticmethod
+    def _create_relation(segments, attributes, annotation_id, document_id):
+        relation_type, kind, arg1_id, arg2_id = "", "", "", ""
+        arg1, arg2 = None, None
+        for attribute in attributes:
+            name = attribute["name"]
+            value = attribute["value"]
+            if name == "type":
+                relation_type = value
+                if relation_type == "support" or relation_type == "attack":
+                    kind = "relation"
+                else:
+                    kind = "stance"
+            elif name == "arg1":
+                arg1_id = value
+            elif name == "arg2":
+                arg2_id = value
+        for seg in segments:
+            if seg.segment_id == arg1_id:
+                arg1 = seg
+            elif seg.segment_id == arg2_id:
+                arg2 = seg
+        return Relation(relation_id=annotation_id, document_id=document_id, arg1=arg1,
+                        arg2=arg2, kind=kind, relation_type=relation_type)
+
+    def _create_segment(self, span, document_id, annotation_id, attributes):
+        segment_text = span["segment"]
+        segment = Segment(segment_id=annotation_id, document_id=document_id, text=segment_text,
+                          char_start=span["start"], char_end=span["end"], arg_type=attributes[0]["value"])
+        segment.sentences = self.utilities.tokenize(text=segment.text, punct=False)
+        segment.bio_tagging(other_label=self.app_config.properties["preprocessing"]["other_label"])
+        return segment
+
+    # ********************************** Create ADUs csv file ****************************************
     def load_adus(self):
         self.app_logger.debug("Running ADU preprocessing")
         resources = self.app_config.resources_path
@@ -212,6 +282,7 @@ class DataLoader:
         df.to_csv(out_file_path, sep='\t', index=False, header=False)
         self.app_logger.debug("Dataframe saved!")
 
+    # **************************** Create relations and stance csv files *******************************
     def load_relations(self, do_oversample=False):
         relations, stances = self._get_relations()
         self._save_rel_df(rel_list=relations, filename=self.app_config.rel_train_csv)
@@ -233,10 +304,14 @@ class DataLoader:
         for document in documents:
             self.app_logger.debug(f"Processing relations for document: {document.document_id}")
             major_claims, claims, premises, relation_pairs, stance_pairs = self._collect_segments(document)
-            relations += self._collect_relation_pairs(parents=major_claims, children=claims,
-                                                      relation_pairs=relation_pairs)
-            relations += self._collect_relation_pairs(parents=claims, children=premises, relation_pairs=relation_pairs)
-            stances += self._collect_relation_pairs(parents=major_claims, children=claims, relation_pairs=stance_pairs)
+            relations += self.utilities.collect_relation_pairs(parents=major_claims, children=claims,
+                                                               relation_pairs=relation_pairs)
+            relations += self.utilities.collect_relation_pairs(parents=claims, children=premises,
+                                                               relation_pairs=relation_pairs)
+            self.app_logger.debug(f"Found {len(relations)} relations")
+            stances += self.utilities.collect_relation_pairs(parents=major_claims, children=claims,
+                                                             relation_pairs=stance_pairs)
+            self.app_logger.debug(f"Found {len(stances)} stance")
         return relations, stances
 
     def _save_rel_df(self, rel_list, filename):
@@ -286,89 +361,3 @@ class DataLoader:
             else:
                 continue
         return major_claims, claims, premises, relation_pairs, stance_pairs
-
-    def _collect_relation_pairs(self, parents, children, relation_pairs):
-        new_relation_pairs = []
-        count_relations = 0
-        for p_id, p_text in parents.items():
-            for c_id, c_text in children.items():
-                key = (c_id, p_id)
-                if key in relation_pairs.keys():
-                    count_relations += 1
-                relation = relation_pairs.get(key, "other")
-                new_relation_pairs.append((c_text, p_text, relation))
-        self.app_logger.debug(f"Found {count_relations} relations")
-        return new_relation_pairs
-
-    def _create_document(self, doc):
-        document = Document(app_logger=self.app_logger, document_id=doc["id"], name=doc["name"],
-                            content=doc["text"], annotations=doc["annotations"])
-        document.sentences = tokeniser.tokenise_no_punc(document.content)
-        self.app_logger.debug(
-            f"Processing document with id {document.document_id}")
-        for annotation in document.annotations:
-            annotation_id = annotation["_id"]
-            spans = annotation["spans"]
-            segment_type = annotation["type"]
-            attributes = annotation["attributes"]
-            if self._is_old_annotation(attributes):
-                continue
-            if segment_type == "argument":
-                span = spans[0]
-                segment = self._create_segment(span=span, document_id=document.document_id,
-                                               annotation_id=annotation_id, attributes=attributes)
-                document.segments.append(segment)
-            elif segment_type == "argument_relation":
-                relation = self._create_relation(segments=document.segments, attributes=attributes,
-                                                 annotation_id=annotation_id, document_id=document.document_id)
-                if relation.kind == "relation":
-                    document.relations.append(relation)
-                else:
-                    document.stance.append(relation)
-        document.segments.sort(key=lambda x: x.char_start)
-        document.update_segments(repl_char=self.app_config.properties["preprocessing"]["repl_char"],
-                                 other_label=self.app_config.properties["preprocessing"]["other_label"])
-        document.update_document()
-        document.segments.sort(key=lambda x: x.char_start)
-        return document
-
-    def _create_segment(self, span, document_id, annotation_id, attributes):
-        segment_text = span["segment"]
-        segment = Segment(segment_id=annotation_id, document_id=document_id, text=segment_text,
-                          char_start=span["start"], char_end=span["end"], arg_type=attributes[0]["value"])
-        segment.sentences = tokeniser.tokenise_no_punc(segment.text)
-        segment.bio_tagging(other_label=self.app_config.properties["preprocessing"]["other_label"])
-        return segment
-
-    @staticmethod
-    def _create_relation(segments, attributes, annotation_id, document_id):
-        relation_type, kind, arg1_id, arg2_id = "", "", "", ""
-        arg1, arg2 = None, None
-        for attribute in attributes:
-            name = attribute["name"]
-            value = attribute["value"]
-            if name == "type":
-                relation_type = value
-                if relation_type == "support" or relation_type == "attack":
-                    kind = "relation"
-                else:
-                    kind = "stance"
-            elif name == "arg1":
-                arg1_id = value
-            elif name == "arg2":
-                arg2_id = value
-        for seg in segments:
-            if seg.segment_id == arg1_id:
-                arg1 = seg
-            elif seg.segment_id == arg2_id:
-                arg2 = seg
-        return Relation(relation_id=annotation_id, document_id=document_id, arg1=arg1,
-                        arg2=arg2, kind=kind, relation_type=relation_type)
-
-    @staticmethod
-    def _is_old_annotation(attributes):
-        for attribute in attributes:
-            name = attribute["name"]
-            if name == "premise_type" or name == "premise" or name == "claim":
-                return True
-        return False
