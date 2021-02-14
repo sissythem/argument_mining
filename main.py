@@ -10,10 +10,6 @@ from training.preprocessing import DataLoader
 from utils.config import AppConfig
 
 
-# ADU labels: B-major_claims --> 38, I-major_claims --> 257, B-claim --> 380, I-claim --> 6389, B-premise -->615,
-# I-premise --> 8906, O --> 19401
-# relation labels: support --> 781, attack --> 84, other --> 8705
-# stance labels: for --> 289, against --> 42
 def error_analysis(path_to_resources):
     """
     Function to perform error analysis on the results. Saves the incorrect predictions into a file
@@ -107,8 +103,7 @@ def main():
     """
     The main function of the program. Initializes the AppConfig class to load the application properties and
     configurations and based on the tasks in the properties executes the necessary steps (preprocessing, training,
-    debatelab pipeline, error analysis)
-    :return:
+    DebateLab pipeline, error analysis)
     """
     app_config: AppConfig = AppConfig()
     try:

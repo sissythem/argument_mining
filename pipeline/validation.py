@@ -43,6 +43,20 @@ class JsonValidator:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
 
+    def run_validation(self, document, segment_counter, rel_counter, stance_counter, do_correction=False):
+        validation_errors, invalid_adus = self.validate(document=document)
+        if do_correction and validation_errors:
+            counter = self.app_config.properties["eval"]["max_correction_tries"]
+            corrector = JsonCorrector(app_config=self.app_config, segment_counter=segment_counter,
+                                      rel_counter=rel_counter, stance_counter=stance_counter)
+            while counter > 0 and validation_errors:
+                if not corrector.can_document_be_corrected(validation_errors=validation_errors):
+                    break
+                document = corrector.correction(document=document, invalid_adus=invalid_adus)
+                validation_errors, invalid_adus = self.validate(document=document)
+                counter -= 1
+        return validation_errors, invalid_adus
+
     def validate(self, document):
         """
         Gets a document (in json format) and validates it based on specific rules:
@@ -295,6 +309,19 @@ class JsonCorrector:
         return document
 
     def handle_claims_without_stance(self, document, claims, relations):
+        """
+        Gets the invalid claims, that do not have stance, and checks the relations list. If a relation exists between
+        a claim without stance and its major claim, then the stance is updated based on the relation and thus the error
+        of missing stance is fixed.
+
+        Args
+            | document (dict): the json object containing a specific document
+            | claims (list): a list of invalid claims extracted from the validation step
+            | relations (list): the list of relations to lookup for major claim - claim relation
+
+        Returns
+            dict: the updated document
+        """
         for claim in claims:
             for rel in relations:
                 # assuming that we have only one major claim
@@ -313,6 +340,17 @@ class JsonCorrector:
         return document
 
     def handle_source_missing_claims(self, document, claims, major_claim):
+        """
+        Function to handle the errors from missing relations of claims as sources (i.e. major claim / claim relations).
+        This function performs the opposite operation from the ```handle_claims_without_stance()``` function. More
+        specifically, for each invalid claim, its stance is checked (if exists) and a new relation is created based on
+        the stance so as to fix the error of missing relations.
+
+        Args
+            document (dict): the json object containing a document
+            claims (list): the list of invalid claims
+            major_claim (dict): the major claim of the document -- assuming that there is only one major claim
+        """
         for invalid_claim in claims:
             for adu in document["annotations"]["ADUs"]:
                 if invalid_claim["id"] == adu["id"]:
@@ -333,6 +371,17 @@ class JsonCorrector:
         return document
 
     def handle_missing_premises(self, document, premises):
+        """
+        Function to fix errors from missing relations of premises/claims. If a premise does not have any relations, it
+        is removed from the ADU list
+
+        Args
+            | document (dict): the json object that contains the document
+            | premises (list): list of invalid premises
+
+        Returns
+            dict: the updated document
+        """
         adus = document["annotations"]["ADUs"]
         adus_to_be_kept = []
         invalid_premise_ids = [premise["id"] for premise in premises]

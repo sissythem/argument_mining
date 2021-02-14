@@ -1,6 +1,5 @@
 import random
-from os import mkdir
-from os.path import join, exists
+from os.path import join
 from typing import List
 
 import flair
@@ -11,15 +10,14 @@ import pandas as pd
 import torch
 import umap
 from ellogon import tokeniser
-from flair.data import Corpus, Sentence
+from flair.data import Corpus
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
-from sentence_transformers import SentenceTransformer
 from sklearn.feature_extraction.text import CountVectorizer
-
 from transformers import AutoModel, AutoTokenizer
+
 from utils.config import AppConfig
 
 
@@ -271,7 +269,7 @@ class Clustering:
         self.bert_model = AutoModel.from_pretrained(model_id, output_hidden_states=True)
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
 
-    def get_clusters(self, sentences, n_clusters):
+    def get_clusters(self, n_clusters, sentences, doc_ids=None):
         try:
             # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
             # embeddings = model.encode(sentences, show_progress_bar=True)
@@ -292,7 +290,9 @@ class Clustering:
             clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
                                        metric='euclidean',
                                        cluster_selection_method='eom').fit(umap_embeddings)
-            return clusters
+            cluster_list = self.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=sentences,
+                                                        doc_ids=doc_ids)
+            return clusters, cluster_list
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
@@ -305,6 +305,7 @@ class Clustering:
             doc_id = doc_ids[idx]
             cluster_lists[cluster].append((sentence, doc_id))
         self.print_clusters(cluster_lists=cluster_lists)
+        return cluster_lists
 
     def print_clusters(self, cluster_lists):
         for idx, cluster in enumerate(cluster_lists):
@@ -327,7 +328,7 @@ class TopicModel(Clustering):
         """
         super(TopicModel, self).__init__(app_config=app_config)
 
-    def get_topics(self, sentences: List[str]):
+    def get_topics(self, content):
         """
         Function that uses BERT model and clustering to find the topics of the document
 
@@ -338,6 +339,9 @@ class TopicModel(Clustering):
             list: a list of topics
         """
         topics = []
+        sentences = tokeniser.tokenise(content)
+        sentences = [" ".join(s) for s in sentences]
+        self.app_logger.debug(f"Sentences fed to TopicModel: {sentences}")
         try:
             n_clusters = int(len(sentences) / 2)
             clusters = self.get_clusters(sentences=sentences, n_clusters=n_clusters)
