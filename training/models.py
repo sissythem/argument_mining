@@ -9,7 +9,6 @@ import numpy as np
 import pandas as pd
 import torch
 import umap
-from ellogon import tokeniser
 from flair.data import Corpus
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings
@@ -19,6 +18,7 @@ from sklearn.feature_extraction.text import CountVectorizer
 from transformers import AutoModel, AutoTokenizer
 
 from utils.config import AppConfig
+from utils.utils import Utilities
 
 
 class Classifier:
@@ -265,6 +265,7 @@ class Clustering:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.device_name = app_config.device_name
+        self.utilities = Utilities(app_config=app_config)
         model_id = "nlpaueb/bert-base-greek-uncased-v1"
         self.bert_model = AutoModel.from_pretrained(model_id, output_hidden_states=True)
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -292,7 +293,7 @@ class Clustering:
                                        cluster_selection_method='eom').fit(umap_embeddings)
             cluster_list = self.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=sentences,
                                                         doc_ids=doc_ids)
-            return clusters, cluster_list
+            return list(clusters.labels_), cluster_list
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
@@ -339,14 +340,14 @@ class TopicModel(Clustering):
             list: a list of topics
         """
         topics = []
-        sentences = tokeniser.tokenise(content)
+        sentences = self.utilities.tokenize(text=content)
         sentences = [" ".join(s) for s in sentences]
         self.app_logger.debug(f"Sentences fed to TopicModel: {sentences}")
         try:
             n_clusters = int(len(sentences) / 2)
             clusters = self.get_clusters(sentences=sentences, n_clusters=n_clusters)
             docs_df = pd.DataFrame(sentences, columns=["Sentence"])
-            docs_df['Topic'] = clusters.labels_
+            docs_df['Topic'] = clusters
             docs_df['Doc_ID'] = range(len(docs_df))
             docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Sentence': ' '.join})
             tf_idf, count = self._c_tf_idf(docs_per_topic.Sentence.values, m=len(sentences))
@@ -363,9 +364,8 @@ class TopicModel(Clustering):
             self.app_logger.error(e)
             return topics
 
-    @staticmethod
-    def _c_tf_idf(sentences, m, ngram_range=(1, 1)):
-        greek_stopwords = tokeniser.stop_words()
+    def _c_tf_idf(self, sentences, m, ngram_range=(1, 1)):
+        greek_stopwords = self.utilities.get_greek_stopwords()
         count = CountVectorizer(ngram_range=ngram_range, stop_words=greek_stopwords).fit(sentences)
         t = count.transform(sentences).toarray()
         w = t.sum(axis=1)

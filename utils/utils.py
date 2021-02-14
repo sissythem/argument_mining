@@ -5,10 +5,12 @@ from os.path import join
 
 import numpy as np
 import pandas as pd
+from ellogon import tokeniser
 from imblearn.over_sampling import RandomOverSampler
 
+# from pipeline.debatelab import ArgumentMining
+# from training.preprocessing import Relation, Segment
 from utils.config import AppConfig
-from pipeline.debatelab import ArgumentMining
 
 
 class Utilities:
@@ -151,7 +153,7 @@ class Utilities:
             while True:
                 segment, idx = self._get_next_segment(sentence.tokens, current_idx=idx)
                 if segment:
-                    segment.mean_conf = np.mean(segment.confidences)
+                    segment["mean_conf"] = np.mean(segment["confidences"])
                     segments.append(segment)
                 if idx is None:
                     break
@@ -177,19 +179,18 @@ class Utilities:
         if current_label is not None:
             if label_type == "I" and current_label == label:
                 # append to the running collections
-                segment.text += " " + token.text
-                segment.confidences.append(confidence)
+                segment["text"] += " " + token.text
+                segment["confidences"].append(confidence)
                 return self._get_next_segment(tokens, current_idx + 1, current_label, segment)
             else:
                 # new segment, different than the current one
                 # next function call should start at the current_idx
-                self.app_logger.debug(f"Returning completed segment: {segment.text}")
+                self.app_logger.debug(f"Returning completed segment: {segment['text']}")
                 return segment, current_idx
         else:
             # only care about B-tags to start a segment
             if label_type == "B":
-                segment = ArgumentMining.Segment(text=token.text, label=label)
-                segment.confidences.append(confidence)
+                segment = {"text": token.text, "label": label, "confidences": [confidence]}
                 return self._get_next_segment(tokens, current_idx + 1, label, segment)
             else:
                 return self._get_next_segment(tokens, current_idx + 1, None, segment)
@@ -254,6 +255,28 @@ class Utilities:
                         doc_ids.append(document["id"])
         return adus, doc_ids
 
+    # ******************************** Preprocessing *****************************************
+    @staticmethod
+    def is_old_annotation(attributes):
+        for attribute in attributes:
+            name = attribute["name"]
+            if name == "premise_type" or name == "premise" or name == "claim":
+                return True
+        return False
+
+    @staticmethod
+    def collect_relation_pairs(parents, children, relation_pairs):
+        new_relation_pairs = []
+        count_relations = 0
+        for p_id, p_text in parents.items():
+            for c_id, c_text in children.items():
+                key = (c_id, p_id)
+                if key in relation_pairs.keys():
+                    count_relations += 1
+                relation = relation_pairs.get(key, "other")
+                new_relation_pairs.append((c_text, p_text, relation))
+        return new_relation_pairs
+
     # ***************************** Misc utilities functions ******************************
     @staticmethod
     def replace_multiple_spaces_with_single_space(text):
@@ -283,3 +306,11 @@ class Utilities:
             int: the length of the encoded filename
         """
         return len(s.encode('utf-8'))
+
+    @staticmethod
+    def get_greek_stopwords():
+        return tokeniser.stop_words()
+
+    @staticmethod
+    def tokenize(text, punct=True):
+        return tokeniser.tokenise_no_punc(text) if not punct else tokeniser.tokenise(text)

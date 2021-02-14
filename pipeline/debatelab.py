@@ -1,7 +1,6 @@
 import json
 
 import requests
-from ellogon import tokeniser
 from flair.data import Sentence
 
 from pipeline.validation import JsonValidator
@@ -14,17 +13,6 @@ class ArgumentMining:
     """
     Class representing the full pipeline of DebateLab
     """
-
-    class Segment:
-        """
-        Inner class to keep information on the predicted ADUs
-        """
-
-        def __init__(self, text, label):
-            self.text = text
-            self.label = label
-            self.confidences = []
-            self.mean_conf = 0.0
 
     def __init__(self, app_config):
         """
@@ -127,12 +115,13 @@ class ArgumentMining:
             | document_ids (list): list of the ids of the valid documents
 
         Returns
+            dict: the json object with the cross document results
         """
         adus, doc_ids = self.utilities.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
         clustering = Clustering(app_config=self.app_config)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
         clusters, clusters_list = clustering.get_clusters(n_clusters=n_clusters, sentences=adus, doc_ids=doc_ids)
-        clusters = list(clusters.labels_)
+        print(clusters)
 
     def predict(self, document):
         """
@@ -211,7 +200,7 @@ class ArgumentMining:
         adus = []
         self.app_logger.debug(f"Processing document with id: {document['id']} and name: {document}")
         segment_counter = 0
-        sentences = tokeniser.tokenise_no_punc(document["content"])
+        sentences = self.utilities.tokenize(text=document["content"], punct=False)
         for sentence in sentences:
             self.app_logger.debug(f"Predicting labels for sentence: {sentence}")
             sentence = " ".join(list(sentence))
@@ -221,19 +210,19 @@ class ArgumentMining:
             segments = self.utilities.get_args_from_sentence(sentence)
             if segments:
                 for segment in segments:
-                    if segment.text and segment.label:
-                        self.app_logger.debug(f"Segment text: {segment.text}")
-                        self.app_logger.debug(f"Segment type: {segment.label}")
+                    if segment["text"] and segment["label"]:
+                        self.app_logger.debug(f"Segment text: {segment['text']}")
+                        self.app_logger.debug(f"Segment type: {segment['label']}")
                         segment_counter += 1
                         start_idx, end_idx = self.utilities.find_segment_in_text(content=document["content"],
-                                                                                 text=segment.text)
+                                                                                 text=segment["text"])
                         seg = {
                             "id": f"T{segment_counter}",
-                            "type": segment.label,
+                            "type": segment["label"],
                             "starts": str(start_idx),
                             "ends": str(end_idx),
-                            "segment": segment.text,
-                            "confidence": segment.mean_conf
+                            "segment": segment["text"],
+                            "confidence": segment["mean_conf"]
                         }
                         adus.append(seg)
         return adus, segment_counter
