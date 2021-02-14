@@ -8,6 +8,7 @@ from ellogon import tokeniser
 
 from utils.utils import Utilities
 
+
 class Document:
     """
     Class representing a document. Contains the sentences, segments, annotations, relations etc
@@ -211,7 +212,7 @@ class DataLoader:
         df.to_csv(out_file_path, sep='\t', index=False, header=False)
         self.app_logger.debug("Dataframe saved!")
 
-    def load_relations(self, do_oversample=True):
+    def load_relations(self, do_oversample=False):
         relations, stances = self._get_relations()
         self._save_rel_df(rel_list=relations, filename=self.app_config.rel_train_csv)
         self._save_rel_df(rel_list=stances, filename=self.app_config.stance_train_csv)

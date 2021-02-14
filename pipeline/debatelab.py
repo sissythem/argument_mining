@@ -65,7 +65,8 @@ class ArgumentMining:
             | 4. Notifies ICS
         """
         # retrive new documents
-        documents = self.app_config.elastic_retrieve.retrieve()
+        # TODO retrieve previous day's articles, save now to properties --> retrieve_kind="date"
+        documents = self.app_config.elastic_retrieve.retrieve_documents()
         self.app_config.update_last_retrieve_date()
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(documents=documents)
