@@ -334,16 +334,13 @@ class JsonCorrector:
 
     def handle_missing_premises(self, document, premises):
         adus = document["annotations"]["ADUs"]
-        correct_premises = []
+        adus_to_be_kept = []
         invalid_premise_ids = [premise["id"] for premise in premises]
         for adu in adus:
             if adu["id"] not in invalid_premise_ids:
-                correct_premises.append(adu)
+                adus_to_be_kept.append(adu)
             else:
                 self.app_logger.warning(
                     f"Missing relation for premise with id {adu['id']} and text {adu['segment']}")
-        major_claims = [adu for adu in adus if adu["type"] == "major_claim"]
-        claims = [adu for adu in adus if adu["type"] == "claim"]
-        adus = major_claims + claims + correct_premises
-        document["annotations"]["ADUs"] = adus
+        document["annotations"]["ADUs"] = adus_to_be_kept
         return document
