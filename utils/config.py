@@ -372,7 +372,7 @@ class ElasticSearchConfig:
         """
         Search(using=self.elasticsearch_client, index="httpresponses").query("match_all").delete()
 
-    def retrieve(self, previous_date=None, retrieve_kind="file"):
+    def retrieve_documents(self, previous_date=None, retrieve_kind="file"):
         if retrieve_kind == "file":
             file_path = join(getcwd(), "resources", "kasteli_34_urls.txt")
             # read the list of urls from the file:
@@ -380,12 +380,8 @@ class ElasticSearchConfig:
                 urls = [line.rstrip() for line in f]
             search_articles = Search(using=self.elasticsearch_client, index='articles').filter('terms', link=urls)
         else:
-            # TODO retrieve previous day's articles, save now to properties
-            now = datetime.now()
-            search_articles = Search(using=self.elasticsearch_client, index='articles').filter('range',
-                                                                                               date={
-                                                                                                   'gt': previous_date,
-                                                                                                   'lte': now})
+            date_range = {'gt': previous_date,'lte': datetime.now()}
+            search_articles = Search(using=self.elasticsearch_client, index='articles').filter('range', date=date_range)
         documents = []
         for hit in search_articles.scan():
             document = hit.to_dict()
