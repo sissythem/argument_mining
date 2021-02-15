@@ -60,8 +60,7 @@ class ArgumentMining:
         documents, document_ids = self.run_argument_mining(documents=documents)
         # run cross-document clustering
         self.run_clustering(documents=documents, document_ids=document_ids)
-        # TODO uncomment notification
-        # self.app_config.notify_ics(document_ids=document_ids)
+        self.app_config.notify_ics(document_ids=document_ids)
         self.app_logger.info("Evaluation is finished!")
 
     def run_argument_mining(self, documents, export_schema=False):
