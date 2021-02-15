@@ -1,4 +1,5 @@
 import json
+import random
 import re
 from datetime import datetime
 from os.path import join
@@ -8,8 +9,6 @@ import pandas as pd
 from ellogon import tokeniser
 from imblearn.over_sampling import RandomOverSampler
 
-# from pipeline.debatelab import ArgumentMining
-# from training.preprocessing import Relation, Segment
 from utils.config import AppConfig
 
 
@@ -50,15 +49,49 @@ class Utilities:
         file_path = join(self.data_folder, filename)
         df = pd.read_csv(file_path, sep="\t", index_col=None, header=None)
         if task_kind == "adu":
-            pass
+            if not type(total_num) == dict:
+                self.app_logger.warning(
+                    "For ADU oversampling total_num should be a dict with the labels & their final count")
+                self.app_logger.warning("Labels that have equal or greater number of instance will be kept the same")
+            df = self.oversample_adus(data=df, desired_lbl_count=total_num)
         else:
-            df = self._relation_oversampling(df=df, rel=task_kind, total_num=total_num)
+            df = self.oversample_relations(df=df, rel=task_kind, total_num=total_num)
         filename = filename.replace(".csv", "")
         new_file = f"{filename}_oversample.csv"
         output_filepath = join(self.data_folder, new_file)
         df.to_csv(output_filepath, sep='\t', index=False, header=0)
 
-    def _relation_oversampling(self, df, rel, total_num):
+    @staticmethod
+    def oversample_adus(data, desired_lbl_count: dict):
+        df_list = np.split(data, data[data.isnull().all(1)].index)
+        df_list = [df.dropna() for df in df_list]
+        labels_dict = {"B-major_claim": [], "I-major_claim": [], "B-claim": [], "I-claim": [], "B-premise": [],
+                       "I-premise": []}
+        for df in df_list:
+            labels = list(df[1])
+            for lbl in labels_dict.keys():
+                if lbl in labels:
+                    labels_dict[lbl].append(df)
+        for lbl, desired_count in desired_lbl_count.items():
+            dfs = labels_dict[lbl]
+            append_idxs = []
+            num_instances = len(dfs)
+            ixs = range(num_instances)
+            while True:
+                if desired_count <= num_instances + len(append_idxs):
+                    break
+                num_append = min(desired_count - num_instances + len(append_idxs), num_instances)
+                append_idxs.extend(random.sample(ixs, num_append))
+            dfs.extend([dfs[i] for i in append_idxs])
+        new_df_list = []
+        for _, df_list in labels_dict.items():
+            for df in df_list:
+                empty_row = pd.DataFrame([[np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN]])
+                new_df_list.append(df)
+                new_df_list.append(empty_row)
+        return pd.concat(new_df_list, axis=0)
+
+    def oversample_relations(self, df, rel, total_num):
         texts = list(df[0])
         indices = [texts.index(x) for x in texts]
         labels = list(df[1])

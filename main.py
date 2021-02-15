@@ -55,7 +55,7 @@ def preprocess(app_config):
     logger.info("Creating CSV file in CONLL format for ADUs classification")
     data_loader.load_adus()
     logger.info("Creating CSV file in CONLL format for relations/stance classification")
-    data_loader.load_relations()
+    # data_loader.load_relations()
 
 
 def train(app_config):
