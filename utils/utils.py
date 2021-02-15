@@ -279,14 +279,15 @@ class Utilities:
     @staticmethod
     def collect_adu_for_clustering(documents, document_ids):
         # TODO uses only claims
-        adus, doc_ids = [], []
+        adus, adu_ids, doc_ids = [], [], []
         for document in documents:
             if document["id"] in document_ids:
                 for adu in document["annotations"]["ADUs"]:
                     if adu["type"] == "claim":
                         adus.append(adu["segment"])
+                        adu_ids.append(adu["id"])
                         doc_ids.append(document["id"])
-        return adus, doc_ids
+        return adus, doc_ids, adu_ids
 
     # ******************************** Preprocessing *****************************************
     @staticmethod

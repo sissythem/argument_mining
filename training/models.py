@@ -1,4 +1,5 @@
 import random
+from itertools import combinations
 from os.path import join
 from typing import List
 
@@ -58,7 +59,7 @@ class Classifier:
         elif model_name == "rel" or model_name == "stance":
             self.model_properties: dict = self.properties["rel_model"]
 
-    def get_optimizer(self):
+    def get_optimizer(self) -> torch.optim.Optimizer:
         """
         Define the model's optimizer based on the application properties
 
@@ -270,7 +271,7 @@ class Clustering:
         self.bert_model = AutoModel.from_pretrained(model_id, output_hidden_states=True)
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
 
-    def get_clusters(self, n_clusters, sentences, doc_ids=None):
+    def get_clusters(self, n_clusters, sentences):
         try:
             # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
             # embeddings = model.encode(sentences, show_progress_bar=True)
@@ -283,30 +284,48 @@ class Clustering:
                 sentence_embeddings.append(embeddings)
             embeddings = np.asarray(sentence_embeddings)
             self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
+
             # reduce document dimensionality
-            umap_embeddings = umap.UMAP(n_neighbors=n_clusters,
-                                        metric='cosine').fit_transform(embeddings)
+            umap_embeddings = umap.UMAP(n_neighbors=n_clusters, metric='cosine').fit_transform(embeddings)
 
             # clustering
-            clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
-                                       metric='euclidean',
+            clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters, metric='euclidean',
                                        cluster_selection_method='eom').fit(umap_embeddings)
-            # cluster_list = self.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=sentences,
-            #                                             doc_ids=doc_ids)
             return clusters
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
-    def get_content_per_cluster(self, n_clusters: int, clusters, sentences, doc_ids):
-        cluster_lists = []
-        for i in range(n_clusters):
-            cluster_lists.append([])
+    def get_cross_document_relations(self, clusters, adu_ids, doc_ids):
+        cluster_dict = self.get_content_per_cluster(clusters=clusters, adu_ids=adu_ids, doc_ids=doc_ids)
+        relations = []
+        id_counter = 1
+        for cluster, pairs in cluster_dict.items():
+            cluster_combinations = list(combinations(pairs, r=2))
+            for pair_combination in cluster_combinations:
+                arg1 = pair_combination[0]
+                arg2 = pair_combination[1]
+                relation = {
+                    "id": f"C{id_counter}",
+                    "cluster": cluster,
+                    "source": arg1[0],
+                    "source_doc": arg1[1],
+                    "target": arg2[0],
+                    "target_doc": arg2[1]
+                }
+                relations.append(relation)
+                id_counter += 1
+        return relations
+
+    def get_content_per_cluster(self, clusters, doc_ids, adu_ids):
+        clusters_dict = {}
         for idx, cluster in enumerate(clusters):
-            sentence = sentences[idx]
+            if cluster not in clusters_dict.keys():
+                clusters_dict[cluster] = []
+            adu_id = adu_ids[idx]
             doc_id = doc_ids[idx]
-            cluster_lists[cluster].append((sentence, doc_id))
-        self.print_clusters(cluster_lists=cluster_lists)
-        return cluster_lists
+            clusters_dict[cluster].append((adu_id, doc_id))
+        self.print_clusters(cluster_lists=clusters_dict)
+        return clusters_dict
 
     def print_clusters(self, cluster_lists):
         for idx, cluster in enumerate(cluster_lists):
