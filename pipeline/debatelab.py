@@ -275,8 +275,8 @@ class ArgumentMining:
                     rel_dict = {
                         "id": f"R{counter}",
                         "type": label,
-                        "arg1": source[1],
-                        "arg2": target[1],
+                        "arg1": adu1[1],
+                        "arg2": adu2[1],
                         "confidence": conf
                     }
                     relations.append(rel_dict)
