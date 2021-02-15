@@ -197,9 +197,9 @@ class Utilities:
 
     @staticmethod
     def get_adus(segments):
-        major_claims = [(segment["text"], segment["id"]) for segment in segments if segment["type"] == "major_claim"]
-        claims = [(segment["text"], segment["id"]) for segment in segments if segment["type"] == "claim"]
-        premises = [(segment["text"], segment["id"]) for segment in segments if segment["type"] == "premise"]
+        major_claims = [(segment["segment"], segment["id"]) for segment in segments if segment["type"] == "major_claim"]
+        claims = [(segment["segment"], segment["id"]) for segment in segments if segment["type"] == "claim"]
+        premises = [(segment["segment"], segment["id"]) for segment in segments if segment["type"] == "premise"]
         return major_claims, claims, premises
 
     def concat_major_claim(self, segments, title, content, counter):
