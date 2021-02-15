@@ -293,7 +293,7 @@ class Clustering:
                                        cluster_selection_method='eom').fit(umap_embeddings)
             cluster_list = self.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=sentences,
                                                         doc_ids=doc_ids)
-            return list(clusters.labels_), cluster_list
+            return clusters, cluster_list
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
@@ -347,7 +347,7 @@ class TopicModel(Clustering):
             n_clusters = int(len(sentences) / 2)
             clusters = self.get_clusters(sentences=sentences, n_clusters=n_clusters)
             docs_df = pd.DataFrame(sentences, columns=["Sentence"])
-            docs_df['Topic'] = clusters
+            docs_df['Topic'] = clusters.labels_
             docs_df['Doc_ID'] = range(len(docs_df))
             docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Sentence': ' '.join})
             tf_idf, count = self._c_tf_idf(docs_per_topic.Sentence.values, m=len(sentences))
