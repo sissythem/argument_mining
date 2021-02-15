@@ -43,7 +43,7 @@ class JsonValidator:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
 
-    def run_validation(self, document, segment_counter, rel_counter, stance_counter, do_correction=False):
+    def run_validation(self, document, segment_counter, rel_counter, stance_counter, do_correction=True):
         validation_errors, invalid_adus = self.validate(document=document)
         if do_correction and validation_errors:
             counter = self.app_config.properties["eval"]["max_correction_tries"]

@@ -116,11 +116,11 @@ class ArgumentMining:
         Returns
             dict: the json object with the cross document results
         """
-        adus, doc_ids = self.utilities.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
+        adus, doc_ids, adu_ids = self.utilities.collect_adu_for_clustering(documents=documents,
+                                                                           document_ids=document_ids)
         clustering = Clustering(app_config=self.app_config)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
-        clusters = clustering.get_clusters(n_clusters=n_clusters, sentences=adus, doc_ids=doc_ids)
-        print(clusters)
+        clusters = clustering.get_clusters(n_clusters=n_clusters, sentences=adus)
 
     def predict(self, document):
         """
