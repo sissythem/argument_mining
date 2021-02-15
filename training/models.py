@@ -291,9 +291,9 @@ class Clustering:
             clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
                                        metric='euclidean',
                                        cluster_selection_method='eom').fit(umap_embeddings)
-            cluster_list = self.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=sentences,
-                                                        doc_ids=doc_ids)
-            return clusters, cluster_list
+            # cluster_list = self.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=sentences,
+            #                                             doc_ids=doc_ids)
+            return clusters
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
