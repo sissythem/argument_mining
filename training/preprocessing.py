@@ -249,7 +249,7 @@ class DataLoader:
         return segment
 
     # ********************************** Create ADUs csv file ****************************************
-    def load_adus(self):
+    def load_adus(self, do_oversample=False):
         self.app_logger.debug("Running ADU preprocessing")
         resources = self.app_config.resources_path
         documents_path = join(resources, self.app_config.documents_pickle)
@@ -273,14 +273,19 @@ class DataLoader:
                     document_str = f"Doc: {document.document_id}"
                     df.loc[row_counter] = [token, label, is_arg, sp, sentence_counter_str, document_str]
                     row_counter += 1
-                    sentence_counter += 1
                     doc_sentence_counter += 1
                 df.loc[row_counter] = ["", "", "", "", "", ""]
+                sentence_counter += 1
                 row_counter += 1
         self.app_logger.debug("Finished building dataframe. Saving...")
         out_file_path = join(resources, "data", "train_adu.csv")
         df.to_csv(out_file_path, sep='\t', index=False, header=False)
         self.app_logger.debug("Dataframe saved!")
+        if do_oversample:
+            des_lbl_count = {"B-major_claim": 1000, "I-major_claim": 1000, "B-claim": 1000, "I-claim": 1000,
+                             "B-premise": 1000,
+                             "I-premise": 1000}
+            self.utilities.oversample(task_kind="adu", file_kind="train", total_num=des_lbl_count)
 
     # **************************** Create relations and stance csv files *******************************
     def load_relations(self, do_oversample=False):
@@ -288,10 +293,9 @@ class DataLoader:
         self._save_rel_df(rel_list=relations, filename=self.app_config.rel_train_csv)
         self._save_rel_df(rel_list=stances, filename=self.app_config.stance_train_csv)
         if do_oversample:
-            utility = Utilities(app_config=self.app_config)
             # TODO oversampling in a dynamic way
-            utility.oversample(task_kind="rel", file_kind="train", total_num=8705)
-            utility.oversample(task_kind="stance", file_kind="train", total_num=289)
+            self.utilities.oversample(task_kind="rel", file_kind="train", total_num=8705)
+            self.utilities.oversample(task_kind="stance", file_kind="train", total_num=289)
 
     def _get_relations(self):
         resources = self.app_config.resources_path

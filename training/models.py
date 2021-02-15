@@ -271,28 +271,31 @@ class Clustering:
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
 
     def get_clusters(self, n_clusters, sentences, doc_ids=None):
-        # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
-        # embeddings = model.encode(sentences, show_progress_bar=True)
-        sentence_embeddings = []
-        for sentence in sentences:
-            tokens = self.tokenizer.encode(sentence)
-            input_ids = torch.tensor(tokens).unsqueeze(0)
-            outputs = self.bert_model(input_ids)
-            embeddings = outputs[1][-1].detach().numpy()
-            sentence_embeddings.append(embeddings)
-        embeddings = np.asarray(sentence_embeddings)
-        self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
-        # reduce document dimensionality
-        umap_embeddings = umap.UMAP(n_neighbors=n_clusters,
-                                    metric='cosine').fit_transform(embeddings)
+        try:
+            # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
+            # embeddings = model.encode(sentences, show_progress_bar=True)
+            sentence_embeddings = []
+            for sentence in sentences:
+                tokens = self.tokenizer.encode(sentence)
+                input_ids = torch.tensor(tokens).unsqueeze(0)
+                outputs = self.bert_model(input_ids)
+                embeddings = outputs[1][-1].detach().numpy()
+                sentence_embeddings.append(embeddings)
+            embeddings = np.asarray(sentence_embeddings)
+            self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
+            # reduce document dimensionality
+            umap_embeddings = umap.UMAP(n_neighbors=n_clusters,
+                                        metric='cosine').fit_transform(embeddings)
 
-        # clustering
-        clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
-                                   metric='euclidean',
-                                   cluster_selection_method='eom').fit(umap_embeddings)
-        # cluster_list = self.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=sentences,
-        #                                             doc_ids=doc_ids)
-        return clusters
+            # clustering
+            clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters,
+                                       metric='euclidean',
+                                       cluster_selection_method='eom').fit(umap_embeddings)
+            # cluster_list = self.get_content_per_cluster(n_clusters=n_clusters, clusters=clusters, sentences=sentences,
+            #                                             doc_ids=doc_ids)
+            return clusters
+        except (BaseException, Exception) as e:
+            self.app_logger.error(e)
 
     def get_content_per_cluster(self, n_clusters: int, clusters, sentences, doc_ids):
         cluster_lists = []
@@ -340,22 +343,26 @@ class TopicModel(Clustering):
         sentences = self.utilities.tokenize(text=content)
         sentences = [" ".join(s) for s in sentences]
         self.app_logger.debug(f"Sentences fed to TopicModel: {sentences}")
-        n_clusters = int(len(sentences) / 2)
-        clusters = self.get_clusters(sentences=sentences, n_clusters=n_clusters)
-        docs_df = pd.DataFrame(sentences, columns=["Sentence"])
-        docs_df['Topic'] = clusters.labels_
-        docs_df['Doc_ID'] = range(len(docs_df))
-        docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Sentence': ' '.join})
-        tf_idf, count = self._c_tf_idf(docs_per_topic.Sentence.values, m=len(sentences))
-        top_n_words = self._extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=10)
-        topic_sizes = self._extract_topic_sizes(docs_df).head(2)
-        topic_ids = topic_sizes["Topic"]
-        for topic in topic_ids:
-            for word_score_tuple in top_n_words[topic]:
-                if word_score_tuple[0].isdigit():
-                    continue
-                topics.append(word_score_tuple[0])
-        return topics
+        try:
+            n_clusters = int(len(sentences) / 2)
+            clusters = self.get_clusters(sentences=sentences, n_clusters=n_clusters)
+            docs_df = pd.DataFrame(sentences, columns=["Sentence"])
+            docs_df['Topic'] = clusters.labels_
+            docs_df['Doc_ID'] = range(len(docs_df))
+            docs_per_topic = docs_df.groupby(['Topic'], as_index=False).agg({'Sentence': ' '.join})
+            tf_idf, count = self._c_tf_idf(docs_per_topic.Sentence.values, m=len(sentences))
+            top_n_words = self._extract_top_n_words_per_topic(tf_idf, count, docs_per_topic, n=10)
+            topic_sizes = self._extract_topic_sizes(docs_df).head(2)
+            topic_ids = topic_sizes["Topic"]
+            for topic in topic_ids:
+                for word_score_tuple in top_n_words[topic]:
+                    if word_score_tuple[0].isdigit():
+                        continue
+                    topics.append(word_score_tuple[0])
+            return topics
+        except (BaseException, Exception) as e:
+            self.app_logger.error(e)
+            return topics
 
     def _c_tf_idf(self, sentences, m, ngram_range=(1, 1)):
         greek_stopwords = self.utilities.get_greek_stopwords()
