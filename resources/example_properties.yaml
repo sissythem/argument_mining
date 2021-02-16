@@ -52,7 +52,8 @@ eval:
   ner_endpoint: "http://petasis.dyndns.org:7100/predict-ner"
   max_correction_tries: 3
   notify:
-    url: "https://isl.ics.forth.gr/debatelab_mq/api/exchanges/dlab/amq.default/publish"
+    url_arg_mining: "https://isl.ics.forth.gr/debatelab_mq/api/exchanges/dlab/amq.default/publish"
+    url_clustering: "https://isl.ics.forth.gr/debatelab_mq/api/exchanges/dlab/amq.default/publish"
     username: "debateLab3ServerUser"
     password: "debateLabPassw0rd"
 adu_model:

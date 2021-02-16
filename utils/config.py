@@ -237,7 +237,7 @@ class AppConfig:
         """
         properties = self.properties["eval"]["notify"]
         # TODO url based on kind. Credentials?
-        url = properties["url"]
+        url = properties["url_arg_mining"] if kind == "arg_mining" else properties["url_clustering"]
         username = properties["username"]
         password = properties["password"]
         data = {"properties": {"delivery_mode": 2}, "routing_key": "dlabqueue", "payload": json.dumps(ids_list),
