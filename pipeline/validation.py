@@ -43,19 +43,20 @@ class JsonValidator:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
 
-    def run_validation(self, document, segment_counter, rel_counter, stance_counter, do_correction=True):
+    def run_validation(self, document: dict, counters: dict, do_correction: bool = True):
         validation_errors, invalid_adus = self.validate(document=document)
+        corrected = False
         if do_correction and validation_errors:
+            corrected = True
             counter = self.app_config.properties["eval"]["max_correction_tries"]
-            corrector = JsonCorrector(app_config=self.app_config, segment_counter=segment_counter,
-                                      rel_counter=rel_counter, stance_counter=stance_counter)
+            corrector = JsonCorrector(app_config=self.app_config, counters=counters)
             while counter > 0 and validation_errors:
                 if not corrector.can_document_be_corrected(validation_errors=validation_errors):
                     break
                 document = corrector.correction(document=document, invalid_adus=invalid_adus)
                 validation_errors, invalid_adus = self.validate(document=document)
                 counter -= 1
-        return validation_errors, invalid_adus
+        return validation_errors, invalid_adus, corrected
 
     def validate(self, document):
         """
@@ -242,7 +243,7 @@ class JsonCorrector:
     Component that performs corrections based on the validation errors
     """
 
-    def __init__(self, app_config: AppConfig, segment_counter: int, rel_counter: int, stance_counter: int):
+    def __init__(self, app_config: AppConfig, counters: dict):
         """
         Constructor for the JsonCorrector class
 
@@ -254,9 +255,9 @@ class JsonCorrector:
         """
         self.app_config = app_config
         self.app_logger = app_config.app_logger
-        self.segment_counter = segment_counter
-        self.rel_counter = rel_counter
-        self.stance_counter = stance_counter
+        self.segment_counter = counters["adu"]
+        self.rel_counter = counters["rel"]
+        self.stance_counter = counters["stance"]
         self.utilities = Utilities(app_config=self.app_config)
 
     @staticmethod
