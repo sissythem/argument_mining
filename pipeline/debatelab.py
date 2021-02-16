@@ -52,15 +52,15 @@ class ArgumentMining:
             | 4. Stores the results in the DebateLab Elasticsearch
             | 4. Notifies ICS
         """
-        # retrive new documents
         # TODO retrieve previous day's articles, save now to properties --> retrieve_kind="date"
+        # retrive new documents
         documents = self.app_config.elastic_retrieve.retrieve_documents()
+        # update yml properties file with the latest retrieve date
         self.app_config.update_last_retrieve_date()
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(documents=documents)
         # run cross-document clustering
         self.run_clustering(documents=documents, document_ids=document_ids)
-        self.app_config.notify_ics(document_ids=document_ids)
         self.app_logger.info("Evaluation is finished!")
 
     def run_argument_mining(self, documents, export_schema=False):
@@ -81,27 +81,25 @@ class ArgumentMining:
         """
         document_ids = []
         invalid_document_ids = []
+        corrected_ids = []
         validator = JsonValidator(app_config=self.app_config)
         for idx, document in enumerate(documents):
             document, segment_counter, rel_counter, stance_counter = self.predict(document=document)
-            validation_errors, invalid_adus = validator.run_validation(document=document,
-                                                                       segment_counter=segment_counter,
-                                                                       rel_counter=rel_counter,
-                                                                       stance_counter=stance_counter)
+            counters = {"adu": segment_counter, "rel": rel_counter, "stance": stance_counter}
+            validation_errors, invalid_adus, corrected = validator.run_validation(document=document, counters=counters)
+            if corrected:
+                corrected_ids.append(document_ids)
             if not validation_errors:
-                self.app_config.elastic_save.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
-                                                                        doc_type='docket', id=document["id"],
-                                                                        body=document)
+                self.app_config.elastic_save.save_document(document=document)
                 document_ids.append(document["id"])
             else:
                 invalid_document_ids.append(document["id"])
                 self.utilities.save_invalid_json(document=document, validation_errors=validation_errors,
                                                  invalid_adus=invalid_adus)
-        self.app_logger.info(f"Total valid documents: {len(document_ids)}")
-        self.app_logger.info(f"Total invalid documents: {len(invalid_document_ids)}")
-        self.app_logger.warn(f"Invalid document ids: {invalid_document_ids}")
+        self.utilities.print_validation_results(document_ids, corrected_ids, invalid_document_ids)
         if export_schema:
             validator.export_json_schema(document_ids=document_ids)
+        self.app_config.notify_ics(ids_list=document_ids)
         return documents, document_ids
 
     def run_clustering(self, documents, document_ids):
@@ -112,15 +110,15 @@ class ArgumentMining:
             | documents (list): list of json documents extracted from the SocialObservatory Elasticsearch & updated by
             the Argument Mining pipeline
             | document_ids (list): list of the ids of the valid documents
-
-        Returns
-            dict: the json object with the cross document results
         """
         adus, doc_ids, adu_ids = self.utilities.collect_adu_for_clustering(documents=documents,
                                                                            document_ids=document_ids)
         clustering = Clustering(app_config=self.app_config)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
-        clusters = clustering.get_clusters(n_clusters=n_clusters, sentences=adus)
+        relation_ids = clustering.run_clustering(n_clusters=n_clusters, sentences=adus, adu_ids=adu_ids,
+                                                 doc_ids=doc_ids)
+        # TODO notify ICS
+        # self.app_config.notify_ics(ids_list=relation_ids, kind="clustering")
 
     def predict(self, document):
         """

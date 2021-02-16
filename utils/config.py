@@ -225,12 +225,22 @@ class AppConfig:
             with open(join(self.resources_path, self.properties_file), "w") as f:
                 yaml.dump(properties, f)
 
-    def notify_ics(self, document_ids):
+    def notify_ics(self, ids_list, kind="arg_mining"):
+        """
+        Function to notify ICS API for any updates in the Elasticsearch. Uses different API endpoints based on the
+        kind parameter. The possible notifications are: argument mining updates for new documents, clustering updates
+        for cross-document relations
+
+        Args
+            | ids_list: list of ids in the Elasticsearch (documents or relations)
+            | kind: the kind of update, possible values --> arg_mining, clustering
+        """
         properties = self.properties["eval"]["notify"]
+        # TODO url based on kind. Credentials?
         url = properties["url"]
         username = properties["username"]
         password = properties["password"]
-        data = {"properties": {"delivery_mode": 2}, "routing_key": "dlabqueue", "payload": json.dumps(document_ids),
+        data = {"properties": {"delivery_mode": 2}, "routing_key": "dlabqueue", "payload": json.dumps(ids_list),
                 "payload_encoding": "string"}
         creds = f"{username}:{password}"
         creds_bytes = creds.encode("ascii")
@@ -380,7 +390,7 @@ class ElasticSearchConfig:
                 urls = [line.rstrip() for line in f]
             search_articles = Search(using=self.elasticsearch_client, index='articles').filter('terms', link=urls)
         else:
-            date_range = {'gt': previous_date,'lte': datetime.now()}
+            date_range = {'gt': previous_date, 'lte': datetime.now()}
             search_articles = Search(using=self.elasticsearch_client, index='articles').filter('range', date=date_range)
         documents = []
         for hit in search_articles.scan():
@@ -390,3 +400,14 @@ class ElasticSearchConfig:
                 document["content"] = document["title"] + "\r\n\r\n" + document["content"]
             documents.append(document)
         return documents
+
+    def save_document(self, document):
+        self.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
+                                        doc_type='docket', id=document["id"],
+                                        body=document)
+
+    def save_relation(self, relation):
+        # TODO change index
+        self.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
+                                        doc_type='docket', id=relation["id"],
+                                        body=relation)

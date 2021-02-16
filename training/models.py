@@ -271,6 +271,15 @@ class Clustering:
         self.bert_model = AutoModel.from_pretrained(model_id, output_hidden_states=True)
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
 
+    def run_clustering(self, n_clusters, sentences, adu_ids, doc_ids):
+        clusters = self.get_clusters(n_clusters=n_clusters, sentences=sentences)
+        relations = self.get_cross_document_relations(clusters=clusters, adu_ids=adu_ids, doc_ids=doc_ids)
+        relations_ids = []
+        for relation in relations:
+            self.app_config.elastic_save.save_relation(relation=relation)
+            relations_ids.append(relation["id"])
+        return relations_ids
+
     def get_clusters(self, n_clusters, sentences):
         try:
             # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
@@ -298,14 +307,13 @@ class Clustering:
     def get_cross_document_relations(self, clusters, adu_ids, doc_ids):
         cluster_dict = self.get_content_per_cluster(clusters=clusters, adu_ids=adu_ids, doc_ids=doc_ids)
         relations = []
-        id_counter = 1
         for cluster, pairs in cluster_dict.items():
             cluster_combinations = list(combinations(pairs, r=2))
             for pair_combination in cluster_combinations:
                 arg1 = pair_combination[0]
                 arg2 = pair_combination[1]
                 relation = {
-                    "id": f"C{id_counter}",
+                    "id": f"{arg1[1]};{arg2[1]};{arg1[0]};{arg2[0]}",
                     "cluster": cluster,
                     "source": arg1[0],
                     "source_doc": arg1[1],
@@ -313,10 +321,9 @@ class Clustering:
                     "target_doc": arg2[1]
                 }
                 relations.append(relation)
-                id_counter += 1
         return relations
 
-    def get_content_per_cluster(self, clusters, doc_ids, adu_ids):
+    def get_content_per_cluster(self, clusters, doc_ids, adu_ids, print_clusters=True):
         clusters_dict = {}
         for idx, cluster in enumerate(clusters):
             if cluster not in clusters_dict.keys():
@@ -324,7 +331,8 @@ class Clustering:
             adu_id = adu_ids[idx]
             doc_id = doc_ids[idx]
             clusters_dict[cluster].append((adu_id, doc_id))
-        self.print_clusters(cluster_lists=clusters_dict)
+        if print_clusters:
+            self.print_clusters(cluster_lists=clusters_dict)
         return clusters_dict
 
     def print_clusters(self, cluster_lists):

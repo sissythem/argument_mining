@@ -151,6 +151,13 @@ class Utilities:
                 f.write(validation_error.value + "\n")
             f.write(str(invalid_adus) + "\n")
 
+    def print_validation_results(self, document_ids, corrected_ids, invalid_document_ids):
+        self.app_logger.info(f"Total valid documents: {len(document_ids)}")
+        self.app_logger.info(f"Total corrected documents: {len(corrected_ids)}")
+        self.app_logger.info(f"Total invalid documents: {len(invalid_document_ids)}")
+        self.app_logger.warn(f"Invalid document ids: {invalid_document_ids}")
+        self.app_logger.warn(f"Corrected document ids: {corrected_ids}")
+
     # **************************** Segment Extraction **************************************
     @staticmethod
     def get_label_with_max_conf(labels):
