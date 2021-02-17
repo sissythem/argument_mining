@@ -293,7 +293,7 @@ class DataLoader:
         self._save_rel_df(rel_list=relations, filename=self.app_config.rel_train_csv)
         self._save_rel_df(rel_list=stances, filename=self.app_config.stance_train_csv)
         if do_oversample:
-            # TODO oversampling in a dynamic way
+            # TODO oversampling with dynamic total num
             self.utilities.oversample(task_kind="rel", file_kind="train", total_num=8705)
             self.utilities.oversample(task_kind="stance", file_kind="train", total_num=289)
 

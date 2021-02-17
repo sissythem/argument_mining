@@ -276,7 +276,8 @@ class Clustering:
         relations = self.get_cross_document_relations(clusters=clusters, adu_ids=adu_ids, doc_ids=doc_ids)
         relations_ids = []
         for relation in relations:
-            self.app_config.elastic_save.save_relation(relation=relation)
+            # TODO uncomment save to Elasticsearch -- change index inside the save_relation function!!
+            # self.app_config.elastic_save.save_relation(relation=relation)
             relations_ids.append(relation["id"])
         return relations_ids
 
