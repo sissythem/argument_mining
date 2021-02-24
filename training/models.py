@@ -326,7 +326,7 @@ class Clustering:
 
     def get_content_per_cluster(self, clusters, doc_ids, adu_ids, print_clusters=True):
         clusters_dict = {}
-        for idx, cluster in enumerate(clusters):
+        for idx, cluster in enumerate(clusters.labels_):
             if cluster not in clusters_dict.keys():
                 clusters_dict[cluster] = []
             adu_id = adu_ids[idx]
@@ -337,9 +337,9 @@ class Clustering:
         return clusters_dict
 
     def print_clusters(self, cluster_lists):
-        for idx, cluster in enumerate(cluster_lists):
+        for idx, cluster_list in cluster_lists.items():
             self.app_logger.debug(f"Content of Cluster {idx}")
-            for pair in cluster:
+            for pair in cluster_list:
                 self.app_logger.debug(f"Sentence {pair[0]} in document with id {pair[1]}")
 
 
