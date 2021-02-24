@@ -156,7 +156,6 @@ class Utilities:
         self.app_logger.info(f"Total corrected documents: {len(corrected_ids)}")
         self.app_logger.info(f"Total invalid documents: {len(invalid_document_ids)}")
         self.app_logger.warn(f"Invalid document ids: {invalid_document_ids}")
-        self.app_logger.warn(f"Corrected document ids: {corrected_ids}")
 
     # **************************** Segment Extraction **************************************
     @staticmethod
