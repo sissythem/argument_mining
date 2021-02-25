@@ -273,7 +273,8 @@ class Clustering:
 
     def run_clustering(self, n_clusters, sentences, adu_ids, doc_ids):
         clusters = self.get_clusters(n_clusters=n_clusters, sentences=sentences)
-        relations = self.get_cross_document_relations(clusters=clusters, adu_ids=adu_ids, doc_ids=doc_ids)
+        relations = self.get_cross_document_relations(clusters=clusters, sentences=sentences, adu_ids=adu_ids,
+                                                      doc_ids=doc_ids)
         relations_ids = []
         for relation in relations:
             # TODO uncomment save to Elasticsearch -- change index inside the save_relation function!!
@@ -305,8 +306,9 @@ class Clustering:
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
-    def get_cross_document_relations(self, clusters, adu_ids, doc_ids):
-        cluster_dict = self.get_content_per_cluster(clusters=clusters, adu_ids=adu_ids, doc_ids=doc_ids)
+    def get_cross_document_relations(self, clusters, sentences, adu_ids, doc_ids):
+        cluster_dict = self.get_content_per_cluster(clusters=clusters, sentences=sentences, adu_ids=adu_ids,
+                                                    doc_ids=doc_ids)
         relations = []
         for cluster, pairs in cluster_dict.items():
             cluster_combinations = list(combinations(pairs, r=2))
@@ -324,14 +326,15 @@ class Clustering:
                 relations.append(relation)
         return relations
 
-    def get_content_per_cluster(self, clusters, doc_ids, adu_ids, print_clusters=True):
+    def get_content_per_cluster(self, clusters, sentences, doc_ids, adu_ids, print_clusters=True):
         clusters_dict = {}
         for idx, cluster in enumerate(clusters.labels_):
             if cluster not in clusters_dict.keys():
                 clusters_dict[cluster] = []
             adu_id = adu_ids[idx]
             doc_id = doc_ids[idx]
-            clusters_dict[cluster].append((adu_id, doc_id))
+            sentence = sentences[idx]
+            clusters_dict[cluster].append((adu_id, doc_id, sentence))
         if print_clusters:
             self.print_clusters(cluster_lists=clusters_dict)
         return clusters_dict
@@ -341,6 +344,7 @@ class Clustering:
             self.app_logger.debug(f"Content of Cluster {idx}")
             for pair in cluster_list:
                 self.app_logger.debug(f"Sentence {pair[0]} in document with id {pair[1]}")
+                self.app_logger.debug(f"Sentence content: {pair[2]}")
 
 
 class TopicModel(Clustering):
