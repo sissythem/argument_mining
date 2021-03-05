@@ -49,7 +49,7 @@ class SupervisedModel(Model):
         # define training / dev / test CSV files
         self.dev_csv, self.train_csv, self.test_csv = self._get_csv_file_names(model_name=model_name)
         self.model_properties: dict = self._get_model_properties(model_name=model_name)
-        self.bert_name = self._get_bert_model_name()
+        self.bert_name = self._get_bert_model_name(model_name=model_name)
         self.base_path: str = self._get_base_path(model_name=model_name)
         self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
         self.model = None
