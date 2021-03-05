@@ -13,7 +13,8 @@ import torch
 import umap
 from flair.data import Corpus
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings, \
+    TransformerDocumentEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sklearn.feature_extraction.text import CountVectorizer
@@ -24,6 +25,9 @@ from utils.utils import Utilities
 
 
 class Model:
+    """
+    Super class for all model classes
+    """
 
     def __init__(self, app_config: AppConfig):
         random.seed(2020)
@@ -35,7 +39,7 @@ class Model:
 
 class SupervisedModel(Model):
     """
-    Abstract class representing a classification model
+    Abstract class representing a supervised learning model
     """
 
     def __init__(self, app_config: AppConfig, model_name: str):
@@ -142,6 +146,17 @@ class SupervisedModel(Model):
         Define the way to load the trained model. All subclasses should implement this method
         """
         raise NotImplementedError
+
+
+class UnsupervisedModel(Model):
+    """
+    Abstract class representing an unsupervised model
+    """
+
+    def __init__(self, app_config: AppConfig):
+        super(UnsupervisedModel, self).__init__(app_config=app_config)
+        self.device_name = app_config.device_name
+        self.utilities = Utilities(app_config=app_config)
 
 
 class AduModel(SupervisedModel):
@@ -277,12 +292,12 @@ class RelationsModel(SupervisedModel):
         label_dictionary = corpus.make_label_dictionary()
 
         # 3. initialize embeddings
-        # document_embeddings = TransformerDocumentEmbeddings('nlpaueb/bert-base-greek-uncased-v1', fine_tune=True)
-        # document_embeddings.tokenizer.model_max_length = 512
+        document_embeddings = TransformerDocumentEmbeddings(self.bert_name, fine_tune=True)
+        document_embeddings.tokenizer.model_max_length = 512
 
         # 3. initialize the document embeddings, mode = mean
-        bert_embeddings = BertEmbeddings(self.bert_name)
-        document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
+        # bert_embeddings = BertEmbeddings(self.bert_name)
+        # document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
 
         # 4. create the TextClassifier
         classifier = TextClassifier(document_embeddings=document_embeddings, label_dictionary=label_dictionary,
@@ -310,13 +325,10 @@ class RelationsModel(SupervisedModel):
         self.model.eval()
 
 
-class Clustering:
+class Clustering(UnsupervisedModel):
 
     def __init__(self, app_config: AppConfig):
-        self.app_config = app_config
-        self.app_logger = app_config.app_logger
-        self.device_name = app_config.device_name
-        self.utilities = Utilities(app_config=app_config)
+        super(Clustering, self).__init__(app_config=app_config)
         model_id = "nlpaueb/bert-base-greek-uncased-v1"
         self.bert_model = AutoModel.from_pretrained(model_id, output_hidden_states=True)
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
