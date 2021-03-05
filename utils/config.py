@@ -166,8 +166,6 @@ class AppConfig:
         embedding_names = 'bert-greek'
         if base_name == "adu_model":
             properties = self.properties["adu_model"]
-        elif base_name == "sim_model":
-            properties = self.properties["sim_model"]
         else:
             properties = self.properties["rel_model"]
         bert_kind = properties.get("bert_kind", "aueb")
