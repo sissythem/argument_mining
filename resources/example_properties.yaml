@@ -79,9 +79,9 @@ seq_model:
   shuffle: False
 class_model:
   bert_kind:
-    rel: "aueb" # base, nli, aueb
-    stance: "aueb" # base, nli, aueb
-    sim: "base" # base, nli, aueb
+    rel: "aueb" # base, nli, aueb, base-multi
+    stance: "aueb" # base, nli, aueb, base-multi
+    sim: "base" # base, nli, aueb, base-multi
   hidden_size: 256
   layers: 2
   use_crf: False
