@@ -61,7 +61,7 @@ class SupervisedModel(Model):
     def download_facebook_nli(self):
         from transformers import AutoModel
         model = AutoModel.from_pretrained("facebook/bart-large-mnli")
-        path = join(self.app_config.resources_path, "models", "facebook")
+        path = join(self.app_config.output_path, "models", "facebook")
         if not exists(path):
             mkdir(path)
         model.save_pretrained(path)
