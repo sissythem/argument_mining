@@ -1,6 +1,7 @@
 import random
 from itertools import combinations
-from os.path import join
+from os import mkdir
+from os.path import join, exists
 from typing import List
 
 import flair
@@ -57,6 +58,15 @@ class SupervisedModel(Model):
         self.device_name = app_config.device_name
         flair.device = torch.device(self.device_name)
 
+    def download_facebook_nli(self):
+        from transformers import AutoModel
+        model = AutoModel.from_pretrained("facebook/bart-large-mnli")
+        path = join(self.app_config.resources_path, "models", "facebook")
+        if not exists(path):
+            mkdir(path)
+        model.save_pretrained(path)
+        return path
+
     def _get_csv_file_names(self, model_name):
         if model_name == "adu":
             return self.app_config.adu_dev_csv, self.app_config.adu_train_csv, self.app_config.adu_test_csv
@@ -91,7 +101,9 @@ class SupervisedModel(Model):
         elif self.bert_kind == "aueb":
             return "nlpaueb/bert-base-greek-uncased-v1"
         elif self.bert_kind == "nli":
-            return "facebook/bart-large-mnli"
+            path = self.download_facebook_nli()
+            # return "facebook/bart-large-mnli"
+            return path
         elif self.bert_kind == "base-multi":
             return "bert-base-multilingual-uncased"
 
