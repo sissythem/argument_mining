@@ -22,42 +22,68 @@ from utils.config import AppConfig
 from utils.utils import Utilities
 
 
-class Classifier:
+class Model:
+
+    def __init__(self, app_config: AppConfig):
+        random.seed(2020)
+        self.app_config = app_config
+        self.app_logger = app_config.app_logger
+        self.properties: dict = app_config.properties
+        self.resources_path: str = self.app_config.resources_path
+
+
+class SupervisedModel(Model):
     """
     Abstract class representing a classification model
     """
 
-    def __init__(self, app_config: AppConfig, dev_csv: str, train_csv: str, test_csv: str, base_path: str,
-                 model_name: str):
+    def __init__(self, app_config: AppConfig, model_name: str):
         """
         Classifier class constructor
 
         Args
             | app_config (AppConfig): the application configuration object
-            | dev_csv (str): the name of the dev csv file
-            | train_csv (str): the name of the train csv file
-            | test_csv (str): the name of the test csv file
-            | base_path (str): full path to the folder where the model will be stored
             | model_name (str): the name of the model
         """
-        random.seed(2020)
-        self.app_config: AppConfig = app_config
-        self.app_logger = app_config.app_logger
-        self.properties: dict = self.app_config.properties
-        self.resources_path: str = self.app_config.resources_path
-        self.dev_file: str = dev_csv
-        self.train_file: str = train_csv
-        self.test_file: str = test_csv
-        self.base_path: str = base_path
+        super(SupervisedModel, self).__init__(app_config=app_config)
+        # define training / dev / test CSV files
+        self.dev_csv, self.train_csv, self.test_csv = self._get_csv_file_names(model_name=model_name)
+        self.base_path: str = self._get_base_path(model_name=model_name)
         self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
         self.model = None
         self.optimizer: torch.optim.Optimizer = self.get_optimizer()
-        flair.device = torch.device(app_config.device_name)
+        self.device_name = app_config.device_name
+        flair.device = torch.device(self.device_name)
 
+        self.model_properties: dict = self._get_model_properties(model_name=model_name)
+
+    def _get_csv_file_names(self, model_name):
         if model_name == "adu":
-            self.model_properties: dict = self.properties["adu_model"]
+            return self.app_config.adu_dev_csv, self.app_config.adu_train_csv, self.app_config.adu_test_csv
+        elif model_name == "sim":
+            return self.app_config.sim_dev_csv, self.app_config.sim_train_csv, self.app_config.sim_test_csv
+        elif model_name == "rel":
+            return self.app_config.rel_dev_csv, self.app_config.rel_train_csv, self.app_config.rel_test_csv
+        elif model_name == "stance":
+            return self.app_config.stance_dev_csv, self.app_config.stance_train_csv, self.app_config.stance_test_csv
+
+    def _get_base_path(self, model_name):
+        if model_name == "adu":
+            return self.app_config.adu_base_path
+        elif model_name == "sim":
+            return self.app_config.sim_base_path
+        elif model_name == "rel":
+            return self.app_config.rel_base_path
+        elif model_name == "stance":
+            return self.app_config.stance_base_path
+
+    def _get_model_properties(self, model_name):
+        if model_name == "adu":
+            return self.properties["adu_model"]
         elif model_name == "rel" or model_name == "stance":
-            self.model_properties: dict = self.properties["rel_model"]
+            return self.properties["rel_model"]
+        elif model_name == "sim":
+            return self.properties["sim_model"]
 
     def get_optimizer(self) -> torch.optim.Optimizer:
         """
@@ -88,21 +114,19 @@ class Classifier:
         raise NotImplementedError
 
 
-class AduModel(Classifier):
+class AduModel(SupervisedModel):
     """
     Class for the ADU sequence model
     """
 
-    def __init__(self, app_config):
+    def __init__(self, app_config: AppConfig, model_name="adu"):
         """
         Constructor for the AduModel class
 
         Args
             app_config (AppConfig): the application configuration object
         """
-        super(AduModel, self).__init__(app_config=app_config, dev_csv=app_config.adu_dev_csv,
-                                       train_csv=app_config.adu_train_csv, test_csv=app_config.adu_test_csv,
-                                       base_path=app_config.adu_base_path, model_name="adu")
+        super(AduModel, self).__init__(app_config=app_config, model_name=model_name)
 
         self.hidden_size: int = self.model_properties["hidden_size"]
         self.use_crf: bool = self.model_properties["use_crf"]
@@ -126,8 +150,8 @@ class AduModel(Classifier):
         columns = {0: 'text', 1: 'ner'}
         data_folder = join(self.resources_path, "data")
         # 1. get the corpus
-        corpus: Corpus = ColumnCorpus(data_folder, columns, train_file=self.train_file, test_file=self.test_file,
-                                      dev_file=self.dev_file)
+        corpus: Corpus = ColumnCorpus(data_folder, columns, train_file=self.train_csv, test_file=self.test_csv,
+                                      dev_file=self.dev_csv)
 
         self.app_logger.info("Corpus created")
         self.app_logger.info(f"First training sentence: {corpus.train[0]}")
@@ -176,12 +200,12 @@ class AduModel(Classifier):
         self.model.eval()
 
 
-class RelationsModel(Classifier):
+class RelationsModel(SupervisedModel):
     """
     Class representing the model for relations and stance prediction
     """
 
-    def __init__(self, app_config, dev_csv, train_csv, test_csv, base_path, model_name):
+    def __init__(self, app_config: AppConfig, model_name: str):
         """
         Constructor of the RelationsModel class
 
@@ -193,9 +217,8 @@ class RelationsModel(Classifier):
             | base_path (str): full path to the folder where the model will be stored
             | model_name (str): the name of the model
         """
-        super(RelationsModel, self).__init__(app_config=app_config, dev_csv=dev_csv, train_csv=train_csv,
-                                             test_csv=test_csv, base_path=base_path, model_name=model_name)
-
+        super(RelationsModel, self).__init__(app_config=app_config, model_name=model_name)
+        self.bert_kind = self.model_properties.get("bert_kind", "aueb")
         self.hidden_size: int = self.model_properties["hidden_size"]
         self.use_crf: bool = self.model_properties["use_crf"]
         self.layers: int = self.model_properties["layers"]
@@ -218,8 +241,8 @@ class RelationsModel(Classifier):
         column_name_map = {0: "text", 1: "label_topic"}
         # 1. create Corpus
         corpus: Corpus = CSVClassificationCorpus(data_folder=data_folder, column_name_map=column_name_map,
-                                                 skip_header=True, delimiter="\t", train_file=self.train_file,
-                                                 test_file=self.test_file, dev_file=self.dev_file)
+                                                 skip_header=True, delimiter="\t", train_file=self.train_csv,
+                                                 test_file=self.test_csv, dev_file=self.dev_csv)
         self.app_logger.info("Corpus created")
         self.app_logger.info(f"First training sentence: {corpus.train[0]}")
 
@@ -231,7 +254,8 @@ class RelationsModel(Classifier):
         # document_embeddings.tokenizer.model_max_length = 512
 
         # 3. initialize the document embeddings, mode = mean
-        bert_embeddings = BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
+        bert_name = self._get_bert_model_name()
+        bert_embeddings = BertEmbeddings(bert_name)
         document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
 
         # 4. create the TextClassifier
@@ -258,6 +282,14 @@ class RelationsModel(Classifier):
         self.app_logger.info(f"Loading Relations model from path: {model_path}")
         self.model = TextClassifier.load(model_path)
         self.model.eval()
+
+    def _get_bert_model_name(self):
+        if self.bert_kind == "base":
+            return "bert-base-uncased"
+        elif self.bert_kind == "aueb":
+            return "nlpaueb/bert-base-greek-uncased-v1"
+        elif self.bert_kind == "nli":
+            return "facebook/bart-large-mnli"
 
 
 class Clustering:

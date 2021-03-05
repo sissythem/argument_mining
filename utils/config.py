@@ -164,7 +164,12 @@ class AppConfig:
         """
         # Create a base path:
         embedding_names = 'bert-greek'
-        properties = self.properties["adu_model"] if base_name == "adu_model" else self.properties["rel_model"]
+        if base_name == "adu_model":
+            properties = self.properties["adu_model"]
+        elif base_name == "sim_model":
+            properties = self.properties["sim_model"]
+        else:
+            properties = self.properties["rel_model"]
         layers = properties["rnn_layers"] if base_name == "adu_model" else properties["layers"]
         base_path = f"{base_name}-" + '-'.join([
             str(embedding_names),
@@ -189,6 +194,7 @@ class AppConfig:
         self.adu_base_path = self._get_base_path(base_name="adu_model")
         self.rel_base_path = self._get_base_path(base_name="rel_model")
         self.stance_base_path = self._get_base_path(base_name="stance_model")
+        self.sim_base_path = self._get_base_path(base_name="sim_model")
 
         config = self.properties["config"]["adu_data"]
         self.adu_train_csv = config["train_csv"]
@@ -204,6 +210,11 @@ class AppConfig:
         self.stance_train_csv = config["train_csv"]
         self.stance_dev_csv = config["dev_csv"]
         self.stance_test_csv = config["test_csv"]
+
+        config = self.properties["config"]["sim_data"]
+        self.sim_train_csv = config["train_csv"]
+        self.sim_dev_csv = config["dev_csv"]
+        self.sim_test_csv = config["test_csv"]
 
     def _config_email(self, config):
         """
