@@ -95,7 +95,7 @@ class SupervisedModel(Model):
         elif model_name == "rel" or model_name == "stance" or model_name == "sim":
             return self.properties["class_model"]
 
-    def _get_bert_model_name(self, model_name):
+    def _get_bert_model_name(self, model_name, download=False):
         self.bert_kind = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
                                                        model_name=model_name)
         if self.bert_kind == "base":
@@ -103,9 +103,11 @@ class SupervisedModel(Model):
         elif self.bert_kind == "aueb":
             return "nlpaueb/bert-base-greek-uncased-v1"
         elif self.bert_kind == "nli":
-            path = self.download_model(model_name="facebook/bart-large-mnli")
-            # return
-            return path
+            if download:
+                path = self.download_model(model_name="facebook/bart-large-mnli")
+                return path
+            else:
+                return "facebook/bart-large-mnli"
         elif self.bert_kind == "base-multi":
             return "bert-base-multilingual-uncased"
 
