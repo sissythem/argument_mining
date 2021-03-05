@@ -58,12 +58,14 @@ class SupervisedModel(Model):
         self.device_name = app_config.device_name
         flair.device = torch.device(self.device_name)
 
-    def download_facebook_nli(self):
-        from transformers import AutoModel
-        model = AutoModel.from_pretrained("facebook/bart-large-mnli")
+    def download_model(self, model_name):
+        from transformers import AutoModel, AutoTokenizer
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModel.from_pretrained(model_name)
         path = join(self.app_config.output_path, "models", "facebook")
         if not exists(path):
             mkdir(path)
+        tokenizer.save_pretrained(path)
         model.save_pretrained(path)
         return path
 
@@ -101,8 +103,8 @@ class SupervisedModel(Model):
         elif self.bert_kind == "aueb":
             return "nlpaueb/bert-base-greek-uncased-v1"
         elif self.bert_kind == "nli":
-            path = self.download_facebook_nli()
-            # return "facebook/bart-large-mnli"
+            path = self.download_model(model_name="facebook/bart-large-mnli")
+            # return
             return path
         elif self.bert_kind == "base-multi":
             return "bert-base-multilingual-uncased"
