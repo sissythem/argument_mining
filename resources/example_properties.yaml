@@ -60,8 +60,9 @@ eval:
     url_clustering: "https://isl.ics.forth.gr/debatelab_mq/api/exchanges/dlab/amq.default/publish"
     username: "debateLab3ServerUser"
     password: "debateLabPassw0rd"
-adu_model:
-  bert_kind: "aueb" # base, nli, aueb
+seq_model:
+  bert_kind:
+    adu: "aueb" # base, nli, aueb
   hidden_size: 256
   rnn_layers: 2
   dropout: 0.5
@@ -76,8 +77,11 @@ adu_model:
   train_with_dev: False
   save_final_model: True
   shuffle: False
-rel_model:
-  bert_kind: "base" # base, nli, aueb
+class_model:
+  bert_kind:
+    rel: "aueb" # base, nli, aueb
+    stance: "aueb" # base, nli, aueb
+    sim: "base" # base, nli, aueb
   hidden_size: 256
   layers: 2
   use_crf: False
