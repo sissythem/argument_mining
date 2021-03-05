@@ -56,6 +56,8 @@ def preprocess(app_config):
     data_loader.load_adus()
     logger.info("Creating CSV file in CONLL format for relations/stance classification")
     data_loader.load_relations()
+    logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
+    data_loader.load_similarities()
 
 
 def train(app_config):

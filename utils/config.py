@@ -170,9 +170,11 @@ class AppConfig:
             properties = self.properties["sim_model"]
         else:
             properties = self.properties["rel_model"]
+        bert_kind = properties.get("bert_kind", "aueb")
         layers = properties["rnn_layers"] if base_name == "adu_model" else properties["layers"]
         base_path = f"{base_name}-" + '-'.join([
             str(embedding_names),
+            "bert=" + bert_kind,
             'hs=' + str(properties["hidden_size"]),
             'hl=' + str(layers),
             'crf=' + str(properties["use_crf"]),

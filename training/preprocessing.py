@@ -7,6 +7,7 @@ from typing import List
 import pandas as pd
 
 from utils.utils import Utilities
+from utils.config import AppConfig
 
 
 class Document:
@@ -155,7 +156,7 @@ class Relation:
 
 class DataLoader:
 
-    def __init__(self, app_config):
+    def __init__(self, app_config: AppConfig):
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.utilities = Utilities(app_config=app_config)
@@ -199,11 +200,11 @@ class DataLoader:
             if segment_type == "argument":
                 span = spans[0]
                 segment = self._create_segment(span=span, document_id=document.document_id,
-                                                        annotation_id=annotation_id, attributes=attributes)
+                                               annotation_id=annotation_id, attributes=attributes)
                 document.segments.append(segment)
             elif segment_type == "argument_relation":
                 relation = self._create_relation(segments=document.segments, attributes=attributes,
-                                                          annotation_id=annotation_id, document_id=document.document_id)
+                                                 annotation_id=annotation_id, document_id=document.document_id)
                 if relation.kind == "relation":
                     document.relations.append(relation)
                 else:
@@ -365,3 +366,24 @@ class DataLoader:
             else:
                 continue
         return major_claims, claims, premises, relation_pairs, stance_pairs
+
+    # *************************** similarity dataset ***********************************************
+    def load_similarities(self, do_oversample=False):
+        self.app_logger.debug("Reading UKP aspect corpus")
+        data_path = join(self.app_config.resources_path, "data")
+        data_csv = "UKP_ASPECT.tsv"
+        data_file_path = join(data_path, data_csv)
+        df = pd.read_csv(data_file_path, sep="\t", header=0, index_col=None)
+        new_df = pd.DataFrame(columns=["sentence", "label", "topic"])
+        row_counter = 0
+        for index, row in df.iterrows():
+            topic, sentence1, sentence2, label = row
+            final_text = f"[CLS] {sentence1} [SEP] {sentence2}"
+            new_df.loc[row_counter] = [final_text, label, topic]
+            row_counter += 1
+        output_filepath = join(self.app_config.resources_path, "data", "train_sim.csv")
+        new_df.to_csv(output_filepath, sep='\t', index=False, header=False)
+        self.app_logger.debug("Dataframe saved!")
+        if do_oversample:
+            # TODO if needed
+            pass
