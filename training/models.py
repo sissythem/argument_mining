@@ -48,14 +48,14 @@ class SupervisedModel(Model):
         super(SupervisedModel, self).__init__(app_config=app_config)
         # define training / dev / test CSV files
         self.dev_csv, self.train_csv, self.test_csv = self._get_csv_file_names(model_name=model_name)
+        self.model_properties: dict = self._get_model_properties(model_name=model_name)
+        self.bert_name = self._get_bert_model_name()
         self.base_path: str = self._get_base_path(model_name=model_name)
         self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
         self.model = None
         self.optimizer: torch.optim.Optimizer = self.get_optimizer()
         self.device_name = app_config.device_name
         flair.device = torch.device(self.device_name)
-
-        self.model_properties: dict = self._get_model_properties(model_name=model_name)
 
     def _get_csv_file_names(self, model_name):
         if model_name == "adu":
@@ -84,6 +84,15 @@ class SupervisedModel(Model):
             return self.properties["rel_model"]
         elif model_name == "sim":
             return self.properties["sim_model"]
+
+    def _get_bert_model_name(self):
+        self.bert_kind = self.model_properties.get("bert_kind", "aueb")
+        if self.bert_kind == "base":
+            return "bert-base-uncased"
+        elif self.bert_kind == "aueb":
+            return "nlpaueb/bert-base-greek-uncased-v1"
+        elif self.bert_kind == "nli":
+            return "facebook/bart-large-mnli"
 
     def get_optimizer(self) -> torch.optim.Optimizer:
         """
@@ -165,9 +174,7 @@ class AduModel(SupervisedModel):
         self.app_logger.debug(tag_dictionary.idx2item)
 
         # 4. initialize embeddings
-        embedding_types: List[TokenEmbeddings] = [
-            BertEmbeddings('nlpaueb/bert-base-greek-uncased-v1')
-        ]
+        embedding_types: List[TokenEmbeddings] = [BertEmbeddings(self.bert_name)]
 
         embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
 
@@ -218,7 +225,6 @@ class RelationsModel(SupervisedModel):
             | model_name (str): the name of the model
         """
         super(RelationsModel, self).__init__(app_config=app_config, model_name=model_name)
-        self.bert_kind = self.model_properties.get("bert_kind", "aueb")
         self.hidden_size: int = self.model_properties["hidden_size"]
         self.use_crf: bool = self.model_properties["use_crf"]
         self.layers: int = self.model_properties["layers"]
@@ -254,8 +260,7 @@ class RelationsModel(SupervisedModel):
         # document_embeddings.tokenizer.model_max_length = 512
 
         # 3. initialize the document embeddings, mode = mean
-        bert_name = self._get_bert_model_name()
-        bert_embeddings = BertEmbeddings(bert_name)
+        bert_embeddings = BertEmbeddings(self.bert_name)
         document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
 
         # 4. create the TextClassifier
@@ -282,14 +287,6 @@ class RelationsModel(SupervisedModel):
         self.app_logger.info(f"Loading Relations model from path: {model_path}")
         self.model = TextClassifier.load(model_path)
         self.model.eval()
-
-    def _get_bert_model_name(self):
-        if self.bert_kind == "base":
-            return "bert-base-uncased"
-        elif self.bert_kind == "aueb":
-            return "nlpaueb/bert-base-greek-uncased-v1"
-        elif self.bert_kind == "nli":
-            return "facebook/bart-large-mnli"
 
 
 class Clustering:
