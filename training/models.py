@@ -80,10 +80,8 @@ class SupervisedModel(Model):
     def _get_model_properties(self, model_name):
         if model_name == "adu":
             return self.properties["adu_model"]
-        elif model_name == "rel" or model_name == "stance":
+        elif model_name == "rel" or model_name == "stance" or model_name == "sim":
             return self.properties["rel_model"]
-        elif model_name == "sim":
-            return self.properties["sim_model"]
 
     def _get_bert_model_name(self):
         self.bert_kind = self.model_properties.get("bert_kind", "aueb")
