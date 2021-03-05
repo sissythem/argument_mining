@@ -92,6 +92,8 @@ class SupervisedModel(Model):
             return "nlpaueb/bert-base-greek-uncased-v1"
         elif self.bert_kind == "nli":
             return "facebook/bart-large-mnli"
+        elif self.bert_kind == "base-multi":
+            return "bert-base-multilingual-uncased"
 
     def get_optimizer(self, model_name) -> torch.optim.Optimizer:
         """
