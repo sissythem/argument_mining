@@ -53,7 +53,7 @@ class SupervisedModel(Model):
         self.base_path: str = self._get_base_path(model_name=model_name)
         self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
         self.model = None
-        self.optimizer: torch.optim.Optimizer = self.get_optimizer()
+        self.optimizer: torch.optim.Optimizer = self.get_optimizer(model_name=model_name)
         self.device_name = app_config.device_name
         flair.device = torch.device(self.device_name)
 
@@ -79,12 +79,13 @@ class SupervisedModel(Model):
 
     def _get_model_properties(self, model_name):
         if model_name == "adu":
-            return self.properties["adu_model"]
+            return self.properties["seq_model"]
         elif model_name == "rel" or model_name == "stance" or model_name == "sim":
-            return self.properties["rel_model"]
+            return self.properties["class_model"]
 
-    def _get_bert_model_name(self):
-        self.bert_kind = self.model_properties.get("bert_kind", "aueb")
+    def _get_bert_model_name(self, model_name):
+        self.bert_kind = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
+                                                       model_name=model_name)
         if self.bert_kind == "base":
             return "bert-base-uncased"
         elif self.bert_kind == "aueb":
@@ -92,14 +93,18 @@ class SupervisedModel(Model):
         elif self.bert_kind == "nli":
             return "facebook/bart-large-mnli"
 
-    def get_optimizer(self) -> torch.optim.Optimizer:
+    def get_optimizer(self, model_name) -> torch.optim.Optimizer:
         """
         Define the model's optimizer based on the application properties
 
         Returns
             optimizer: the optimizer class
         """
-        optimizer_name = self.properties["adu_model"]["optimizer"]
+        if model_name == "adu":
+            properties = self.properties["seq_model"]
+        else:
+            properties = self.properties["class_model"]
+        optimizer_name = properties["optimizer"]
         if optimizer_name == "Adam":
             optimizer = torch.optim.Adam
         elif optimizer_name == "SGD":

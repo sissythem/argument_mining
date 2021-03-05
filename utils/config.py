@@ -164,10 +164,10 @@ class AppConfig:
         """
         # Create a base path:
         if base_name == "adu_model":
-            properties = self.properties["adu_model"]
+            properties = self.properties["seq_model"]
         else:
-            properties = self.properties["rel_model"]
-        bert_kind = properties.get("bert_kind", "aueb")
+            properties = self.properties["class_model"]
+        bert_kind = self.get_bert_kind(bert_kind_props=properties["bert_kind"], model_name=base_name)
         embedding_names = f"bert-{bert_kind}"
         layers = properties["rnn_layers"] if base_name == "adu_model" else properties["layers"]
         base_path = f"{base_name}-" + '-'.join([
@@ -185,6 +185,19 @@ class AppConfig:
         except (OSError, Exception):
             pass
         return base_path
+
+    @staticmethod
+    def get_bert_kind(bert_kind_props: dict, model_name: str):
+        bert_kind = "aueb"
+        if model_name.startswith("adu"):
+            bert_kind = bert_kind_props["adu"]
+        elif model_name.startswith("rel"):
+            bert_kind = bert_kind_props["rel"]
+        elif model_name.startswith("stance"):
+            bert_kind = bert_kind_props["stance"]
+        elif model_name.startswith("sim"):
+            bert_kind = bert_kind_props["sim"]
+        return bert_kind
 
     def _configure_training_data_and_model_path(self):
         """
