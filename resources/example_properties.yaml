@@ -37,6 +37,10 @@ config:
     train_csv: "train_stance.csv"
     dev_csv: "dev_stance.csv"
     test_csv: "test_stance.csv"
+  sim_data:
+    train_csv: "UKP_ASPECT.tsv"
+    dev_csv: "UKP_ASPECT.tsv"
+    test_csv: "UKP_ASPECT.tsv"
 tasks: ["prep", "train", "eval"]
 preprocessing:
   other_label: "O"
@@ -44,7 +48,7 @@ preprocessing:
   max_len: 512
   pad_token: 0
 train:
-  models: ["adu", "rel", "stance"]
+  models: ["adu", "rel", "stance", "sim"]
 eval:
   model: "best" # options: best, final
   retrieve: "file" # options: file, date
@@ -72,6 +76,21 @@ adu_model:
   save_final_model: True
   shuffle: False
 rel_model:
+  hidden_size: 256
+  layers: 2
+  use_crf: False
+  learning_rate: 0.0001
+  mini_batch_size: 32
+  num_workers: 8
+  max_epochs: 150
+  patience: 10
+  optimizer: Adam
+  use_tensorboard: True
+  train_with_dev: False
+  save_final_model: True
+  shuffle: False
+sim_model:
+  bert_kind: "base" # base, nli
   hidden_size: 256
   layers: 2
   use_crf: False

@@ -55,7 +55,7 @@ def preprocess(app_config):
     logger.info("Creating CSV file in CONLL format for ADUs classification")
     data_loader.load_adus()
     logger.info("Creating CSV file in CONLL format for relations/stance classification")
-    # data_loader.load_relations()
+    data_loader.load_relations()
 
 
 def train(app_config):
@@ -74,18 +74,19 @@ def train(app_config):
         logger.info("ADU Training is finished!")
     if "rel" in models_to_train:
         logger.info("Training relations model")
-        rel_model = RelationsModel(app_config=app_config, dev_csv=app_config.rel_dev_csv,
-                                   train_csv=app_config.rel_train_csv, test_csv=app_config.rel_test_csv,
-                                   base_path=app_config.rel_base_path, model_name="rel")
+        rel_model = RelationsModel(app_config=app_config, model_name="rel")
         rel_model.train()
         logger.info("Relations training finished!")
     if "stance" in models_to_train:
         logger.info("Training stance model")
-        stance_model = RelationsModel(app_config=app_config, dev_csv=app_config.stance_dev_csv, model_name="stance",
-                                      train_csv=app_config.stance_train_csv, test_csv=app_config.stance_test_csv,
-                                      base_path=app_config.stance_base_path)
+        stance_model = RelationsModel(app_config=app_config, model_name="stance")
         stance_model.train()
         logger.info("Stance training finished!")
+    if "sim" in models_to_train:
+        logger.info("Training argument similarity model")
+        sim_model = RelationsModel(app_config=app_config, model_name="sim")
+        sim_model.train()
+        logger.info("Finished training similarity model")
 
 
 def evaluate(app_config):
