@@ -2,7 +2,7 @@ import random
 from itertools import combinations
 from os import mkdir
 from os.path import join, exists
-from typing import List
+from typing import List, Tuple
 
 import flair
 import hdbscan
@@ -30,11 +30,11 @@ class Model:
     """
 
     def __init__(self, app_config: AppConfig):
-        random.seed(2020)
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.properties: dict = app_config.properties
         self.resources_path: str = self.app_config.resources_path
+        self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
 
 
 class SupervisedModel(Model):
@@ -56,13 +56,12 @@ class SupervisedModel(Model):
         self.model_properties: dict = self._get_model_properties(model_name=model_name)
         self.bert_name = self._get_bert_model_name(model_name=model_name)
         self.base_path: str = self._get_base_path(model_name=model_name)
-        self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
         self.model = None
         self.optimizer: torch.optim.Optimizer = self.get_optimizer(model_name=model_name)
         self.device_name = app_config.device_name
         flair.device = torch.device(self.device_name)
 
-    def download_model(self, model_name):
+    def download_model(self, model_name) -> str:
         from transformers import AutoModel, AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
@@ -73,7 +72,7 @@ class SupervisedModel(Model):
         model.save_pretrained(path)
         return path
 
-    def _get_csv_file_names(self, model_name):
+    def _get_csv_file_names(self, model_name: str) -> Tuple[str, str, str]:
         if model_name == "adu":
             return self.app_config.adu_dev_csv, self.app_config.adu_train_csv, self.app_config.adu_test_csv
         elif model_name == "sim":
@@ -83,7 +82,7 @@ class SupervisedModel(Model):
         elif model_name == "stance":
             return self.app_config.stance_dev_csv, self.app_config.stance_train_csv, self.app_config.stance_test_csv
 
-    def _get_base_path(self, model_name):
+    def _get_base_path(self, model_name: str) -> str:
         if model_name == "adu":
             return self.app_config.adu_base_path
         elif model_name == "sim":
@@ -93,13 +92,13 @@ class SupervisedModel(Model):
         elif model_name == "stance":
             return self.app_config.stance_base_path
 
-    def _get_model_properties(self, model_name):
+    def _get_model_properties(self, model_name: str) -> dict:
         if model_name == "adu":
             return self.properties["seq_model"]
         elif model_name == "rel" or model_name == "stance" or model_name == "sim":
             return self.properties["class_model"]
 
-    def _get_bert_model_name(self, model_name, download=False):
+    def _get_bert_model_name(self, model_name: str, download: bool = False) -> str:
         self.bert_kind = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
                                                        model_name=model_name)
         if self.bert_kind == "base":
@@ -115,9 +114,12 @@ class SupervisedModel(Model):
         elif self.bert_kind == "base-multi":
             return "bert-base-multilingual-uncased"
 
-    def get_optimizer(self, model_name) -> torch.optim.Optimizer:
+    def get_optimizer(self, model_name: str) -> torch.optim.Optimizer:
         """
         Define the model's optimizer based on the application properties
+
+        Args
+            | model_name (str): the name of the model
 
         Returns
             optimizer: the optimizer class
