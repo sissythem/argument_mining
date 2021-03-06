@@ -242,7 +242,6 @@ class AduModel(SupervisedModel):
         model_path = join(self.base_path, self.model_file)
         self.app_logger.info(f"Loading ADU model from path: {model_path}")
         self.model = SequenceTagger.load(model_path)
-        self.model.eval()
 
 
 class RelationsModel(SupervisedModel):
@@ -324,7 +323,6 @@ class RelationsModel(SupervisedModel):
         model_path = join(self.base_path, self.model_file)
         self.app_logger.info(f"Loading Relations model from path: {model_path}")
         self.model = TextClassifier.load(model_path)
-        self.model.eval()
 
 
 class Clustering(UnsupervisedModel):
