@@ -30,22 +30,11 @@ class Clustering(UnsupervisedModel):
 
     def get_clusters(self, n_clusters, sentences):
         try:
-            # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
-            # embeddings = model.encode(sentences, show_progress_bar=True)
             sentence_embeddings = []
             for sentence in sentences:
                 flair_sentence = Sentence(sentence)
-                # tokens = self.tokenizer.encode(sentence)
-                # input_ids = torch.tensor(tokens).unsqueeze(0)
-                # outputs = self.bert_model(input_ids)
-                # embeddings = outputs[1][-1].detach().numpy()
                 self.document_embeddings.embed(flair_sentence)
-                embeddings = flair_sentence._embeddings
-                all_embeddings = []
-                for key, tensor in embeddings.items():
-                    tensor = tensor.to("cpu")
-                    all_embeddings.append(tensor.numpy())
-                embeddings = np.concatenate(all_embeddings, axis=None)
+                embeddings = flair_sentence.get_embedding()
                 sentence_embeddings.append(embeddings)
             embeddings = np.asarray(sentence_embeddings)
             self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
