@@ -1,4 +1,3 @@
-import random
 from itertools import combinations
 from os import mkdir
 from os.path import join, exists
@@ -13,7 +12,7 @@ import torch
 import umap
 from flair.data import Corpus
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, BertEmbeddings, \
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, BertEmbeddings, \
     TransformerDocumentEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
