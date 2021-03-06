@@ -100,7 +100,7 @@ class AppConfig:
         program_logger.addHandler(console_handler)
         return program_logger
 
-    def _load_properties(self):
+    def _load_properties(self) -> dict:
         """
         Loads the configuration file from the resources folder
 
@@ -152,7 +152,7 @@ class AppConfig:
         if not exists(join(self.resources_path, "results")):
             mkdir(join(self.resources_path, "results"))
 
-    def _get_base_path(self, base_name):
+    def _get_base_path(self, base_name: str) -> str:
         """
         Create the base full path to the directory where each model will be saved
 
@@ -187,7 +187,7 @@ class AppConfig:
         return base_path
 
     @staticmethod
-    def get_bert_kind(bert_kind_props: dict, model_name: str):
+    def get_bert_kind(bert_kind_props: dict, model_name: str) -> str:
         bert_kind = "aueb"
         if model_name.startswith("adu"):
             bert_kind = bert_kind_props["adu"]
@@ -203,30 +203,30 @@ class AppConfig:
         """
         Reads the application properties to find for each model the train, test and dev datasets
         """
-        self.adu_base_path = self._get_base_path(base_name="adu_model")
-        self.rel_base_path = self._get_base_path(base_name="rel_model")
-        self.stance_base_path = self._get_base_path(base_name="stance_model")
-        self.sim_base_path = self._get_base_path(base_name="sim_model")
+        self.adu_base_path: str = self._get_base_path(base_name="adu_model")
+        self.rel_base_path: str = self._get_base_path(base_name="rel_model")
+        self.stance_base_path: str = self._get_base_path(base_name="stance_model")
+        self.sim_base_path: str = self._get_base_path(base_name="sim_model")
 
-        config = self.properties["config"]["adu_data"]
-        self.adu_train_csv = config["train_csv"]
-        self.adu_dev_csv = config["dev_csv"]
-        self.adu_test_csv = config["test_csv"]
+        config: dict = self.properties["config"]["adu_data"]
+        self.adu_train_csv: str = config["train_csv"]
+        self.adu_dev_csv: str = config["dev_csv"]
+        self.adu_test_csv: str = config["test_csv"]
 
-        config = self.properties["config"]["rel_data"]
-        self.rel_train_csv = config["train_csv"]
-        self.rel_dev_csv = config["dev_csv"]
-        self.rel_test_csv = config["test_csv"]
+        config: dict = self.properties["config"]["rel_data"]
+        self.rel_train_csv: str = config["train_csv"]
+        self.rel_dev_csv: str = config["dev_csv"]
+        self.rel_test_csv: str = config["test_csv"]
 
-        config = self.properties["config"]["stance_data"]
-        self.stance_train_csv = config["train_csv"]
-        self.stance_dev_csv = config["dev_csv"]
-        self.stance_test_csv = config["test_csv"]
+        config: dict = self.properties["config"]["stance_data"]
+        self.stance_train_csv: str = config["train_csv"]
+        self.stance_dev_csv: str = config["dev_csv"]
+        self.stance_test_csv: str = config["test_csv"]
 
-        config = self.properties["config"]["sim_data"]
-        self.sim_train_csv = config["train_csv"]
-        self.sim_dev_csv = config["dev_csv"]
-        self.sim_test_csv = config["test_csv"]
+        config: dict = self.properties["config"]["sim_data"]
+        self.sim_train_csv: str = config["train_csv"]
+        self.sim_dev_csv: str = config["dev_csv"]
+        self.sim_test_csv: str = config["test_csv"]
 
     def _config_email(self, config):
         """
