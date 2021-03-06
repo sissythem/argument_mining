@@ -1,3 +1,4 @@
+from itertools import combinations
 from os.path import join
 
 import hdbscan
@@ -25,7 +26,7 @@ class Clustering(UnsupervisedModel):
         sentences = list(df["sentence_1"]) + list(df["sentence_2"])
         sentences = list(set(sentences))
         clusters = self.get_clusters(n_clusters=n_clusters, sentences=sentences)
-        self.get_content_per_cluster(clusters=clusters, sentences=sentences)
+        self.get_content_per_cluster(clusters=clusters, sentences=sentences, df=df)
 
     def get_clusters(self, n_clusters, sentences):
         try:
@@ -41,9 +42,9 @@ class Clustering(UnsupervisedModel):
                 self.document_embeddings.embed(flair_sentence)
                 embeddings = flair_sentence._embeddings
                 all_embeddings = []
-                for key, value in embeddings.items():
-                    value.to("cpu")
-                    all_embeddings.append(value.numpy())
+                for key, tensor in embeddings.items():
+                    tensor = tensor.to("cpu")
+                    all_embeddings.append(tensor.numpy())
                 embeddings = np.concatenate(all_embeddings, axis=None)
                 sentence_embeddings.append(embeddings)
             embeddings = np.asarray(sentence_embeddings)
@@ -59,7 +60,7 @@ class Clustering(UnsupervisedModel):
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
-    def get_content_per_cluster(self, clusters, sentences, print_clusters=True):
+    def get_content_per_cluster(self, clusters, sentences, df, print_clusters=True):
         clusters_dict = {}
         for idx, cluster in enumerate(clusters.labels_):
             if cluster not in clusters_dict.keys():
@@ -67,17 +68,27 @@ class Clustering(UnsupervisedModel):
             sentence = sentences[idx]
             clusters_dict[cluster].append(sentence)
         if print_clusters:
-            self.print_clusters(cluster_lists=clusters_dict)
+            self.print_clusters(cluster_lists=clusters_dict, df=df)
         return clusters_dict
 
-    def print_clusters(self, cluster_lists):
+    def print_clusters(self, cluster_lists, df):
         for idx, cluster_list in cluster_lists.items():
             self.app_logger.debug(f"Content of Cluster {idx}")
             for sentence in cluster_list:
                 self.app_logger.debug(f"Sentence content: {sentence}")
-
-
-if __name__ == '__main__':
-    conf_app = AppConfig()
-    clustering = Clustering(app_config=conf_app)
-    clustering.run_clustering()
+        sim_clusters = {}
+        for cluster, sentences in cluster_lists.items():
+            sim_clusters[cluster] = {"DTORCD": 0, "NS": 0, "SS": 0, "HS": 0}
+            cluster_combinations = list(combinations(sentences, r=2))
+            for pair_combination in cluster_combinations:
+                sentence1 = pair_combination[0]
+                sentence2 = pair_combination[1]
+                sentence1_row = df[(df == sentence1).any(axis=1)]
+                for index, row in sentence1_row.iterrows():
+                    sent2 = row["sentence_2"]
+                    label = row["label"]
+                    if sentence2 == sent2:
+                        sim_clusters[cluster][label] += 1
+        for cluster, labels_dict in sim_clusters.items():
+            self.app_logger.info(f"For cluster {cluster}: number of sentences for each label:")
+            self.app_logger.info(f"{labels_dict}")
