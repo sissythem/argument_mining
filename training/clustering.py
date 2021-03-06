@@ -1,10 +1,11 @@
 from os.path import join
+
+import hdbscan
 import numpy as np
 import pandas as pd
-import hdbscan
 import umap
-from flair.embeddings import TransformerDocumentEmbeddings
 from flair.data import Sentence
+
 from training.models import UnsupervisedModel, RelationsModel
 from utils.config import AppConfig
 
@@ -15,15 +16,14 @@ class Clustering(UnsupervisedModel):
         super(Clustering, self).__init__(app_config=app_config)
         self.sim_model = RelationsModel(app_config=app_config, model_name="sim")
         self.sim_model.load()
-        self.path_to_transformer_model = join(self.app_config.sim_base_path, self.model_file)
-        # init embeddings from your trained LM
-        self.document_embeddings = TransformerDocumentEmbeddings(self.path_to_transformer_model)
+        self.document_embeddings = self.sim_model.model.document_embeddings
 
     def run_clustering(self):
         n_clusters = 10
-        path_to_csv = join(self.resources_path, "data", "train_sim.csv")
-        df = pd.read_csv(path_to_csv, sep="\t", header=None, index_col=None)
-        sentences = list(df[0])
+        path_to_csv = join(self.resources_path, "data", "UKP_ASPECT.tsv")
+        df = pd.read_csv(path_to_csv, sep="\t", header=0, index_col=None)
+        sentences = list(df["sentence_1"]) + list(df["sentence_2"])
+        sentences = list(set(sentences))
         clusters = self.get_clusters(n_clusters=n_clusters, sentences=sentences)
         self.get_content_per_cluster(clusters=clusters, sentences=sentences)
 
@@ -38,7 +38,13 @@ class Clustering(UnsupervisedModel):
                 # input_ids = torch.tensor(tokens).unsqueeze(0)
                 # outputs = self.bert_model(input_ids)
                 # embeddings = outputs[1][-1].detach().numpy()
-                embeddings = self.document_embeddings.embed(flair_sentence)
+                self.document_embeddings.embed(flair_sentence)
+                embeddings = flair_sentence._embeddings
+                all_embeddings = []
+                for key, value in embeddings.items():
+                    value.to("cpu")
+                    all_embeddings.append(value.numpy())
+                embeddings = np.concatenate(all_embeddings, axis=None)
                 sentence_embeddings.append(embeddings)
             embeddings = np.asarray(sentence_embeddings)
             self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
