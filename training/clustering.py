@@ -35,6 +35,8 @@ class Clustering(UnsupervisedModel):
                 flair_sentence = Sentence(sentence)
                 self.document_embeddings.embed(flair_sentence)
                 embeddings = flair_sentence.get_embedding()
+                embeddings = embeddings.to("cpu")
+                embeddings = embeddings.numpy()
                 sentence_embeddings.append(embeddings)
             embeddings = np.asarray(sentence_embeddings)
             self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
@@ -74,9 +76,10 @@ class Clustering(UnsupervisedModel):
                 sentence2 = pair_combination[1]
                 sentence1_row = df[(df == sentence1).any(axis=1)]
                 for index, row in sentence1_row.iterrows():
+                    sent1 = row["sentence_1"]
                     sent2 = row["sentence_2"]
                     label = row["label"]
-                    if sentence2 == sent2:
+                    if sentence2 == sent2 or sentence2 == sent1:
                         sim_clusters[cluster][label] += 1
         for cluster, labels_dict in sim_clusters.items():
             self.app_logger.info(f"For cluster {cluster}: number of sentences for each label:")
