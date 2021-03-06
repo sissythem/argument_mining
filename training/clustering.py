@@ -5,7 +5,7 @@ import hdbscan
 import umap
 from flair.embeddings import TransformerDocumentEmbeddings
 from flair.data import Sentence
-from training.models import UnsupervisedModel
+from training.models import UnsupervisedModel, RelationsModel
 from utils.config import AppConfig
 
 
@@ -13,6 +13,8 @@ class Clustering(UnsupervisedModel):
 
     def __init__(self, app_config: AppConfig):
         super(Clustering, self).__init__(app_config=app_config)
+        self.sim_model = RelationsModel(app_config=app_config, model_name="sim")
+        self.sim_model.load()
         self.path_to_transformer_model = join(self.app_config.sim_base_path, self.model_file)
         # init embeddings from your trained LM
         self.document_embeddings = TransformerDocumentEmbeddings(self.path_to_transformer_model)
