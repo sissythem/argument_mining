@@ -22,7 +22,7 @@ class Clustering(UnsupervisedModel):
     def run_clustering(self):
         n_clusters = 10
         path_to_csv = join(self.resources_path, "data", "train_sim.csv")
-        df = pd.read_csv(path_to_csv, sep="\t")
+        df = pd.read_csv(path_to_csv, sep="\t", header=None, index_col=None)
         sentences = list(df[0])
         clusters = self.get_clusters(n_clusters=n_clusters, sentences=sentences)
         self.get_content_per_cluster(clusters=clusters, sentences=sentences)
