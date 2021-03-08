@@ -12,8 +12,8 @@ import torch
 import umap
 from flair.data import Corpus
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, BertEmbeddings, \
-    TransformerDocumentEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, BertEmbeddings, DocumentPoolEmbeddings, \
+    TransformerDocumentEmbeddings, TransformerWordEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sklearn.feature_extraction.text import CountVectorizer
@@ -53,18 +53,18 @@ class SupervisedModel(Model):
         # define training / dev / test CSV files
         self.dev_csv, self.train_csv, self.test_csv = self._get_csv_file_names(model_name=model_name)
         self.model_properties: dict = self._get_model_properties(model_name=model_name)
-        self.bert_name = self._get_bert_model_name(model_name=model_name)
+        self._set_bert_model_names(model_name=model_name)
         self.base_path: str = self._get_base_path(model_name=model_name)
         self.model = None
         self.optimizer: torch.optim.Optimizer = self.get_optimizer(model_name=model_name)
         self.device_name = app_config.device_name
         flair.device = torch.device(self.device_name)
 
-    def download_model(self, model_name) -> str:
+    def download_model(self, model_name, dir_name) -> str:
         from transformers import AutoModel, AutoTokenizer
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
-        path = join(self.app_config.output_path, "models", "facebook")
+        path = join(self.app_config.output_path, "models", dir_name)
         if not exists(path):
             mkdir(path)
         tokenizer.save_pretrained(path)
@@ -97,22 +97,30 @@ class SupervisedModel(Model):
         elif model_name == "rel" or model_name == "stance" or model_name == "sim":
             return self.properties["class_model"]
 
-    def _get_bert_model_name(self, model_name: str, download: bool = False) -> str:
-        self.bert_kind = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
-                                                       model_name=model_name)
-        if self.bert_kind == "base":
-            return "bert-base-uncased"
-        elif self.bert_kind == "aueb":
-            return "nlpaueb/bert-base-greek-uncased-v1"
-        elif self.bert_kind == "nli" or self.bert_kind == "multi-nli":
-            model_name = "joeddav/xlm-roberta-large-xnli" if self.bert_kind == "multi-nli" else \
-                "facebook/bart-large-mnli"
-            if download:
-                path = self.download_model(model_name=model_name)
-                return path
-            return model_name
-        elif self.bert_kind == "base-multi":
-            return "bert-base-multilingual-uncased"
+    def _set_bert_model_names(self, model_name: str, download: bool = False):
+        bert_kinds = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
+                                                   model_name=model_name)
+        if bert_kinds:
+            self.bert_model_names = []
+            for bert_kind in bert_kinds:
+                if bert_kind == "base":
+                    self.bert_model_names.append(("bert-base-uncased", bert_kind))
+                elif bert_kind == "aueb":
+                    self.bert_model_names.append(("nlpaueb/bert-base-greek-uncased-v1", bert_kind))
+                elif bert_kind == "nli":
+                    self.bert_model_names.append(("facebook/bart-large-mnli", bert_kind))
+                elif bert_kind == "multi-nli":
+                    self.bert_model_names.append(("joeddav/xlm-roberta-large-xnli", bert_kind))  # not good performance
+                elif bert_kind == "base-multi":
+                    self.bert_model_names.append(("bert-base-multilingual-uncased", bert_kind))
+
+        else:
+            self.bert_model_names = ["nlpaueb/bert-base-greek-uncased-v1"]
+        if download:
+            for idx, pair in enumerate(self.bert_model_names):
+                model, kind = pair[0], pair[1]
+                path = self.download_model(model_name=model_name, dir_name=kind)
+                self.bert_model_names[idx] = (path, kind)
 
     def get_optimizer(self, model_name: str) -> torch.optim.Optimizer:
         """
@@ -212,7 +220,9 @@ class AduModel(SupervisedModel):
         self.app_logger.debug(tag_dictionary.idx2item)
 
         # 4. initialize embeddings
-        embedding_types: List[TokenEmbeddings] = [BertEmbeddings(self.bert_name)]
+        # embedding_types: List[TokenEmbeddings] = [BertEmbeddings(bert_name) for bert_name in self.bert_model_names]
+        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name) for bert_name in
+                                                  self.bert_model_names]
 
         embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
 
@@ -293,8 +303,12 @@ class RelationsModel(SupervisedModel):
         label_dictionary = corpus.make_label_dictionary()
 
         # 3. initialize embeddings
-        document_embeddings = TransformerDocumentEmbeddings(self.bert_name, fine_tune=True)
-        document_embeddings.tokenizer.model_max_length = 512
+        embeddings_list = []
+        for bert_name in self.bert_model_names:
+            embeddings_list.append(TransformerWordEmbeddings(bert_name, fine_tune=True))
+        # document_embeddings = TransformerDocumentEmbeddings(self.bert_name, fine_tune=True)
+        # document_embeddings.tokenizer.model_max_length = 512
+        document_embeddings = DocumentPoolEmbeddings(embeddings_list)
 
         # 3. initialize the document embeddings, mode = mean
         # bert_embeddings = BertEmbeddings(self.bert_name)
