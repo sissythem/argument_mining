@@ -33,23 +33,8 @@ class Model:
         self.model_name = model_name
         self.properties: dict = app_config.properties
         self.resources_path: str = self.app_config.resources_path
+        self.utilities = Utilities(app_config=app_config)
         self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
-
-    @staticmethod
-    def get_bert_model_names(bert_kinds):
-        bert_model_names = []
-        for bert_kind in bert_kinds:
-            if bert_kind == "base":
-                bert_model_names.append(("bert-base-uncased", bert_kind))
-            elif bert_kind == "aueb":
-                bert_model_names.append(("nlpaueb/bert-base-greek-uncased-v1", bert_kind))
-            elif bert_kind == "nli":
-                bert_model_names.append(("facebook/bart-large-mnli", bert_kind))
-            elif bert_kind == "multi-nli":
-                bert_model_names.append(("joeddav/xlm-roberta-large-xnli", bert_kind))  # not good performance
-            elif bert_kind == "base-multi":
-                bert_model_names.append(("bert-base-multilingual-uncased", bert_kind))
-        return bert_model_names
 
     def _get_model_properties(self) -> dict:
         if self.model_name == "adu":
@@ -198,7 +183,7 @@ class SupervisedModel(Model):
         bert_kinds = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
                                                    model_name=self.model_name)
         if bert_kinds:
-            self.bert_model_names = self.get_bert_model_names(bert_kinds=bert_kinds)
+            self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=bert_kinds)
         else:
             self.bert_model_names = ["nlpaueb/bert-base-greek-uncased-v1"]
         if download:
@@ -290,7 +275,6 @@ class UnsupervisedModel(Model):
     def __init__(self, app_config: AppConfig):
         super(UnsupervisedModel, self).__init__(app_config=app_config, model_name="clustering")
         self.device_name = app_config.device_name
-        self.utilities = Utilities(app_config=app_config)
 
 
 class Clustering(UnsupervisedModel):
@@ -305,7 +289,7 @@ class Clustering(UnsupervisedModel):
             self.document_embeddings = self.sim_model.model.document_embeddings
         else:
             bert_kinds = self.model_properties["embeddings"]["bert_kind"]
-            self.bert_model_names = self.get_bert_model_names(bert_kinds=bert_kinds)
+            self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=bert_kinds)
             embeddings_list: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0], fine_tune=True) for
                                                       bert_name in self.bert_model_names]
             self.document_embeddings = DocumentPoolEmbeddings(embeddings_list)

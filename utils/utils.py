@@ -354,3 +354,19 @@ class Utilities:
     @staticmethod
     def tokenize(text, punct=True):
         return tokeniser.tokenise_no_punc(text) if not punct else tokeniser.tokenise(text)
+
+    @staticmethod
+    def get_bert_model_names(bert_kinds):
+        bert_model_names = []
+        for bert_kind in bert_kinds:
+            if bert_kind == "base":
+                bert_model_names.append(("bert-base-uncased", bert_kind))
+            elif bert_kind == "aueb":
+                bert_model_names.append(("nlpaueb/bert-base-greek-uncased-v1", bert_kind))
+            elif bert_kind == "nli":
+                bert_model_names.append(("facebook/bart-large-mnli", bert_kind))
+            elif bert_kind == "multi-nli":
+                bert_model_names.append(("joeddav/xlm-roberta-large-xnli", bert_kind))  # not good performance
+            elif bert_kind == "base-multi":
+                bert_model_names.append(("bert-base-multilingual-uncased", bert_kind))
+        return bert_model_names
