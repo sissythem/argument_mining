@@ -16,6 +16,7 @@ from os import environ, getcwd
 from os import mkdir
 from os.path import exists, join
 from pathlib import Path
+from typing import List
 
 import requests
 import torch
@@ -187,7 +188,7 @@ class AppConfig:
         return base_path
 
     @staticmethod
-    def get_bert_kind(bert_kind_props: dict, model_name: str) -> str:
+    def get_bert_kind(bert_kind_props: dict, model_name: str) -> List[str]:
         bert_kind = "aueb"
         if model_name.startswith("adu"):
             bert_kind = bert_kind_props["adu"]
