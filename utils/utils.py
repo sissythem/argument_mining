@@ -59,7 +59,7 @@ class Utilities:
         filename = filename.replace(".csv", "")
         new_file = f"{filename}_oversample.csv"
         output_filepath = join(self.data_folder, new_file)
-        df.to_csv(output_filepath, sep='\t', index=False, header=0)
+        df.to_csv(output_filepath, sep='\t', index=False, header=True)
 
     @staticmethod
     def oversample_adus(data, desired_lbl_count: dict):
