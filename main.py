@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 
 from pipeline.debatelab import DebateLab
-from training.models import AduModel, RelationsModel
+from training.models import SequentialModel, ClassificationModel
 from training.preprocessing import DataLoader
 from utils.config import AppConfig
 
@@ -71,22 +71,22 @@ def train(app_config):
     models_to_train = app_config.properties["train"]["models"]
     if "adu" in models_to_train:
         logger.info("Training ADU classifier")
-        adu_model = AduModel(app_config=app_config)
+        adu_model = SequentialModel(app_config=app_config, model_name="adu")
         adu_model.train()
         logger.info("ADU Training is finished!")
     if "rel" in models_to_train:
         logger.info("Training relations model")
-        rel_model = RelationsModel(app_config=app_config, model_name="rel")
+        rel_model = ClassificationModel(app_config=app_config, model_name="rel")
         rel_model.train()
         logger.info("Relations training finished!")
     if "stance" in models_to_train:
         logger.info("Training stance model")
-        stance_model = RelationsModel(app_config=app_config, model_name="stance")
+        stance_model = ClassificationModel(app_config=app_config, model_name="stance")
         stance_model.train()
         logger.info("Stance training finished!")
     if "sim" in models_to_train:
         logger.info("Training argument similarity model")
-        sim_model = RelationsModel(app_config=app_config, model_name="sim")
+        sim_model = ClassificationModel(app_config=app_config, model_name="sim")
         sim_model.train()
         logger.info("Finished training similarity model")
 

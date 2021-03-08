@@ -97,4 +97,6 @@ class_model:
   shuffle: False
 clustering:
   n_clusters: 10
-  bert_kind: "aueb" # aueb, base, nli
+  embeddings:
+    model: "local" # local, remote
+    bert_kind: ["aueb"] # if local use sim as name

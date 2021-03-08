@@ -5,7 +5,7 @@ import requests
 from flair.data import Sentence
 
 from pipeline.validation import JsonValidator
-from training.models import AduModel, RelationsModel, TopicModel, Clustering
+from training.models import SequentialModel, ClassificationModel, TopicModel, Clustering
 from utils.config import AppConfig
 from utils.utils import Utilities
 
@@ -27,15 +27,15 @@ class DebateLab:
         self.utilities = Utilities(app_config=self.app_config)
 
         # load ADU model
-        self.adu_model = AduModel(app_config=self.app_config)
+        self.adu_model = SequentialModel(app_config=self.app_config, model_name="adu")
         self.adu_model.load()
 
         # load Relations model
-        self.rel_model = RelationsModel(app_config=self.app_config, model_name="rel")
+        self.rel_model = ClassificationModel(app_config=self.app_config, model_name="rel")
         self.rel_model.load()
 
         # load Stance model
-        self.stance_model = RelationsModel(app_config=self.app_config, model_name="stance")
+        self.stance_model = ClassificationModel(app_config=self.app_config, model_name="stance")
         self.stance_model.load()
 
     def run_pipeline(self):

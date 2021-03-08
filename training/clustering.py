@@ -7,7 +7,7 @@ import pandas as pd
 import umap
 from flair.data import Sentence
 
-from training.models import UnsupervisedModel, RelationsModel
+from training.models import UnsupervisedModel, ClassificationModel
 from utils.config import AppConfig
 
 
@@ -15,7 +15,7 @@ class Clustering(UnsupervisedModel):
 
     def __init__(self, app_config: AppConfig):
         super(Clustering, self).__init__(app_config=app_config)
-        self.sim_model = RelationsModel(app_config=app_config, model_name="sim")
+        self.sim_model = ClassificationModel(app_config=app_config, model_name="sim")
         self.sim_model.load()
         self.document_embeddings = self.sim_model.model.document_embeddings
 

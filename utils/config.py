@@ -189,7 +189,7 @@ class AppConfig:
 
     @staticmethod
     def get_bert_kind(bert_kind_props: dict, model_name: str) -> List[str]:
-        bert_kind = "aueb"
+        bert_kind = ["aueb"]
         if model_name.startswith("adu"):
             bert_kind = bert_kind_props["adu"]
         elif model_name.startswith("rel"):

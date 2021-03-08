@@ -1,7 +1,6 @@
-from itertools import combinations
 from os import mkdir
 from os.path import join, exists
-from typing import List, Tuple
+from typing import List, Tuple, Type, Union
 
 import flair
 import hdbscan
@@ -10,14 +9,14 @@ import numpy as np
 import pandas as pd
 import torch
 import umap
-from flair.data import Corpus
+from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, BertEmbeddings, DocumentPoolEmbeddings, \
-    TransformerDocumentEmbeddings, TransformerWordEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, \
+    TransformerWordEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sklearn.feature_extraction.text import CountVectorizer
-from transformers import AutoModel, AutoTokenizer
+from torch.optim import SGD, Adam, Optimizer
 
 from utils.config import AppConfig
 from utils.utils import Utilities
@@ -28,12 +27,37 @@ class Model:
     Super class for all model classes
     """
 
-    def __init__(self, app_config: AppConfig):
+    def __init__(self, app_config: AppConfig, model_name: str):
         self.app_config = app_config
         self.app_logger = app_config.app_logger
+        self.model_name = model_name
         self.properties: dict = app_config.properties
         self.resources_path: str = self.app_config.resources_path
         self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
+
+    @staticmethod
+    def get_bert_model_names(bert_kinds):
+        bert_model_names = []
+        for bert_kind in bert_kinds:
+            if bert_kind == "base":
+                bert_model_names.append(("bert-base-uncased", bert_kind))
+            elif bert_kind == "aueb":
+                bert_model_names.append(("nlpaueb/bert-base-greek-uncased-v1", bert_kind))
+            elif bert_kind == "nli":
+                bert_model_names.append(("facebook/bart-large-mnli", bert_kind))
+            elif bert_kind == "multi-nli":
+                bert_model_names.append(("joeddav/xlm-roberta-large-xnli", bert_kind))  # not good performance
+            elif bert_kind == "base-multi":
+                bert_model_names.append(("bert-base-multilingual-uncased", bert_kind))
+        return bert_model_names
+
+    def _get_model_properties(self) -> dict:
+        if self.model_name == "adu":
+            return self.properties["seq_model"]
+        elif self.model_name == "rel" or self.model_name == "stance" or self.model_name == "sim":
+            return self.properties["class_model"]
+        elif self.model_name == "clustering":
+            return self.properties["clustering"]
 
 
 class SupervisedModel(Model):
@@ -49,16 +73,73 @@ class SupervisedModel(Model):
             | app_config (AppConfig): the application configuration object
             | model_name (str): the name of the model
         """
-        super(SupervisedModel, self).__init__(app_config=app_config)
+        super(SupervisedModel, self).__init__(app_config=app_config, model_name=model_name)
         # define training / dev / test CSV files
-        self.dev_csv, self.train_csv, self.test_csv = self._get_csv_file_names(model_name=model_name)
-        self.model_properties: dict = self._get_model_properties(model_name=model_name)
-        self._set_bert_model_names(model_name=model_name)
-        self.base_path: str = self._get_base_path(model_name=model_name)
+        self.dev_csv, self.train_csv, self.test_csv = self.get_data_files()
+        self.model_properties: dict = self._get_model_properties()
+        self.use_tensorboard = self.model_properties.get("use_tensorboard", True)
+        self._set_bert_model_names()
+        self.base_path: str = self._get_base_path()
         self.model = None
-        self.optimizer: torch.optim.Optimizer = self.get_optimizer(model_name=model_name)
+        self.optimizer: Optimizer = self.get_optimizer(model_name=model_name)
         self.device_name = app_config.device_name
         flair.device = torch.device(self.device_name)
+
+    def train(self):
+        """
+        Define the training process of the model
+        """
+        # 1. get the corpus
+        corpus = self.get_corpus()
+        self.app_logger.info("Corpus created")
+        self.app_logger.info(f"First training sentence: {corpus.train[0]}")
+
+        # 2. make the dictionary from the corpus
+        dictionary: Dictionary = self.get_dictionary(corpus=corpus)
+
+        # 3. initialize embeddings
+        embeddings = self.get_embeddings()
+
+        # 4. get flair model: SequenceTagger or TextClassifier
+        flair_model = self.get_flair_model(dictionary=dictionary, embeddings=embeddings)
+
+        # 5. initialize the ModelTrainer
+        trainer: ModelTrainer = self.get_model_trainer(corpus=corpus, flair_model=flair_model)
+
+        trainer.train(self.base_path, learning_rate=self.model_properties["learning_rate"],
+                      patience=self.model_properties["patience"], max_epochs=self.model_properties["max_epochs"],
+                      mini_batch_size=self.model_properties["mini_batch_size"], monitor_test=True,
+                      train_with_dev=self.model_properties["train_with_dev"],
+                      save_final_model=self.model_properties["save_final_model"],
+                      num_workers=self.model_properties["num_workers"], shuffle=self.model_properties["shuffle"])
+
+    def get_corpus(self) -> Corpus:
+        raise NotImplementedError
+
+    def get_dictionary(self, corpus: Corpus) -> Dictionary:
+        raise NotImplementedError
+
+    def get_embeddings(self):
+        raise NotImplementedError
+
+    def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:
+        raise NotImplementedError
+
+    def get_model_trainer(self, corpus: Corpus, flair_model: flair.nn.Model) -> ModelTrainer:
+        # 5. initialize the ModelTrainer
+        trainer: ModelTrainer = ModelTrainer(flair_model, corpus, use_tensorboard=self.use_tensorboard,
+                                             optimizer=self.optimizer)
+        self.app_logger.info("Starting training with ModelTrainer")
+        self.app_logger.info(f"Model configuration properties: {self.model_properties}")
+        return trainer
+
+    def load(self):
+        """
+        Define the way to load the trained model
+        """
+        model_path = join(self.base_path, self.model_file)
+        self.app_logger.info(f"Loading model from path: {model_path}")
+        self.model = SequenceTagger.load(model_path)
 
     def download_model(self, model_name, dir_name) -> str:
         from transformers import AutoModel, AutoTokenizer
@@ -71,58 +152,7 @@ class SupervisedModel(Model):
         model.save_pretrained(path)
         return path
 
-    def _get_csv_file_names(self, model_name: str) -> Tuple[str, str, str]:
-        if model_name == "adu":
-            return self.app_config.adu_dev_csv, self.app_config.adu_train_csv, self.app_config.adu_test_csv
-        elif model_name == "sim":
-            return self.app_config.sim_dev_csv, self.app_config.sim_train_csv, self.app_config.sim_test_csv
-        elif model_name == "rel":
-            return self.app_config.rel_dev_csv, self.app_config.rel_train_csv, self.app_config.rel_test_csv
-        elif model_name == "stance":
-            return self.app_config.stance_dev_csv, self.app_config.stance_train_csv, self.app_config.stance_test_csv
-
-    def _get_base_path(self, model_name: str) -> str:
-        if model_name == "adu":
-            return self.app_config.adu_base_path
-        elif model_name == "sim":
-            return self.app_config.sim_base_path
-        elif model_name == "rel":
-            return self.app_config.rel_base_path
-        elif model_name == "stance":
-            return self.app_config.stance_base_path
-
-    def _get_model_properties(self, model_name: str) -> dict:
-        if model_name == "adu":
-            return self.properties["seq_model"]
-        elif model_name == "rel" or model_name == "stance" or model_name == "sim":
-            return self.properties["class_model"]
-
-    def _set_bert_model_names(self, model_name: str, download: bool = False):
-        bert_kinds = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
-                                                   model_name=model_name)
-        if bert_kinds:
-            self.bert_model_names = []
-            for bert_kind in bert_kinds:
-                if bert_kind == "base":
-                    self.bert_model_names.append(("bert-base-uncased", bert_kind))
-                elif bert_kind == "aueb":
-                    self.bert_model_names.append(("nlpaueb/bert-base-greek-uncased-v1", bert_kind))
-                elif bert_kind == "nli":
-                    self.bert_model_names.append(("facebook/bart-large-mnli", bert_kind))
-                elif bert_kind == "multi-nli":
-                    self.bert_model_names.append(("joeddav/xlm-roberta-large-xnli", bert_kind))  # not good performance
-                elif bert_kind == "base-multi":
-                    self.bert_model_names.append(("bert-base-multilingual-uncased", bert_kind))
-
-        else:
-            self.bert_model_names = ["nlpaueb/bert-base-greek-uncased-v1"]
-        if download:
-            for idx, pair in enumerate(self.bert_model_names):
-                model, kind = pair[0], pair[1]
-                path = self.download_model(model_name=model_name, dir_name=kind)
-                self.bert_model_names[idx] = (path, kind)
-
-    def get_optimizer(self, model_name: str) -> torch.optim.Optimizer:
+    def get_optimizer(self, model_name: str) -> Union[Type[Optimizer], Optimizer]:
         """
         Define the model's optimizer based on the application properties
 
@@ -137,25 +167,119 @@ class SupervisedModel(Model):
         else:
             properties = self.properties["class_model"]
         optimizer_name = properties["optimizer"]
+        optimizer = Adam
         if optimizer_name == "Adam":
-            optimizer = torch.optim.Adam
+            optimizer = Adam
         elif optimizer_name == "SGD":
-            optimizer = torch.optim.SGD
-        else:
-            optimizer = torch.optim.Adam
+            optimizer = SGD
         return optimizer
 
-    def train(self):
-        """
-        Define the training process of the model. All subclasses should implement this method
-        """
-        raise NotImplementedError
+    def get_data_files(self) -> Tuple[str, str, str]:
+        if self.model_name == "adu":
+            return self.app_config.adu_dev_csv, self.app_config.adu_train_csv, self.app_config.adu_test_csv
+        elif self.model_name == "sim":
+            return self.app_config.sim_dev_csv, self.app_config.sim_train_csv, self.app_config.sim_test_csv
+        elif self.model_name == "rel":
+            return self.app_config.rel_dev_csv, self.app_config.rel_train_csv, self.app_config.rel_test_csv
+        elif self.model_name == "stance":
+            return self.app_config.stance_dev_csv, self.app_config.stance_train_csv, self.app_config.stance_test_csv
 
-    def load(self):
-        """
-        Define the way to load the trained model. All subclasses should implement this method
-        """
-        raise NotImplementedError
+    def _get_base_path(self) -> str:
+        if self.model_name == "adu":
+            return self.app_config.adu_base_path
+        elif self.model_name == "sim":
+            return self.app_config.sim_base_path
+        elif self.model_name == "rel":
+            return self.app_config.rel_base_path
+        elif self.model_name == "stance":
+            return self.app_config.stance_base_path
+
+    def _set_bert_model_names(self, download: bool = False):
+        bert_kinds = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
+                                                   model_name=self.model_name)
+        if bert_kinds:
+            self.bert_model_names = self.get_bert_model_names(bert_kinds=bert_kinds)
+        else:
+            self.bert_model_names = ["nlpaueb/bert-base-greek-uncased-v1"]
+        if download:
+            for idx, pair in enumerate(self.bert_model_names):
+                model, kind = pair[0], pair[1]
+                path = self.download_model(model_name=model, dir_name=kind)
+                self.bert_model_names[idx] = (path, kind)
+
+
+class SequentialModel(SupervisedModel):
+
+    def __init__(self, app_config: AppConfig, model_name: str):
+        super(SequentialModel, self).__init__(app_config=app_config, model_name=model_name)
+        self.hidden_size: int = self.model_properties["hidden_size"]
+        self.use_crf: bool = self.model_properties["use_crf"]
+        self.rnn_layers: int = self.model_properties["rnn_layers"]
+        # what tag do we want to predict?
+        self.tag_type = 'ner'
+
+    def get_corpus(self) -> Corpus:
+        columns = {0: 'text', 1: 'ner'}
+        data_folder = join(self.resources_path, "data")
+        corpus: Corpus = ColumnCorpus(data_folder, columns, train_file=self.train_csv, test_file=self.test_csv,
+                                      dev_file=self.dev_csv)
+        return corpus
+
+    def get_dictionary(self, corpus: Corpus) -> Dictionary:
+        tag_dictionary = corpus.make_tag_dictionary(tag_type=self.tag_type)
+        self.app_logger.info("Tag dictionary created")
+        self.app_logger.debug(tag_dictionary.idx2item)
+        return tag_dictionary
+
+    def get_embeddings(self):
+        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0]) for bert_name in
+                                                  self.bert_model_names]
+
+        embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
+        return embeddings
+
+    def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:
+        # 5. initialize sequence tagger
+        tagger: SequenceTagger = SequenceTagger(hidden_size=self.hidden_size,
+                                                embeddings=embeddings,
+                                                tag_dictionary=dictionary,
+                                                tag_type=self.tag_type,
+                                                use_crf=self.use_crf,
+                                                rnn_layers=self.rnn_layers)
+        return tagger
+
+
+class ClassificationModel(SupervisedModel):
+
+    def __init__(self, app_config: AppConfig, model_name: str):
+        super(ClassificationModel, self).__init__(app_config=app_config, model_name=model_name)
+
+    def get_corpus(self) -> Corpus:
+        data_folder = join(self.resources_path, "data")
+        # define columns
+        column_name_map = {0: "text", 1: "label_topic"}
+        # create Corpus
+        corpus: Corpus = CSVClassificationCorpus(data_folder=data_folder, column_name_map=column_name_map,
+                                                 skip_header=True, delimiter="\t", train_file=self.train_csv,
+                                                 test_file=self.test_csv, dev_file=self.dev_csv)
+        return corpus
+
+    def get_dictionary(self, corpus: Corpus) -> Dictionary:
+        # make label dictionary
+        return corpus.make_label_dictionary()
+
+    def get_embeddings(self):
+        # initialize the document embeddings, mode=mean
+        embeddings_list: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0], fine_tune=True) for
+                                                  bert_name in self.bert_model_names]
+        document_embeddings = DocumentPoolEmbeddings(embeddings_list)
+        return document_embeddings
+
+    def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:
+        # create the TextClassifier
+        classifier = TextClassifier(document_embeddings=embeddings, label_dictionary=dictionary,
+                                    multi_label=dictionary.multi_label)
+        return classifier
 
 
 class UnsupervisedModel(Model):
@@ -164,210 +288,37 @@ class UnsupervisedModel(Model):
     """
 
     def __init__(self, app_config: AppConfig):
-        super(UnsupervisedModel, self).__init__(app_config=app_config)
+        super(UnsupervisedModel, self).__init__(app_config=app_config, model_name="clustering")
         self.device_name = app_config.device_name
         self.utilities = Utilities(app_config=app_config)
-
-
-class AduModel(SupervisedModel):
-    """
-    Class for the ADU sequence model
-    """
-
-    def __init__(self, app_config: AppConfig, model_name="adu"):
-        """
-        Constructor for the AduModel class
-
-        Args
-            app_config (AppConfig): the application configuration object
-        """
-        super(AduModel, self).__init__(app_config=app_config, model_name=model_name)
-
-        self.hidden_size: int = self.model_properties["hidden_size"]
-        self.use_crf: bool = self.model_properties["use_crf"]
-        self.rnn_layers: int = self.model_properties["rnn_layers"]
-        self.dropout: float = self.model_properties["dropout"]
-        self.learning_rate: float = self.model_properties["learning_rate"]
-        self.mini_batch_size: int = self.model_properties["mini_batch_size"]
-        self.max_epochs: int = self.model_properties["max_epochs"]
-        self.num_workers: int = self.model_properties["num_workers"]
-        self.patience: int = self.model_properties["patience"]
-        self.use_tensorboard: bool = self.model_properties["use_tensorboard"]
-        self.train_with_dev: bool = self.model_properties["train_with_dev"]
-        self.save_final_model: bool = self.model_properties["save_final_model"]
-        self.shuffle: bool = self.model_properties["shuffle"]
-
-    def train(self):
-        """
-        ADU training method. It uses the flair library.
-        """
-        # define columns
-        columns = {0: 'text', 1: 'ner'}
-        data_folder = join(self.resources_path, "data")
-        # 1. get the corpus
-        corpus: Corpus = ColumnCorpus(data_folder, columns, train_file=self.train_csv, test_file=self.test_csv,
-                                      dev_file=self.dev_csv)
-
-        self.app_logger.info("Corpus created")
-        self.app_logger.info(f"First training sentence: {corpus.train[0]}")
-        # 2. what tag do we want to predict?
-        tag_type = 'ner'
-
-        # 3. make the tag dictionary from the corpus
-        tag_dictionary = corpus.make_tag_dictionary(tag_type=tag_type)
-
-        self.app_logger.info("Tag dictionary created")
-        self.app_logger.debug(tag_dictionary.idx2item)
-
-        # 4. initialize embeddings
-        # embedding_types: List[TokenEmbeddings] = [BertEmbeddings(bert_name) for bert_name in self.bert_model_names]
-        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0]) for bert_name in
-                                                  self.bert_model_names]
-
-        embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
-
-        # 5. initialize sequence tagger
-        tagger: SequenceTagger = SequenceTagger(hidden_size=self.hidden_size,
-                                                embeddings=embeddings,
-                                                tag_dictionary=tag_dictionary,
-                                                tag_type=tag_type,
-                                                use_crf=self.use_crf,
-                                                rnn_layers=self.rnn_layers)
-        # 6. initialize trainer
-        trainer: ModelTrainer = ModelTrainer(tagger, corpus, use_tensorboard=self.use_tensorboard,
-                                             optimizer=self.optimizer)
-
-        self.app_logger.info("Starting training with ModelTrainer")
-        self.app_logger.info(f"Model configuration properties: {self.model_properties}")
-        # 7. start training
-        trainer.train(self.base_path, patience=self.patience, learning_rate=self.learning_rate,
-                      mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
-                      train_with_dev=self.train_with_dev, save_final_model=self.save_final_model,
-                      num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
-
-    def load(self):
-        """
-        Loads the trained ADU model for the folder specified during the training
-        """
-        model_path = join(self.base_path, self.model_file)
-        self.app_logger.info(f"Loading ADU model from path: {model_path}")
-        self.model = SequenceTagger.load(model_path)
-
-
-class RelationsModel(SupervisedModel):
-    """
-    Class representing the model for relations and stance prediction
-    """
-
-    def __init__(self, app_config: AppConfig, model_name: str):
-        """
-        Constructor of the RelationsModel class
-
-        Args
-            | app_config (AppConfig): the application configuration object
-            | dev_csv (str): the name of the dev csv file
-            | train_csv (str): the name of the train csv file
-            | test_csv (str): the name of the test csv file
-            | base_path (str): full path to the folder where the model will be stored
-            | model_name (str): the name of the model
-        """
-        super(RelationsModel, self).__init__(app_config=app_config, model_name=model_name)
-        self.hidden_size: int = self.model_properties["hidden_size"]
-        self.use_crf: bool = self.model_properties["use_crf"]
-        self.layers: int = self.model_properties["layers"]
-        self.learning_rate: float = self.model_properties["learning_rate"]
-        self.mini_batch_size: int = self.model_properties["mini_batch_size"]
-        self.max_epochs: int = self.model_properties["max_epochs"]
-        self.patience: int = self.model_properties["patience"]
-        self.num_workers: int = self.model_properties["num_workers"]
-        self.use_tensorboard: bool = self.model_properties["use_tensorboard"]
-        self.train_with_dev: bool = self.model_properties["train_with_dev"]
-        self.save_final_model: bool = self.model_properties["save_final_model"]
-        self.shuffle: bool = self.model_properties["shuffle"]
-
-    def train(self):
-        """
-        Function to train a relations or stance prediction model. Uses the flair library
-        """
-        data_folder = join(self.resources_path, "data")
-        # define columns
-        column_name_map = {0: "text", 1: "label_topic"}
-        # 1. create Corpus
-        corpus: Corpus = CSVClassificationCorpus(data_folder=data_folder, column_name_map=column_name_map,
-                                                 skip_header=True, delimiter="\t", train_file=self.train_csv,
-                                                 test_file=self.test_csv, dev_file=self.dev_csv)
-        self.app_logger.info("Corpus created")
-        self.app_logger.info(f"First training sentence: {corpus.train[0]}")
-
-        # 2. make label dictionary
-        label_dictionary = corpus.make_label_dictionary()
-
-        # 3. initialize embeddings
-        embeddings_list = []
-        for bert_name in self.bert_model_names:
-            embeddings_list.append(TransformerWordEmbeddings(bert_name[0], fine_tune=True))
-        # document_embeddings = TransformerDocumentEmbeddings(self.bert_name, fine_tune=True)
-        # document_embeddings.tokenizer.model_max_length = 512
-        document_embeddings = DocumentPoolEmbeddings(embeddings_list)
-
-        # 3. initialize the document embeddings, mode = mean
-        # bert_embeddings = BertEmbeddings(self.bert_name)
-        # document_embeddings = DocumentPoolEmbeddings([bert_embeddings])
-
-        # 4. create the TextClassifier
-        classifier = TextClassifier(document_embeddings=document_embeddings, label_dictionary=label_dictionary,
-                                    multi_label=True)
-
-        # 5. create the ModelTrainer
-        trainer: ModelTrainer = ModelTrainer(classifier, corpus, use_tensorboard=self.use_tensorboard,
-                                             optimizer=self.optimizer)
-
-        self.app_logger.info("Starting training with ModelTrainer")
-        self.app_logger.info(f"Model configuration properties: {self.model_properties}")
-        # 7. start training
-        trainer.train(self.base_path, learning_rate=self.learning_rate, patience=self.patience,
-                      mini_batch_size=self.mini_batch_size, max_epochs=self.max_epochs,
-                      train_with_dev=self.train_with_dev, save_final_model=self.save_final_model,
-                      num_workers=self.num_workers, shuffle=self.shuffle, monitor_test=True)
-
-    def load(self):
-        """
-        Load the relations or stance model
-        """
-        model_path = join(self.base_path, self.model_file)
-        self.app_logger.info(f"Loading Relations model from path: {model_path}")
-        self.model = TextClassifier.load(model_path)
 
 
 class Clustering(UnsupervisedModel):
 
     def __init__(self, app_config: AppConfig):
         super(Clustering, self).__init__(app_config=app_config)
-        model_id = "nlpaueb/bert-base-greek-uncased-v1"
-        self.bert_model = AutoModel.from_pretrained(model_id, output_hidden_states=True)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_id)
-
-    def run_clustering(self, n_clusters, sentences, adu_ids, doc_ids):
-        clusters = self.get_clusters(n_clusters=n_clusters, sentences=sentences)
-        relations = self.get_cross_document_relations(clusters=clusters, sentences=sentences, adu_ids=adu_ids,
-                                                      doc_ids=doc_ids)
-        relations_ids = []
-        for relation in relations:
-            # TODO uncomment save to Elasticsearch -- change index inside the save_relation function!!
-            # self.app_config.elastic_save.save_relation(relation=relation)
-            relations_ids.append(relation["id"])
-        return relations_ids
+        self.model_properties = self.app_config.properties["clustering"]
+        self.n_clusters = self.model_properties["n_clusters"]
+        if self.model_properties["embeddings"]["model"] == "local":
+            self.sim_model = ClassificationModel(app_config=app_config, model_name="sim")
+            self.sim_model.load()
+            self.document_embeddings = self.sim_model.model.document_embeddings
+        else:
+            bert_kinds = self.model_properties["embeddings"]["bert_kind"]
+            self.bert_model_names = self.get_bert_model_names(bert_kinds=bert_kinds)
+            embeddings_list: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0], fine_tune=True) for
+                                                      bert_name in self.bert_model_names]
+            self.document_embeddings = DocumentPoolEmbeddings(embeddings_list)
 
     def get_clusters(self, n_clusters, sentences):
         try:
-            # model = SentenceTransformer("distiluse-base-multilingual-cased-v2").to(self.device_name)
-            # embeddings = model.encode(sentences, show_progress_bar=True)
             sentence_embeddings = []
             for sentence in sentences:
-                tokens = self.tokenizer.encode(sentence)
-                input_ids = torch.tensor(tokens).unsqueeze(0)
-                outputs = self.bert_model(input_ids)
-                embeddings = outputs[1][-1].detach().numpy()
+                flair_sentence = Sentence(sentence)
+                self.document_embeddings.embed(flair_sentence)
+                embeddings = flair_sentence.get_embedding()
+                embeddings = embeddings.to("cpu")
+                embeddings = embeddings.numpy()
                 sentence_embeddings.append(embeddings)
             embeddings = np.asarray(sentence_embeddings)
             self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
@@ -382,45 +333,20 @@ class Clustering(UnsupervisedModel):
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
-    def get_cross_document_relations(self, clusters, sentences, adu_ids, doc_ids):
-        cluster_dict = self.get_content_per_cluster(clusters=clusters, sentences=sentences, adu_ids=adu_ids,
-                                                    doc_ids=doc_ids)
-        relations = []
-        for cluster, pairs in cluster_dict.items():
-            cluster_combinations = list(combinations(pairs, r=2))
-            for pair_combination in cluster_combinations:
-                arg1 = pair_combination[0]
-                arg2 = pair_combination[1]
-                relation = {
-                    "id": f"{arg1[1]};{arg2[1]};{arg1[0]};{arg2[0]}",
-                    "cluster": cluster,
-                    "source": arg1[0],
-                    "source_doc": arg1[1],
-                    "target": arg2[0],
-                    "target_doc": arg2[1]
-                }
-                relations.append(relation)
-        return relations
+    @staticmethod
+    def visualize(cluster, umap_embeddings):
+        # Prepare data
+        result = pd.DataFrame(umap_embeddings, columns=['x', 'y'])
+        result['labels'] = cluster.labels_
 
-    def get_content_per_cluster(self, clusters, sentences, doc_ids, adu_ids, print_clusters=True):
-        clusters_dict = {}
-        for idx, cluster in enumerate(clusters.labels_):
-            if cluster not in clusters_dict.keys():
-                clusters_dict[cluster] = []
-            adu_id = adu_ids[idx]
-            doc_id = doc_ids[idx]
-            sentence = sentences[idx]
-            clusters_dict[cluster].append((adu_id, doc_id, sentence))
-        if print_clusters:
-            self.print_clusters(cluster_lists=clusters_dict)
-        return clusters_dict
-
-    def print_clusters(self, cluster_lists):
-        for idx, cluster_list in cluster_lists.items():
-            self.app_logger.debug(f"Content of Cluster {idx}")
-            for pair in cluster_list:
-                self.app_logger.debug(f"Sentence {pair[0]} in document with id {pair[1]}")
-                self.app_logger.debug(f"Sentence content: {pair[2]}")
+        # Visualize clusters
+        # fig, ax = plt.subplots(figsize=(20, 10))
+        plt.subplots(figsize=(20, 10))
+        outliers = result.loc[result.labels == -1, :]
+        clustered = result.loc[result.labels != -1, :]
+        plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
+        plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
+        plt.colorbar()
 
 
 class TopicModel(Clustering):
@@ -450,7 +376,6 @@ class TopicModel(Clustering):
         topics = []
         sentences = self.utilities.tokenize(text=content)
         sentences = [" ".join(s) for s in sentences]
-        self.app_logger.debug(f"Sentences fed to TopicModel: {sentences}")
         try:
             n_clusters = int(len(sentences) / 2)
             clusters = self.get_clusters(sentences=sentences, n_clusters=n_clusters)
@@ -502,19 +427,3 @@ class TopicModel(Clustering):
                        .rename({"Topic": "Topic", "Sentence": "Size"}, axis='columns')
                        .sort_values("Size", ascending=False))
         return topic_sizes
-
-    @staticmethod
-    def visualize_topics(cluster, embeddings):
-        # Prepare data
-        umap_data = umap.UMAP(n_neighbors=15, n_components=2, min_dist=0.0, metric='cosine').fit_transform(embeddings)
-        result = pd.DataFrame(umap_data, columns=['x', 'y'])
-        result['labels'] = cluster.labels_
-
-        # Visualize clusters
-        # fig, ax = plt.subplots(figsize=(20, 10))
-        plt.subplots(figsize=(20, 10))
-        outliers = result.loc[result.labels == -1, :]
-        clustered = result.loc[result.labels != -1, :]
-        plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
-        plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
-        plt.colorbar()
