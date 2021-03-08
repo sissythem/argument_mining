@@ -1,4 +1,5 @@
 import json
+from itertools import combinations
 
 import requests
 from flair.data import Sentence
@@ -9,7 +10,7 @@ from utils.config import AppConfig
 from utils.utils import Utilities
 
 
-class ArgumentMining:
+class DebateLab:
     """
     Class representing the full pipeline of DebateLab
     """
@@ -30,16 +31,11 @@ class ArgumentMining:
         self.adu_model.load()
 
         # load Relations model
-        self.rel_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.rel_dev_csv,
-                                        train_csv=self.app_config.rel_train_csv, test_csv=self.app_config.rel_test_csv,
-                                        base_path=self.app_config.rel_base_path, model_name="rel")
+        self.rel_model = RelationsModel(app_config=self.app_config, model_name="rel")
         self.rel_model.load()
 
         # load Stance model
-        self.stance_model = RelationsModel(app_config=self.app_config, dev_csv=self.app_config.stance_dev_csv,
-                                           train_csv=self.app_config.stance_train_csv,
-                                           test_csv=self.app_config.stance_test_csv,
-                                           base_path=self.app_config.stance_base_path, model_name="stance")
+        self.stance_model = RelationsModel(app_config=self.app_config, model_name="stance")
         self.stance_model.load()
 
     def run_pipeline(self):
@@ -63,6 +59,7 @@ class ArgumentMining:
         self.run_clustering(documents=documents, document_ids=document_ids)
         self.app_logger.info("Evaluation is finished!")
 
+    # ************************** Classification ********************************************************
     def run_argument_mining(self, documents, export_schema=False):
         """
         Argument Mining pipeline:
@@ -101,24 +98,6 @@ class ArgumentMining:
             validator.export_json_schema(document_ids=document_ids)
         self.app_config.notify_ics(ids_list=document_ids)
         return documents, document_ids
-
-    def run_clustering(self, documents, document_ids):
-        """
-        Cross-document relations pipeline
-
-        Args
-            | documents (list): list of json documents extracted from the SocialObservatory Elasticsearch & updated by
-            the Argument Mining pipeline
-            | document_ids (list): list of the ids of the valid documents
-        """
-        adus, doc_ids, adu_ids = self.utilities.collect_adu_for_clustering(documents=documents,
-                                                                           document_ids=document_ids)
-        clustering = Clustering(app_config=self.app_config)
-        n_clusters = self.app_config.properties["clustering"]["n_clusters"]
-        relation_ids = clustering.run_clustering(n_clusters=n_clusters, sentences=adus, adu_ids=adu_ids,
-                                                 doc_ids=doc_ids)
-        # TODO notify ICS
-        # self.app_config.notify_ics(ids_list=relation_ids, kind="clustering")
 
     def predict(self, document):
         """
@@ -312,3 +291,65 @@ class ArgumentMining:
                             if segment["id"] == claim[1]:
                                 segment["stance"] = stance_list
         return json_obj, stance_counter
+
+    # ************************************* Cross-document relations **********************************
+    def run_clustering(self, documents, document_ids):
+        """
+        Cross-document relations pipeline
+
+        Args
+            | documents (list): list of json documents extracted from the SocialObservatory Elasticsearch & updated by
+            the Argument Mining pipeline
+            | document_ids (list): list of the ids of the valid documents
+        """
+        adus, doc_ids, adu_ids = self.utilities.collect_adu_for_clustering(documents=documents,
+                                                                           document_ids=document_ids)
+        clustering = Clustering(app_config=self.app_config)
+        n_clusters = self.app_config.properties["clustering"]["n_clusters"]
+        clusters = clustering.get_clusters(n_clusters=n_clusters, sentences=adus)
+        relations = self.get_cross_document_relations(clusters=clusters, sentences=adus, adu_ids=adu_ids,
+                                                      doc_ids=doc_ids)
+        relations_ids = []
+        for relation in relations:
+            # TODO uncomment save to Elasticsearch -- change index inside the save_relation function!!
+            # self.app_config.elastic_save.save_relation(relation=relation)
+            relations_ids.append(relation["id"])
+        # TODO notify ICS
+        # self.app_config.notify_ics(ids_list=relations_ids, kind="clustering")
+
+    def get_cross_document_relations(self, clusters, sentences, adu_ids, doc_ids):
+        cluster_dict = self.get_content_per_cluster(clusters=clusters, sentences=sentences, adu_ids=adu_ids,
+                                                    doc_ids=doc_ids)
+        relations = []
+        for cluster, pairs in cluster_dict.items():
+            cluster_combinations = list(combinations(pairs, r=2))
+            for pair_combination in cluster_combinations:
+                arg1 = pair_combination[0]
+                arg2 = pair_combination[1]
+                relation = {
+                    "id": f"{arg1[1]};{arg2[1]};{arg1[0]};{arg2[0]}",
+                    "cluster": cluster,
+                    "source": arg1[0],
+                    "source_doc": arg1[1],
+                    "target": arg2[0],
+                    "target_doc": arg2[1]
+                }
+                relations.append(relation)
+        return relations
+
+    def get_content_per_cluster(self, clusters, sentences, doc_ids, adu_ids, print_clusters=True):
+        clusters_dict = {}
+        for idx, cluster in enumerate(clusters.labels_):
+            if cluster not in clusters_dict.keys():
+                clusters_dict[cluster] = []
+            adu_id = adu_ids[idx]
+            doc_id = doc_ids[idx]
+            sentence = sentences[idx]
+            clusters_dict[cluster].append((adu_id, doc_id, sentence))
+        if print_clusters:
+            for idx, cluster_list in clusters_dict.items():
+                self.app_logger.debug(f"Content of Cluster {idx}")
+                for pair in cluster_list:
+                    self.app_logger.debug(f"Sentence {pair[0]} in document with id {pair[1]}")
+                    self.app_logger.debug(f"Sentence content: {pair[2]}")
+        return clusters_dict

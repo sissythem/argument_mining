@@ -4,7 +4,7 @@ from os.path import join
 import numpy as np
 import pandas as pd
 
-from pipeline.debatelab import ArgumentMining
+from pipeline.debatelab import DebateLab
 from training.models import AduModel, RelationsModel
 from training.preprocessing import DataLoader
 from utils.config import AppConfig
@@ -98,7 +98,7 @@ def evaluate(app_config):
     Args
         app_config (AppConfig): the application configuration
     """
-    arg_mining = ArgumentMining(app_config=app_config)
+    arg_mining = DebateLab(app_config=app_config)
     arg_mining.run_pipeline()
 
 
