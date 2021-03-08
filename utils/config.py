@@ -168,7 +168,7 @@ class AppConfig:
             properties = self.properties["seq_model"]
         else:
             properties = self.properties["class_model"]
-        bert_kind = self.get_bert_kind(bert_kind_props=properties["bert_kind"], model_name=base_name)
+        bert_kind = "-".join(self.get_bert_kind(bert_kind_props=properties["bert_kind"], model_name=base_name))
         embedding_names = f"bert-{bert_kind}"
         layers = properties["rnn_layers"] if base_name == "adu_model" else properties["layers"]
         base_path = f"{base_name}-" + '-'.join([
