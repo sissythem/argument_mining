@@ -105,7 +105,7 @@ class SupervisedModel(Model):
         elif self.bert_kind == "aueb":
             return "nlpaueb/bert-base-greek-uncased-v1"
         elif self.bert_kind == "nli" or self.bert_kind == "multi-nli":
-            model_name = "microsoft/Multilingual-MiniLM-L12-H384" if self.bert_kind == "multi-nli" else \
+            model_name = "joeddav/xlm-roberta-large-xnli" if self.bert_kind == "multi-nli" else \
                 "facebook/bart-large-mnli"
             if download:
                 path = self.download_model(model_name=model_name)
