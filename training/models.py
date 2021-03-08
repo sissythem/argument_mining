@@ -221,7 +221,7 @@ class AduModel(SupervisedModel):
 
         # 4. initialize embeddings
         # embedding_types: List[TokenEmbeddings] = [BertEmbeddings(bert_name) for bert_name in self.bert_model_names]
-        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name) for bert_name in
+        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0]) for bert_name in
                                                   self.bert_model_names]
 
         embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
@@ -305,7 +305,7 @@ class RelationsModel(SupervisedModel):
         # 3. initialize embeddings
         embeddings_list = []
         for bert_name in self.bert_model_names:
-            embeddings_list.append(TransformerWordEmbeddings(bert_name, fine_tune=True))
+            embeddings_list.append(TransformerWordEmbeddings(bert_name[0], fine_tune=True))
         # document_embeddings = TransformerDocumentEmbeddings(self.bert_name, fine_tune=True)
         # document_embeddings.tokenizer.model_max_length = 512
         document_embeddings = DocumentPoolEmbeddings(embeddings_list)
