@@ -81,7 +81,7 @@ class_model:
   bert_kind:
     rel: "aueb" # base, nli, aueb, base-multi
     stance: "aueb" # base, nli, aueb, base-multi
-    sim: "base" # base, nli, aueb, base-multi
+    sim: "multi-nli" # base, nli, aueb, base-multi, multi-nli
   hidden_size: 256
   layers: 2
   use_crf: False
@@ -97,3 +97,4 @@ class_model:
   shuffle: False
 clustering:
   n_clusters: 10
+  bert_kind: "aueb" # aueb, base, nli
