@@ -2,6 +2,7 @@ import json
 from itertools import combinations
 
 import requests
+import numpy as np
 from flair.data import Sentence
 
 from pipeline.validation import JsonValidator
@@ -341,7 +342,9 @@ class DebateLab:
 
     def get_content_per_cluster(self, clusters, sentences, doc_ids, adu_ids, print_clusters=True):
         clusters_dict = {}
-        for idx, cluster in enumerate(clusters.labels_):
+        clusters = clusters.labels_
+        self.app_logger.debug(f"Clusters: {np.unique(clusters)}")
+        for idx, cluster in enumerate(clusters):
             if cluster not in clusters_dict.keys():
                 clusters_dict[cluster] = []
             adu_id = adu_ids[idx]
