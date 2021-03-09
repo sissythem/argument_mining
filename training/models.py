@@ -15,7 +15,7 @@ from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmb
     TransformerWordEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
 from utils.config import AppConfig
@@ -308,7 +308,9 @@ class Clustering(UnsupervisedModel):
                                                       bert_name in self.bert_model_names]
             self.document_embeddings = DocumentPoolEmbeddings(embeddings_list)
 
-    def get_clusters(self, n_clusters, sentences):
+    def get_clusters(self, n_clusters, sentences, preprocess=False):
+        if preprocess:
+            sentences = self.preprocess_sentences(sentences=sentences)
         try:
             sentence_embeddings = []
             for sentence in sentences:
@@ -330,6 +332,29 @@ class Clustering(UnsupervisedModel):
             return clusters
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
+
+    def preprocess_sentences(self, sentences, top_n_words=100):
+        preprocessed_sentences = []
+        greek_stopwords = self.utilities.get_greek_stopwords()
+        tf_idf_vectorizer = TfidfVectorizer(stop_words=greek_stopwords)
+        res = tf_idf_vectorizer.fit_transform(sentences)
+        vocab = tf_idf_vectorizer.vocabulary_
+        word_weights = zip(res.indices, res.data)
+        word_weights = sorted(word_weights, key=lambda k: k[1], reverse=True)
+        keep_words = word_weights[:top_n_words]
+        keep_vocab = []
+        for weight_tuple in keep_words:
+            word_index, word_weight = weight_tuple
+            for word, index in vocab.items():
+                if index == word_index:
+                    keep_vocab.append(word)
+        for sentence in sentences:
+            tokens = self.utilities.tokenize(sentence)
+            tokens = [token for token in tokens if token in keep_vocab]
+            sentence = " ".join(tokens)
+            sentence = self.utilities.replace_multiple_spaces_with_single_space(text=sentence)
+            preprocessed_sentences.append(sentence)
+        return preprocessed_sentences
 
     @staticmethod
     def visualize(cluster, umap_embeddings):
