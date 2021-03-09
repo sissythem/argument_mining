@@ -110,6 +110,12 @@ class SupervisedModel(Model):
     def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:
         raise NotImplementedError
 
+    def load(self):
+        """
+        Define the way to load the trained model
+        """
+        raise NotImplementedError
+
     def get_model_trainer(self, corpus: Corpus, flair_model: flair.nn.Model) -> ModelTrainer:
         # 5. initialize the ModelTrainer
         trainer: ModelTrainer = ModelTrainer(flair_model, corpus, use_tensorboard=self.use_tensorboard,
@@ -117,14 +123,6 @@ class SupervisedModel(Model):
         self.app_logger.info("Starting training with ModelTrainer")
         self.app_logger.info(f"Model configuration properties: {self.model_properties}")
         return trainer
-
-    def load(self):
-        """
-        Define the way to load the trained model
-        """
-        model_path = join(self.base_path, self.model_file)
-        self.app_logger.info(f"Loading model from path: {model_path}")
-        self.model = SequenceTagger.load(model_path)
 
     def download_model(self, model_name, dir_name) -> str:
         from transformers import AutoModel, AutoTokenizer
@@ -233,6 +231,14 @@ class SequentialModel(SupervisedModel):
                                                 rnn_layers=self.rnn_layers)
         return tagger
 
+    def load(self):
+        """
+        Define the way to load the trained model
+        """
+        model_path = join(self.base_path, self.model_file)
+        self.app_logger.info(f"Loading model from path: {model_path}")
+        self.model = SequenceTagger.load(model_path)
+
 
 class ClassificationModel(SupervisedModel):
 
@@ -266,21 +272,29 @@ class ClassificationModel(SupervisedModel):
                                     multi_label=dictionary.multi_label)
         return classifier
 
+    def load(self):
+        """
+        Define the way to load the trained model
+        """
+        model_path = join(self.base_path, self.model_file)
+        self.app_logger.info(f"Loading model from path: {model_path}")
+        self.model = TextClassifier.load(model_path)
+
 
 class UnsupervisedModel(Model):
     """
     Abstract class representing an unsupervised model
     """
 
-    def __init__(self, app_config: AppConfig):
-        super(UnsupervisedModel, self).__init__(app_config=app_config, model_name="clustering")
+    def __init__(self, app_config: AppConfig, model_name: str):
+        super(UnsupervisedModel, self).__init__(app_config=app_config, model_name=model_name)
         self.device_name = app_config.device_name
 
 
 class Clustering(UnsupervisedModel):
 
     def __init__(self, app_config: AppConfig):
-        super(Clustering, self).__init__(app_config=app_config)
+        super(Clustering, self).__init__(app_config=app_config, model_name="clustering")
         self.model_properties = self.app_config.properties["clustering"]
         self.n_clusters = self.model_properties["n_clusters"]
         if self.model_properties["embeddings"]["model"] == "local":
