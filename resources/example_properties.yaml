@@ -99,4 +99,9 @@ clustering:
   n_clusters: 10
   embeddings:
     model: "local" # local, remote
-    bert_kind: ["aueb"] # if local use sim as name
+    bert_kind: ["sim"] # if local use sim as name
+topic:
+  n_clusters: 10
+  embeddings:
+    model: "remote"
+    bert_kind: ["aueb"]
