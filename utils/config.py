@@ -198,6 +198,8 @@ class AppConfig:
             bert_kind = bert_kind_props["stance"]
         elif model_name.startswith("sim"):
             bert_kind = bert_kind_props["sim"]
+        if type(bert_kind) == str:
+            bert_kind = [bert_kind]
         return bert_kind
 
     def _configure_training_data_and_model_path(self):

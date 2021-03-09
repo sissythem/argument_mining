@@ -11,8 +11,8 @@ import torch
 import umap
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, DocumentPoolEmbeddings, \
-    TransformerWordEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, \
+    TransformerDocumentEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
@@ -260,10 +260,9 @@ class ClassificationModel(SupervisedModel):
         return corpus.make_label_dictionary()
 
     def get_embeddings(self):
-        # initialize the document embeddings, mode=mean
-        embeddings_list: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0], fine_tune=True) for
-                                                  bert_name in self.bert_model_names]
-        document_embeddings = DocumentPoolEmbeddings(embeddings_list)
+        # initialize the document embeddings
+        bert_name = self.bert_model_names[0][0]
+        document_embeddings = TransformerDocumentEmbeddings(bert_name, fine_tune=True)
         return document_embeddings
 
     def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:
@@ -293,20 +292,19 @@ class UnsupervisedModel(Model):
 
 class Clustering(UnsupervisedModel):
 
-    def __init__(self, app_config: AppConfig, model_name="clustering"):
+    def __init__(self, app_config: AppConfig, model_name="clustering", trained_model_name="sim"):
         super(Clustering, self).__init__(app_config=app_config, model_name=model_name)
         self.model_properties = self.app_config.properties["clustering"]
         self.n_clusters = self.model_properties["n_clusters"]
         if self.model_properties["embeddings"]["model"] == "local":
-            self.sim_model = ClassificationModel(app_config=app_config, model_name="sim")
-            self.sim_model.load()
-            self.document_embeddings = self.sim_model.model.document_embeddings
+            self.trained_model = ClassificationModel(app_config=app_config, model_name=trained_model_name)
+            self.trained_model.load()
+            self.document_embeddings = self.trained_model.model.document_embeddings
         else:
             bert_kinds = self.model_properties["embeddings"]["bert_kind"]
             self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=bert_kinds)
-            embeddings_list: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0], fine_tune=True) for
-                                                      bert_name in self.bert_model_names]
-            self.document_embeddings = DocumentPoolEmbeddings(embeddings_list)
+            bert_name = self.bert_model_names[0][0]
+            self.document_embeddings = TransformerDocumentEmbeddings(bert_name, fine_tune=True)
 
     def get_clusters(self, n_clusters, sentences, preprocess=False):
         if preprocess:
