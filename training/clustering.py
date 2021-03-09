@@ -20,7 +20,7 @@ class Clustering(UnsupervisedModel):
         self.document_embeddings = self.sim_model.model.document_embeddings
 
     def run_clustering(self):
-        n_clusters = 10
+        n_clusters = self.model_properties["n_clusters"]
         path_to_csv = join(self.resources_path, "data", "UKP_ASPECT.tsv")
         df = pd.read_csv(path_to_csv, sep="\t", header=0, index_col=None)
         sentences = list(df["sentence_1"]) + list(df["sentence_2"])
