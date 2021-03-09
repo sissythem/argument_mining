@@ -11,7 +11,7 @@ import torch
 import umap
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, BertEmbeddings, \
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, \
     TransformerDocumentEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
@@ -215,7 +215,7 @@ class SequentialModel(SupervisedModel):
         return tag_dictionary
 
     def get_embeddings(self):
-        embedding_types: List[TokenEmbeddings] = [BertEmbeddings(bert_name[0]) for bert_name in
+        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0]) for bert_name in
                                                   self.bert_model_names]
 
         embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
