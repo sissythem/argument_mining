@@ -31,8 +31,8 @@ class Model:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.model_name = model_name
-        self.model_properties: dict = self._get_model_properties()
         self.properties: dict = app_config.properties
+        self.model_properties: dict = self._get_model_properties()
         self.resources_path: str = self.app_config.resources_path
         self.utilities = Utilities(app_config=app_config)
         self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
