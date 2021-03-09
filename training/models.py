@@ -293,8 +293,8 @@ class UnsupervisedModel(Model):
 
 class Clustering(UnsupervisedModel):
 
-    def __init__(self, app_config: AppConfig):
-        super(Clustering, self).__init__(app_config=app_config, model_name="clustering")
+    def __init__(self, app_config: AppConfig, model_name="clustering"):
+        super(Clustering, self).__init__(app_config=app_config, model_name=model_name)
         self.model_properties = self.app_config.properties["clustering"]
         self.n_clusters = self.model_properties["n_clusters"]
         if self.model_properties["embeddings"]["model"] == "local":
@@ -359,7 +359,7 @@ class TopicModel(Clustering):
         Args
             app_config (AppConfig): the application configuration object
         """
-        super(TopicModel, self).__init__(app_config=app_config)
+        super(TopicModel, self).__init__(app_config=app_config, model_name="topic")
 
     def get_topics(self, content):
         """
