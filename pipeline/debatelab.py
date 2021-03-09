@@ -87,7 +87,8 @@ class DebateLab:
             if corrected:
                 corrected_ids.append(document_ids)
             if not validation_errors:
-                self.app_config.elastic_save.save_document(document=document)
+                # TODO uncomment
+                # self.app_config.elastic_save.save_document(document=document)
                 document_ids.append(document["id"])
             else:
                 invalid_document_ids.append(document["id"])
@@ -96,7 +97,8 @@ class DebateLab:
         self.utilities.print_validation_results(document_ids, corrected_ids, invalid_document_ids)
         if export_schema:
             validator.export_json_schema(document_ids=document_ids)
-        self.app_config.notify_ics(ids_list=document_ids)
+        # TODO uncomment
+        # self.app_config.notify_ics(ids_list=document_ids)
         return documents, document_ids
 
     def predict(self, document):
