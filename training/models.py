@@ -3,12 +3,12 @@ from os.path import join, exists
 from typing import List, Tuple, Type, Union
 
 import flair
-import hdbscan
+# import hdbscan
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-import umap
+# import umap
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, \
@@ -322,11 +322,12 @@ class Clustering(UnsupervisedModel):
             self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
 
             # reduce document dimensionality
-            umap_embeddings = umap.UMAP(n_neighbors=n_clusters, metric='cosine').fit_transform(embeddings)
+            # umap_embeddings = umap.UMAP(n_neighbors=n_clusters, metric='cosine').fit_transform(embeddings)
 
             # clustering
-            clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters, metric='euclidean',
-                                       cluster_selection_method='eom').fit(umap_embeddings)
+            # clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters, metric='euclidean',
+            #                            cluster_selection_method='eom').fit(umap_embeddings)
+            clusters = []
             return clusters
         except (BaseException, Exception) as e:
             self.app_logger.error(e)

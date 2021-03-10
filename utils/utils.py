@@ -3,6 +3,7 @@ import random
 import re
 from datetime import datetime
 from os.path import join
+from typing import Union, List, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -321,6 +322,20 @@ class Utilities:
     @staticmethod
     def replace_multiple_spaces_with_single_space(text):
         return re.sub(' +', ' ', text)
+
+    @staticmethod
+    def is_empty(obj: Union[List, Tuple, str, Dict]):
+        if obj is None:
+            return True
+        if type(obj) == str:
+            return obj == ""
+        elif type(obj) == list:
+            return obj == []
+        elif type(obj) == dict:
+            return obj == {}
+        elif type(obj) == tuple:
+            return obj == ()
+        return False
 
     def name_exceeds_bytes(self, name):
         """

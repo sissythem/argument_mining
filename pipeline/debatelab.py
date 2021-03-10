@@ -313,8 +313,8 @@ class DebateLab:
         adus, doc_ids, adu_ids = self.utilities.collect_adu_for_clustering(documents=documents,
                                                                            document_ids=document_ids)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
-        preprocessed_adus = self.clean_data(adus=adus, doc_ids=doc_ids, adu_ids=adu_ids)
-        clusters = self.clustering.get_clusters(n_clusters=n_clusters, sentences=preprocessed_adus)
+        # preprocessed_adus = self.clean_data(adus=adus, doc_ids=doc_ids, adu_ids=adu_ids)
+        clusters = self.clustering.get_clusters(n_clusters=n_clusters, sentences=adus)
         relations = self.get_cross_document_relations(clusters=clusters, sentences=adus, adu_ids=adu_ids,
                                                       doc_ids=doc_ids)
         relations_ids = []
