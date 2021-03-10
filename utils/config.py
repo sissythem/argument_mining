@@ -354,8 +354,8 @@ class ElasticSearchConfig:
         self.ssh_password = properties["ssh"]["password"]
         self.ssh_key = properties["ssh"]["key_path"]
         self.connect = properties["connect"]
-        self._init_ssh_tunnel()
-        self._init_elasticsearch_client()
+        # self._init_ssh_tunnel()
+        # self._init_elasticsearch_client()
 
     def _init_elasticsearch_client(self, timeout=60):
         """
