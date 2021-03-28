@@ -59,11 +59,6 @@ class AppConfig:
         # training data
         self._configure_training_data_and_model_path()
 
-        # email
-        config = self.properties["config"]
-        self._config_email(config=config)
-        self._configure_training_data_and_model_path()
-
     def _configure_device(self):
         """
         Reads the environmental variable CUDA_VISIBLE_DEVICES in order to initialize the device to be used
@@ -231,6 +226,19 @@ class AppConfig:
         self.sim_dev_csv: str = config["dev_csv"]
         self.sim_test_csv: str = config["test_csv"]
 
+
+class Notification:
+
+    def __init__(self, app_config: AppConfig):
+        self.app_config = app_config
+        self.app_logger = app_config.app_logger
+        self.properties = app_config.properties
+        self.resources_path = app_config.resources_path
+        self.properties_file = app_config.properties_file
+        self.logs_path = app_config.logs_path
+        self.log_filename = app_config.log_filename
+        self._config_email(config=self.properties["config"])
+
     def _config_email(self, config):
         """
         Email configuration in order to get notification when the program has finished
@@ -242,14 +250,6 @@ class AppConfig:
         self.sender_email = config_email.get("sender", "skthemeli@gmail.com")
         self.receiver_email = config_email.get("receiver", "skthemeli@gmail.com")
         self.password = config_email["password"]
-
-    def update_last_retrieve_date(self):
-        # update last search date
-        properties = self.properties
-        if properties["eval"]["retrieve"] == "date":
-            properties["eval"]["last_date"] = datetime.now()
-            with open(join(self.resources_path, self.properties_file), "w") as f:
-                yaml.dump(properties, f)
 
     def notify_ics(self, ids_list, kind="arg_mining"):
         """
