@@ -313,7 +313,6 @@ class DebateLab:
         adus, doc_ids, adu_ids = self.utilities.collect_adu_for_clustering(documents=documents,
                                                                            document_ids=document_ids)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
-        # preprocessed_adus = self.clean_data(adus=adus, doc_ids=doc_ids, adu_ids=adu_ids)
         clusters = self.clustering.get_clusters(n_clusters=n_clusters, sentences=adus)
         relations = self.get_cross_document_relations(clusters=clusters, sentences=adus, adu_ids=adu_ids,
                                                       doc_ids=doc_ids)
@@ -363,15 +362,3 @@ class DebateLab:
                     self.app_logger.debug(f"Sentence {pair[0]} in document with id {pair[1]}")
                     self.app_logger.debug(f"Sentence content: {pair[2]}")
         return clusters_dict
-
-    def clean_data(self, adus, doc_ids, adu_ids):
-        # TODO preprocess?
-        preprocessed_adus = self.clustering.preprocess_sentences(sentences=adus)
-        final_prep_adus, final_adus, final_doc_ids, final_adu_ids = [], [], [], []
-        for prep_adu, adu, doc_id, adu_id in zip(preprocessed_adus, adus, doc_ids, adu_ids):
-            if prep_adu != "" and prep_adu is not None:
-                final_prep_adus.append(prep_adu)
-                final_adus.append(adu)
-                final_doc_ids.append(doc_id)
-                final_adu_ids.append(adu_id)
-        return final_prep_adus, final_adus, final_doc_ids, final_adu_ids

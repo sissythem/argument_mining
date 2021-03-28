@@ -3,19 +3,19 @@ from os.path import join, exists
 from typing import List, Tuple, Type, Union
 
 import flair
-# import hdbscan
-import matplotlib.pyplot as plt
+import hdbscan
 import numpy as np
 import pandas as pd
 import torch
-# import umap
+import umap
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, \
-    TransformerDocumentEmbeddings
+    TransformerDocumentEmbeddings, WordEmbeddings, BytePairEmbeddings, DocumentPoolEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
 from utils.config import AppConfig
@@ -292,86 +292,87 @@ class UnsupervisedModel(Model):
 
 class Clustering(UnsupervisedModel):
 
-    def __init__(self, app_config: AppConfig, model_name="clustering", trained_model_name="sim"):
+    def __init__(self, app_config: AppConfig, model_name="clustering"):
         super(Clustering, self).__init__(app_config=app_config, model_name=model_name)
-        self.model_properties = self.app_config.properties["clustering"]
         self.n_clusters = self.model_properties["n_clusters"]
-        if self.model_properties["embeddings"]["model"] == "local":
-            self.trained_model = ClassificationModel(app_config=app_config, model_name=trained_model_name)
-            self.trained_model.load()
-            self.document_embeddings = self.trained_model.model.document_embeddings
+        embedding_kind = self.model_properties["embeddings"]
+        if embedding_kind == "fasttext":
+            self.document_embeddings = DocumentPoolEmbeddings(
+                [
+                    # standard FastText word embeddings for English
+                    WordEmbeddings('en'),
+                    # Byte pair embeddings for English
+                    BytePairEmbeddings('en'),
+                ]
+            )
         else:
-            bert_kinds = self.model_properties["embeddings"]["bert_kind"]
-            self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=bert_kinds)
+            self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=[embedding_kind])
             bert_name = self.bert_model_names[0][0]
-            self.document_embeddings = TransformerDocumentEmbeddings(bert_name, fine_tune=True)
+            self.document_embeddings = TransformerDocumentEmbeddings(bert_name)
 
-    def get_clusters(self, n_clusters, sentences, preprocess=False):
-        if preprocess:
-            sentences = self.preprocess_sentences(sentences=sentences)
+    def get_embeddings(self, sentences):
+        sentence_embeddings = []
+        for sentence in sentences:
+            flair_sentence = Sentence(sentence)
+            self.document_embeddings.embed(flair_sentence)
+            embeddings = flair_sentence.get_embedding()
+            embeddings = embeddings.to("cpu")
+            embeddings = embeddings.detach().numpy()
+            sentence_embeddings.append(embeddings)
+        embeddings = np.asarray(sentence_embeddings)
+        return embeddings
+
+    def get_clusters(self, sentences, n_clusters=None):
+        raise NotImplementedError
+
+
+class Hdbscan(Clustering):
+
+    def __init__(self, app_config: AppConfig):
+        super(Hdbscan, self).__init__(app_config=app_config)
+
+    def get_clusters(self, sentences, n_clusters=None):
+        if n_clusters is None:
+            n_clusters = self.n_clusters
+        embeddings = self.get_embeddings(sentences=sentences)
         try:
-            sentence_embeddings = []
-            for sentence in sentences:
-                flair_sentence = Sentence(sentence)
-                self.document_embeddings.embed(flair_sentence)
-                embeddings = flair_sentence.get_embedding()
-                embeddings = embeddings.to("cpu")
-                embeddings = embeddings.numpy()
-                sentence_embeddings.append(embeddings)
-            embeddings = np.asarray(sentence_embeddings)
             self.app_logger.debug(f"Sentence embeddings shape: {embeddings.shape}")
-
             # reduce document dimensionality
-            # umap_embeddings = umap.UMAP(n_neighbors=n_clusters, metric='cosine').fit_transform(embeddings)
-
+            umap_embeddings = umap.UMAP(n_neighbors=n_clusters, metric='cosine').fit_transform(embeddings)
             # clustering
-            # clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters, metric='euclidean',
-            #                            cluster_selection_method='eom').fit(umap_embeddings)
-            clusters = []
+            clusters = hdbscan.HDBSCAN(min_cluster_size=n_clusters, metric='euclidean',
+                                       cluster_selection_method='eom').fit(umap_embeddings)
             return clusters
         except (BaseException, Exception) as e:
             self.app_logger.error(e)
 
-    def preprocess_sentences(self, sentences, top_n_words=100):
-        preprocessed_sentences = []
-        greek_stopwords = self.utilities.get_greek_stopwords()
-        tf_idf_vectorizer = TfidfVectorizer(stop_words=greek_stopwords)
-        res = tf_idf_vectorizer.fit_transform(sentences)
-        vocab = tf_idf_vectorizer.vocabulary_
-        word_weights = zip(res.indices, res.data)
-        word_weights = sorted(word_weights, key=lambda k: k[1], reverse=True)
-        keep_words = word_weights[:top_n_words]
-        keep_vocab = []
-        for weight_tuple in keep_words:
-            word_index, word_weight = weight_tuple
-            for word, index in vocab.items():
-                if index == word_index:
-                    keep_vocab.append(word)
-        for sentence in sentences:
-            tokens = self.utilities.tokenize(sentence)
-            tokens = [token for token in tokens if token in keep_vocab]
-            sentence = " ".join(tokens)
-            sentence = self.utilities.replace_multiple_spaces_with_single_space(text=sentence)
-            preprocessed_sentences.append(sentence)
-        return preprocessed_sentences
 
-    @staticmethod
-    def visualize(cluster, umap_embeddings):
-        # Prepare data
-        result = pd.DataFrame(umap_embeddings, columns=['x', 'y'])
-        result['labels'] = cluster.labels_
+class KmeansClustering(Clustering):
 
-        # Visualize clusters
-        # fig, ax = plt.subplots(figsize=(20, 10))
-        plt.subplots(figsize=(20, 10))
-        outliers = result.loc[result.labels == -1, :]
-        clustered = result.loc[result.labels != -1, :]
-        plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
-        plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
-        plt.colorbar()
+    def __init__(self, app_config):
+        super(KmeansClustering, self).__init__(app_config=app_config)
+        self.kmeans_model = KMeans(n_clusters=self.n_clusters)
+
+    def get_clusters(self, sentences, n_clusters=None):
+        embeddings = self.get_embeddings(sentences=sentences)
+        clusters = self.kmeans_model.fit(embeddings)
+        return clusters
 
 
-class TopicModel(Clustering):
+class Agglomerative(Clustering):
+
+    def __init__(self, app_config: AppConfig):
+        super(Agglomerative, self).__init__(app_config=app_config)
+        self.agglomerative_model = AgglomerativeClustering(linkage="complete", affinity="cosine",
+                                                           n_clusters=self.n_clusters, compute_distances=True)
+
+    def get_clusters(self, sentences, n_clusters=None):
+        embeddings = self.get_embeddings(sentences=sentences)
+        clusters = self.agglomerative_model.fit(embeddings)
+        return clusters
+
+
+class TopicModel(Hdbscan):
     """
     Class for topic modeling
     """
@@ -383,7 +384,7 @@ class TopicModel(Clustering):
         Args
             app_config (AppConfig): the application configuration object
         """
-        super(TopicModel, self).__init__(app_config=app_config, model_name="topic")
+        super(TopicModel, self).__init__(app_config=app_config)
 
     def get_topics(self, content):
         """

@@ -97,11 +97,5 @@ class_model:
   shuffle: False
 clustering:
   n_clusters: 10
-  embeddings:
-    model: "local" # local, remote
-    bert_kind: ["sim"] # if local use sim as name
-topic:
-  n_clusters: 10
-  embeddings:
-    model: "remote"
-    bert_kind: ["aueb"]
+  algorithm: "hdbscan" # options: kmeans, agglomerative, hdbscan
+  embeddings: "aueb" # options: aueb, base-multi, fasttext
