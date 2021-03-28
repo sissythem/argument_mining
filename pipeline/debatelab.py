@@ -1,13 +1,13 @@
 import json
 from itertools import combinations
 
-import requests
 import numpy as np
+import requests
 from flair.data import Sentence
 
 from pipeline.validation import JsonValidator
-from training.models import SequentialModel, ClassificationModel, TopicModel, Clustering
-from utils.config import AppConfig
+from training.models import SequentialModel, ClassificationModel, TopicModel, Hdbscan, KmeansClustering, Agglomerative
+from utils.config import AppConfig, Notification
 from utils.utils import Utilities
 
 
@@ -24,6 +24,7 @@ class DebateLab:
             app_config (AppConfig): object with the project's configuration
         """
         self.app_config: AppConfig = app_config
+        self.notification: Notification = Notification(app_config=app_config)
         self.app_logger = app_config.app_logger
         self.utilities = Utilities(app_config=self.app_config)
 
@@ -43,9 +44,19 @@ class DebateLab:
         self.topic_model = TopicModel(app_config=self.app_config)
 
         # initialize Clustering model
-        self.clustering = Clustering(app_config=self.app_config)
+        self.clustering = self.get_clustering_model()
 
-    def run_pipeline(self):
+    def get_clustering_model(self):
+        algorithm = self.app_config.properties["clustering"]["algorithm"]
+        if algorithm == "hdbscan":
+            clustering = Hdbscan(app_config=self.app_config)
+        elif algorithm == "kmeans":
+            clustering = KmeansClustering(app_config=self.app_config)
+        else:
+            clustering = Agglomerative(app_config=self.app_config)
+        return clustering
+
+    def run_pipeline(self, notify=False):
         """
         Function to execute the DebateLab pipeline.
 
@@ -59,15 +70,19 @@ class DebateLab:
         # retrive new documents
         documents = self.app_config.elastic_retrieve.retrieve_documents()
         # update yml properties file with the latest retrieve date
-        self.app_config.update_last_retrieve_date()
+        self.utilities.update_last_retrieve_date()
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(documents=documents)
+        if notify:
+            self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
-        self.run_clustering(documents=documents, document_ids=document_ids)
+        relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
+        if notify:
+            self.notification.notify_ics(ids_list=relations_ids, kind="clustering")
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************
-    def run_argument_mining(self, documents, export_schema=False):
+    def run_argument_mining(self, documents, export_schema=False, save=False):
         """
         Argument Mining pipeline:
         | 1. Predict ADUs for each document
@@ -93,9 +108,8 @@ class DebateLab:
             validation_errors, invalid_adus, corrected = validator.run_validation(document=document, counters=counters)
             if corrected:
                 corrected_ids.append(document_ids)
-            if not validation_errors:
-                # TODO uncomment
-                # self.app_config.elastic_save.save_document(document=document)
+            if not validation_errors and save:
+                self.app_config.elastic_save.save_document(document=document)
                 document_ids.append(document["id"])
             else:
                 invalid_document_ids.append(document["id"])
@@ -104,8 +118,6 @@ class DebateLab:
         self.utilities.print_validation_results(document_ids, corrected_ids, invalid_document_ids)
         if export_schema:
             validator.export_json_schema(document_ids=document_ids)
-        # TODO uncomment
-        # self.app_config.notify_ics(ids_list=document_ids)
         return documents, document_ids
 
     def predict(self, document):
@@ -301,7 +313,7 @@ class DebateLab:
         return json_obj, stance_counter
 
     # ************************************* Cross-document relations **********************************
-    def run_clustering(self, documents, document_ids):
+    def run_clustering(self, documents, document_ids, save=False):
         """
         Cross-document relations pipeline
 
@@ -318,11 +330,10 @@ class DebateLab:
                                                       doc_ids=doc_ids)
         relations_ids = []
         for relation in relations:
-            # TODO uncomment save to Elasticsearch -- change index inside the save_relation function!!
-            # self.app_config.elastic_save.save_relation(relation=relation)
+            if save:
+                self.app_config.elastic_save.save_relation(relation=relation)
             relations_ids.append(relation["id"])
-        # TODO notify ICS
-        # self.app_config.notify_ics(ids_list=relations_ids, kind="clustering")
+        return relations_ids
 
     def get_cross_document_relations(self, clusters, sentences, adu_ids, doc_ids):
         cluster_dict = self.get_content_per_cluster(clusters=clusters, sentences=sentences, adu_ids=adu_ids,

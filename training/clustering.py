@@ -1,11 +1,16 @@
+import logging
 from itertools import combinations
 from os.path import join
+
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
+
 from training.models import KmeansClustering, Agglomerative, Hdbscan
 from utils.config import AppConfig
 
 app_config = AppConfig()
+logger = app_config.app_logger
+logger.setLevel(logging.DEBUG)
 clustering_properties = app_config.properties["clustering"]
 algorithm = clustering_properties["algorithm"]
 if algorithm == "hdbscan":
@@ -29,14 +34,28 @@ for idx, cluster in enumerate(clusters):
     embedding = embeddings[idx]
     clusters_dict[cluster].append((sentence, embedding))
 
+cluster_sims_dict = {}
 for cluster, sentences in clusters_dict.items():
-    print(f"finding cosine similarities for cluster {cluster}")
+    logger.info(f"finding cosine similarities for cluster {cluster}")
     cluster_combinations = list(combinations(sentences, r=2))
     cluster_sims = []
     for pair_combination in cluster_combinations:
         sentence1, embedding1 = pair_combination[0]
         sentence2, embedding2 = pair_combination[1]
-        embedding1, embedding2 = embedding1.reshape(-1, 1), embedding2.reshape(-1, 1)
-        sim = cosine_similarity(embedding1, embedding2)
-        print(f"For sentence {sentence1} and sentence {sentence2} cosine similarity is: {sim}")
+        embedding1, embedding2 = embedding1.reshape(1, -1), embedding2.reshape(1, -1)
+        sim = list(list(cosine_similarity(embedding1, embedding2))[0])[0]
+        logger.debug(f"For sentence {sentence1} and sentence {sentence2} cosine similarity is: {sim}")
         cluster_sims.append(sim)
+    cluster_sims.sort()
+    cluster_sims_dict[cluster] = cluster_sims
+logger.info(f"Number of clusters: {len(cluster_sims_dict.keys())}")
+for cluster, sims in cluster_sims_dict.items():
+    logger.debug(f"Similarities for cluster {cluster}:")
+    logger.debug(sims)
+    if sims:
+        avg_per_cluster = sum(sims) / len(sims)
+        min_per_cluster = min(sims)
+        max_per_cluster = max(sims)
+        logger.info(f"Average similarity for cluster {cluster} is {avg_per_cluster}")
+        logger.info(f"Min similarity in cluster {cluster} is {min_per_cluster}")
+        logger.info(f"Max similarity in cluster {cluster} is {max_per_cluster}")

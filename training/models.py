@@ -10,7 +10,7 @@ import torch
 import umap
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, \
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings,\
     TransformerDocumentEmbeddings, WordEmbeddings, BytePairEmbeddings, DocumentPoolEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
@@ -297,14 +297,18 @@ class Clustering(UnsupervisedModel):
         self.n_clusters = self.model_properties["n_clusters"]
         embedding_kind = self.model_properties["embeddings"]
         if embedding_kind == "fasttext":
-            self.document_embeddings = DocumentPoolEmbeddings(
-                [
-                    # standard FastText word embeddings for English
-                    WordEmbeddings('en'),
-                    # Byte pair embeddings for English
-                    BytePairEmbeddings('en'),
-                ]
-            )
+            path_to_embeddings = join(self.resources_path, "embeddings", "wiki.el.bin")
+            self.document_embeddings = DocumentPoolEmbeddings([
+                FastTextEmbeddings(path_to_embeddings, use_local=True)
+            ])
+            # self.document_embeddings = DocumentPoolEmbeddings(
+            #     [
+            #         # standard FastText word embeddings for English
+            #         WordEmbeddings('en'),
+            #         # Byte pair embeddings for English
+            #         BytePairEmbeddings('en'),
+            #     ]
+            # )
         else:
             self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=[embedding_kind])
             bert_name = self.bert_model_names[0][0]

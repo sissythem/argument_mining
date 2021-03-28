@@ -5,6 +5,7 @@ from datetime import datetime
 from os.path import join
 from typing import Union, List, Dict, Tuple
 
+import yaml
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -23,6 +24,7 @@ class Utilities:
     def __init__(self, app_config: AppConfig):
         self.app_config = app_config
         self.app_logger = app_config.app_logger
+        self.properties = app_config.properties
         self.data_folder = join(app_config.resources_path, "data")
 
         self.adu_train_csv = app_config.adu_train_csv
@@ -36,6 +38,16 @@ class Utilities:
         self.stance_train_csv = app_config.stance_train_csv
         self.stance_dev_csv = app_config.stance_dev_csv
         self.stance_test_csv = app_config.stance_test_csv
+
+    # ***************************** Pipeline ******************************************************
+    def update_last_retrieve_date(self):
+        path_to_properties = join(self.app_config.resources_path, self.app_config.properties_file)
+        # update last search date
+        properties = self.app_config.properties
+        if properties["eval"]["retrieve"] == "date":
+            properties["eval"]["last_date"] = datetime.now()
+            with open(path_to_properties, "w") as f:
+                yaml.dump(properties, f)
 
     # ******************************* Oversampling **************************************************
     def oversample(self, task_kind, file_kind, total_num):
@@ -154,9 +166,10 @@ class Utilities:
                 f.write(validation_error.value + "\n")
             f.write(str(invalid_adus) + "\n")
 
-    def print_validation_results(self, document_ids, corrected_ids, invalid_document_ids):
+    def print_validation_results(self, document_ids, corrected_ids, invalid_document_ids, print_corrected=False):
         self.app_logger.info(f"Total valid documents: {len(document_ids)}")
-        self.app_logger.info(f"Total corrected documents: {len(corrected_ids)}")
+        if print_corrected:
+            self.app_logger.info(f"Total corrected documents: {len(corrected_ids)}")
         self.app_logger.info(f"Total invalid documents: {len(invalid_document_ids)}")
         self.app_logger.warn(f"Invalid document ids: {invalid_document_ids}")
 
