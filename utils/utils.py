@@ -5,10 +5,12 @@ from datetime import datetime
 from os.path import join
 from typing import Union, List, Dict, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from ellogon import tokeniser
 from imblearn.over_sampling import RandomOverSampler
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 from utils.config import AppConfig
 
@@ -385,3 +387,42 @@ class Utilities:
             elif bert_kind == "base-multi":
                 bert_model_names.append(("bert-base-multilingual-uncased", bert_kind))
         return bert_model_names
+
+    # *********************************** Clustering **************************************************
+    def preprocess_sentences(self, sentences, top_n_words=100):
+        preprocessed_sentences = []
+        greek_stopwords = self.get_greek_stopwords()
+        tf_idf_vectorizer = TfidfVectorizer(stop_words=greek_stopwords)
+        res = tf_idf_vectorizer.fit_transform(sentences)
+        vocab = tf_idf_vectorizer.vocabulary_
+        word_weights = zip(res.indices, res.data)
+        word_weights = sorted(word_weights, key=lambda k: k[1], reverse=True)
+        keep_words = word_weights[:top_n_words]
+        keep_vocab = []
+        for weight_tuple in keep_words:
+            word_index, word_weight = weight_tuple
+            for word, index in vocab.items():
+                if index == word_index:
+                    keep_vocab.append(word)
+        for sentence in sentences:
+            tokens = self.tokenize(sentence)
+            tokens = [token for token in tokens if token in keep_vocab]
+            sentence = " ".join(tokens)
+            sentence = self.replace_multiple_spaces_with_single_space(text=sentence)
+            preprocessed_sentences.append(sentence)
+        return preprocessed_sentences
+
+    @staticmethod
+    def visualize(cluster, embeddings):
+        # Prepare data
+        result = pd.DataFrame(embeddings, columns=['x', 'y'])
+        result['labels'] = cluster.labels_
+
+        # Visualize clusters
+        # fig, ax = plt.subplots(figsize=(20, 10))
+        plt.subplots(figsize=(20, 10))
+        outliers = result.loc[result.labels == -1, :]
+        clustered = result.loc[result.labels != -1, :]
+        plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
+        plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
+        plt.colorbar()
