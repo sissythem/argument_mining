@@ -7,7 +7,7 @@ import pandas as pd
 from pipeline.debatelab import DebateLab
 from training.models import SequentialModel, ClassificationModel
 from training.preprocessing import DataLoader
-from utils.config import AppConfig
+from utils.config import AppConfig, Notification
 
 
 def error_analysis(path_to_resources):
@@ -109,6 +109,7 @@ def main():
     DebateLab pipeline, error analysis)
     """
     app_config: AppConfig = AppConfig()
+    notification: Notification = Notification(app_config=app_config)
     try:
         properties = app_config.properties
         tasks = properties["tasks"]
@@ -120,11 +121,11 @@ def main():
             evaluate(app_config=app_config)
         if "error" in properties["tasks"]:
             error_analysis(path_to_resources=app_config.resources_path)
-        app_config.send_email(body="Argument mining pipeline finished successfully",
-                              subject=f"Argument mining run: {app_config.run}")
+        notification.send_email(body="Argument mining pipeline finished successfully",
+                                subject=f"Argument mining run: {app_config.run}")
     except(BaseException, Exception):
         app_config.app_logger.error(traceback.format_exc())
-        app_config.send_email(
+        notification.send_email(
             body=f"Argument mining pipeline finished with errors {traceback.format_exc(limit=100)}",
             subject=f"Error in argument mining run: {app_config.run}")
     finally:
