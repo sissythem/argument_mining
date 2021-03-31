@@ -3,7 +3,10 @@ from os.path import join, exists
 from typing import List, Tuple, Type, Union
 
 import flair
-import hdbscan
+try:
+    import hdbscan
+except (BaseException, Exception):
+    pass
 import numpy as np
 import pandas as pd
 import torch
