@@ -5,12 +5,12 @@ from typing import List, Tuple, Type, Union
 import flair
 try:
     import hdbscan
+    import umap
 except (BaseException, Exception):
     pass
 import numpy as np
 import pandas as pd
 import torch
-import umap
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings,\
