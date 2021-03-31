@@ -328,6 +328,7 @@ class JsonCorrector:
                 # assuming that we have only one major claim
                 if rel["arg1"] == claim["id"]:
                     rel_type = rel["type"]
+                    rel_type = "for" if rel_type == "support" else "against"
                     confidence = rel["confidence"]
                     self.stance_counter += 1
                     stance = {
