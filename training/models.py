@@ -10,7 +10,7 @@ import torch
 import umap
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings,\
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings, \
     TransformerDocumentEmbeddings, WordEmbeddings, BytePairEmbeddings, DocumentPoolEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
@@ -367,12 +367,13 @@ class Agglomerative(Clustering):
 
     def __init__(self, app_config: AppConfig):
         super(Agglomerative, self).__init__(app_config=app_config)
-        self.agglomerative_model = AgglomerativeClustering(linkage="complete", affinity="cosine",
-                                                           n_clusters=self.n_clusters, compute_distances=True)
 
     def get_clusters(self, sentences, n_clusters=None):
+        n_clusters = len(sentences) / 2
+        agglomerative_model = AgglomerativeClustering(linkage="complete", affinity="cosine",
+                                                      n_clusters=n_clusters, compute_distances=True)
         embeddings = self.get_embeddings(sentences=sentences)
-        clusters = self.agglomerative_model.fit(embeddings)
+        clusters = agglomerative_model.fit(embeddings)
         return clusters
 
 
