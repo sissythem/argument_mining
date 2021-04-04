@@ -17,7 +17,7 @@ from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWord
     TransformerDocumentEmbeddings, WordEmbeddings, BytePairEmbeddings, DocumentPoolEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
-from sklearn.cluster import KMeans, AgglomerativeClustering
+from sklearn.cluster import KMeans, AgglomerativeClustering, Birch, OPTICS
 from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
@@ -372,11 +372,37 @@ class Agglomerative(Clustering):
         super(Agglomerative, self).__init__(app_config=app_config)
 
     def get_clusters(self, sentences, n_clusters=None):
-        n_clusters = len(sentences) / 2
+        n_clusters = int(len(sentences) / 2)
         agglomerative_model = AgglomerativeClustering(linkage="complete", affinity="cosine",
                                                       n_clusters=n_clusters, compute_distances=True)
         embeddings = self.get_embeddings(sentences=sentences)
         clusters = agglomerative_model.fit(embeddings)
+        return clusters
+
+
+class BirchClustering(Clustering):
+
+    def __init__(self, app_config: AppConfig):
+        super(BirchClustering, self).__init__(app_config=app_config)
+
+    def get_clusters(self, sentences, n_clusters=None):
+        n_clusters = int(len(sentences) / 2)
+        birch_model = Birch(threshold=0.7, n_clusters=n_clusters)
+        embeddings = self.get_embeddings(sentences=sentences)
+        clusters = birch_model.fit(embeddings)
+        return clusters
+
+
+class OpticsClustering(Clustering):
+
+    def __init__(self, app_config: AppConfig):
+        super(OpticsClustering, self).__init__(app_config=app_config)
+
+    def get_clusters(self, sentences, n_clusters=None):
+        n_clusters = int(len(sentences) / 2)
+        optics_model = OPTICS(metric="cosine")
+        embeddings = self.get_embeddings(sentences=sentences)
+        clusters = optics_model.fit(embeddings)
         return clusters
 
 

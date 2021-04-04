@@ -5,7 +5,7 @@ from os.path import join
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 
-from training.models import KmeansClustering, Agglomerative, Hdbscan
+from training.models import KmeansClustering, Agglomerative, Hdbscan, BirchClustering, OpticsClustering
 from utils.config import AppConfig
 
 app_config = AppConfig()
@@ -17,8 +17,12 @@ if algorithm == "hdbscan":
     clustering_model = Hdbscan(app_config=app_config)
 elif algorithm == "kmeans":
     clustering_model = KmeansClustering(app_config=app_config)
-else:
+elif algorithm == "agglomerative":
     clustering_model = Agglomerative(app_config=app_config)
+elif algorithm == "birch":
+    clustering_model = BirchClustering(app_config=app_config)
+else:
+    clustering_model = OpticsClustering(app_config=app_config)
 
 path_to_csv = join(app_config.output_path, "test", "claims.csv")
 df = pd.read_csv(path_to_csv, sep="\t", header=0, index_col=None)
