@@ -14,7 +14,7 @@ import torch
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings, \
-    TransformerDocumentEmbeddings, WordEmbeddings, BytePairEmbeddings, DocumentPoolEmbeddings
+    TransformerDocumentEmbeddings, DocumentPoolEmbeddings  # , WordEmbeddings, BytePairEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sklearn.cluster import KMeans, AgglomerativeClustering, Birch, OPTICS
@@ -431,8 +431,11 @@ class TopicModel(Hdbscan):
             list: a list of topics
         """
         topics = []
-        sentences = self.utilities.tokenize(text=content)
-        sentences = [" ".join(s) for s in sentences]
+        if type(content) == str:
+            sentences = self.utilities.tokenize(text=content)
+            sentences = [" ".join(s) for s in sentences]
+        else:
+            sentences = content
         try:
             n_clusters = int(len(sentences) / 2)
             clusters = self.get_clusters(sentences=sentences, n_clusters=n_clusters)
