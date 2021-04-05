@@ -98,4 +98,4 @@ class_model:
 clustering:
   n_clusters: 10
   algorithm: "hdbscan" # options: kmeans, agglomerative, hdbscan
-  embeddings: "aueb" # options: aueb, base-multi, fasttext
+  embeddings: "aueb" # options: aueb, base-multi, fasttext, tfidf

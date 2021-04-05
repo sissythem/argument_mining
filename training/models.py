@@ -14,11 +14,11 @@ import torch
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings, \
-    TransformerDocumentEmbeddings, DocumentPoolEmbeddings  # , WordEmbeddings, BytePairEmbeddings
+    TransformerDocumentEmbeddings, DocumentPoolEmbeddings, DocumentTFIDFEmbeddings  # , WordEmbeddings, BytePairEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sklearn.cluster import KMeans, AgglomerativeClustering, Birch, OPTICS
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
 from utils.config import AppConfig
@@ -298,8 +298,8 @@ class Clustering(UnsupervisedModel):
     def __init__(self, app_config: AppConfig, model_name="clustering"):
         super(Clustering, self).__init__(app_config=app_config, model_name=model_name)
         self.n_clusters = self.model_properties["n_clusters"]
-        embedding_kind = self.model_properties["embeddings"]
-        if embedding_kind == "fasttext":
+        self.embedding_kind = self.model_properties["embeddings"]
+        if self.embedding_kind == "fasttext":
             path_to_embeddings = join(self.resources_path, "embeddings", "wiki.el.bin")
             self.document_embeddings = DocumentPoolEmbeddings([
                 FastTextEmbeddings(path_to_embeddings, use_local=True)
@@ -312,12 +312,16 @@ class Clustering(UnsupervisedModel):
             #         BytePairEmbeddings('en'),
             #     ]
             # )
+        elif self.embedding_kind == "tfidf":
+            pass
         else:
-            self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=[embedding_kind])
+            self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=[self.embedding_kind])
             bert_name = self.bert_model_names[0][0]
             self.document_embeddings = TransformerDocumentEmbeddings(bert_name)
 
     def get_embeddings(self, sentences):
+        if self.embedding_kind == "tfidf":
+            self.document_embeddings = DocumentTFIDFEmbeddings(train_dataset=sentences)
         sentence_embeddings = []
         for sentence in sentences:
             flair_sentence = Sentence(sentence)
