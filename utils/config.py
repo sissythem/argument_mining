@@ -354,8 +354,12 @@ class ElasticSearchConfig:
         self.ssh_password = properties["ssh"]["password"]
         self.ssh_key = properties["ssh"]["key_path"]
         self.connect = properties["connect"]
-        self._init_ssh_tunnel()
-        self._init_elasticsearch_client()
+        try:
+            self._init_ssh_tunnel()
+            self._init_elasticsearch_client()
+            self.connected = True
+        except (BaseException, Exception):
+            self.connected = False
 
     def _init_elasticsearch_client(self, timeout=60):
         """
@@ -398,9 +402,10 @@ class ElasticSearchConfig:
         """
         Stop the ssh tunneling
         """
-        del self.elasticsearch_client
-        [t.close() for t in threading.enumerate() if t.__class__.__name__ == "Transport"]
-        self.tunnel.stop()
+        if self.connected:
+            del self.elasticsearch_client
+            [t.close() for t in threading.enumerate() if t.__class__.__name__ == "Transport"]
+            self.tunnel.stop()
 
     def truncate_elasticsearch(self):
         """
