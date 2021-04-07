@@ -43,7 +43,7 @@ class DataUpSampler:
             df = self.oversample_relations(df=df, rel=task_kind, total_num=total_num)
         filename = filename.replace(".csv", "")
         new_file = f"{filename}_oversample.csv"
-        output_filepath = join(self.data_folder, new_file)
+        output_filepath = join(file_path, new_file)
         if not exists(output_filepath):
             df.to_csv(output_filepath, sep='\t', index=False, header=True)
 
