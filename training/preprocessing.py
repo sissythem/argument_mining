@@ -30,8 +30,9 @@ class DataUpSampler:
             file_kind (str): possible values are --> train, test, dev
             total_num(int or dict): the total number to augment the minority classes
         """
+        data_path = join(self.data_folder, task_kind)
         filename = f"{file_kind}.csv"
-        file_path = join(self.data_folder, task_kind, filename)
+        file_path = join(data_path, filename)
         df = pd.read_csv(file_path, sep="\t", index_col=None, header=None)
         if task_kind == "adu":
             if not type(total_num) == dict:
@@ -43,7 +44,7 @@ class DataUpSampler:
             df = self.oversample_relations(df=df, rel=task_kind, total_num=total_num)
         filename = filename.replace(".csv", "")
         new_file = f"{filename}_oversample.csv"
-        output_filepath = join(file_path, new_file)
+        output_filepath = join(data_path, new_file)
         if not exists(output_filepath):
             df.to_csv(output_filepath, sep='\t', index=False, header=True)
 
