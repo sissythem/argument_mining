@@ -184,7 +184,7 @@ class DebateLab:
         adus = []
         self.app_logger.debug(f"Processing document with id: {document['id']} and name: {document}")
         segment_counter = 0
-        sentences = utils.tokenize(text=document["content"], punct=False)
+        sentences = utils.tokenize(text=document["content"])
         sentences = utils.join_sentences(tokenized_sentences=sentences)
         for sentence in sentences:
             self.app_logger.debug(f"Predicting labels for sentence: {sentence}")
@@ -195,7 +195,6 @@ class DebateLab:
             if segments:
                 for segment in segments:
                     if segment["text"] and segment["label"]:
-                        segment["text"] = utils.join_sentences(tokenized_sentences=[segment["tokens"]])
                         self.app_logger.debug(f"Segment text: {segment['text']}")
                         self.app_logger.debug(f"Segment type: {segment['label']}")
                         segment_counter += 1
