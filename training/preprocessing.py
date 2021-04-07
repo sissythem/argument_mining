@@ -127,7 +127,7 @@ class CsvCreator:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.pickle_file = pickle_file
-        self.oversampling_prop = app_config.properties["preprocessing"]["oversampling"]
+        self.oversampling_prop = app_config.properties["prep"]["oversampling"]
         if self.oversampling_prop is not None and self.oversampling_prop and type(self.oversampling_prop) == dict:
             self.upsampling = DataUpSampler(app_config=app_config, pickle_file=pickle_file)
 
