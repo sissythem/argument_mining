@@ -3,19 +3,19 @@ from itertools import combinations
 from os.path import join
 
 import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.decomposition import LatentDirichletAllocation
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from training.models import KmeansClustering, Agglomerative, Hdbscan, BirchClustering, OpticsClustering
 from utils.config import AppConfig
-from utils.utils import Utilities
+from utils import utils
 
 
 def get_logger():
-    logger = app_config.app_logger
-    logger.setLevel(logging.DEBUG)
-    return logger
+    app_logger = app_config.app_logger
+    app_logger.setLevel(logging.DEBUG)
+    return app_logger
 
 
 def get_clustering_model():
@@ -53,7 +53,7 @@ def get_topic_words(num_words, topic, vocab):
 
 
 def lda(sentences):
-    greek_stopwords = utilities.get_greek_stopwords()
+    greek_stopwords = utils.get_greek_stopwords()
     count_vec = TfidfVectorizer(stop_words=greek_stopwords, max_df=0.1)
     output = count_vec.fit_transform(sentences)
     lda_model = LatentDirichletAllocation(n_components=150)
@@ -127,6 +127,5 @@ def main():
 
 if __name__ == '__main__':
     app_config = AppConfig()
-    utilities = Utilities(app_config=app_config)
     logger = get_logger()
     main()

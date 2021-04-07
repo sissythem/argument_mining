@@ -16,7 +16,7 @@ from os import environ, getcwd
 from os import mkdir
 from os.path import exists, join
 from pathlib import Path
-from typing import List
+from typing import List, Dict, AnyStr
 
 import requests
 import torch
@@ -24,6 +24,8 @@ import yaml
 from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search
 from sshtunnel import SSHTunnelForwarder
+
+from utils import utils
 
 
 class AppConfig:
@@ -37,27 +39,35 @@ class AppConfig:
         and data files, reads the dynamic configuration from a yaml file, initializes two Elasticsearch clients, i.e.
         one for the social observatory and one for the debatelab elasticsearch and sets some configuration
         """
-        random.seed(2020)
-        self.documents_pickle = "documents.pkl"
         self._configure()
-        self.elastic_retrieve = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="retrieve")
-        self.elastic_save = ElasticSearchConfig(properties=self.properties["config"], elasticsearch="save")
 
     def _configure(self):
         """
         Initialize the application configuration
         """
-        self.run = uuid.uuid4().hex
+        random.seed(2020)
+        # run ID for this execution
+        self.run: AnyStr = uuid.uuid4().hex
+
+        # select device to run the models: gpu, cpu
         self._configure_device()
+        # create necessary folders
         self._create_paths()
-        self.properties = self._load_properties()
+        # load properties file
+        self.properties: Dict = self._load_properties()
 
         # logging
-        self.app_logger = self._config_logger()
+        self.app_logger: logging.Logger = self._config_logger()
         self.app_logger.info(f"Run id: {self.run}")
 
         # training data
-        self._configure_training_data_and_model_path()
+        self.adu_base_path: str = self._get_base_path(base_name="adu_model")
+        self.rel_base_path: str = self._get_base_path(base_name="rel_model")
+        self.stance_base_path: str = self._get_base_path(base_name="stance_model")
+        self.sim_base_path: str = self._get_base_path(base_name="sim_model")
+
+        # config elasticsearch
+        self._config_elastic_search()
 
     def _configure_device(self):
         """
@@ -74,7 +84,7 @@ class AppConfig:
         else:
             self.device_name = "cpu"
 
-    def _config_logger(self):
+    def _config_logger(self) -> logging.Logger:
         """
         Configures the application logger
 
@@ -96,7 +106,7 @@ class AppConfig:
         program_logger.addHandler(console_handler)
         return program_logger
 
-    def _load_properties(self) -> dict:
+    def _load_properties(self) -> Dict:
         """
         Loads the configuration file from the resources folder
 
@@ -121,12 +131,14 @@ class AppConfig:
         curr_dir = str(curr_dir)
         self.app_path = curr_dir if curr_dir.endswith("mining") else parent
 
-        self.resources_path = join(self.app_path, "resources")
-        self.output_path = join(self.app_path, "output")
-        self.logs_path = join(self.output_path, "logs")
-        self.model_path = join(self.output_path, "models")
-        self.output_files = join(self.output_path, "output_files")
-        self.tensorboard_path = join(self.app_path, "runs")
+        self.resources_path: AnyStr = join(self.app_path, "resources")
+        self.output_path: AnyStr = join(self.app_path, "output")
+        self.logs_path: AnyStr = join(self.output_path, "logs")
+        self.model_path: AnyStr = join(self.output_path, "models")
+        self.output_files: AnyStr = join(self.output_path, "output_files")
+        self.tensorboard_path: AnyStr = join(self.app_path, "runs")
+        self.dataset_folder: AnyStr = join(self.resources_path, "data")
+        self.results_folder: AnyStr = join(self.resources_path, "results")
         self._create_output_dirs()
 
     def _create_output_dirs(self):
@@ -143,12 +155,16 @@ class AppConfig:
             mkdir(self.tensorboard_path)
         if not exists(self.output_files):
             mkdir(self.output_files)
-        if not exists(join(self.resources_path, "data")):
-            mkdir(join(self.resources_path, "data"))
-        if not exists(join(self.resources_path, "results")):
-            mkdir(join(self.resources_path, "results"))
+        if not exists(join(self.dataset_folder)):
+            mkdir(self.dataset_folder)
+            mkdir(join(self.dataset_folder, "adu"))
+            mkdir(join(self.dataset_folder, "rel"))
+            mkdir(join(self.dataset_folder, "stance"))
+            mkdir(join(self.dataset_folder, "sim"))
+        if not exists(self.results_folder):
+            mkdir(self.results_folder)
 
-    def _get_base_path(self, base_name: str) -> str:
+    def _get_base_path(self, base_name: AnyStr) -> AnyStr:
         """
         Create the base full path to the directory where each model will be saved
 
@@ -163,7 +179,7 @@ class AppConfig:
             properties = self.properties["seq_model"]
         else:
             properties = self.properties["class_model"]
-        bert_kind = "-".join(self.get_bert_kind(bert_kind_props=properties["bert_kind"], model_name=base_name))
+        bert_kind = "-".join(utils.get_bert_kind(bert_kind_props=properties["bert_kind"], model_name=base_name))
         embedding_names = f"bert-{bert_kind}"
         layers = properties["rnn_layers"] if base_name == "adu_model" else properties["layers"]
         base_path = f"{base_name}-" + '-'.join([
@@ -182,61 +198,27 @@ class AppConfig:
             pass
         return base_path
 
-    @staticmethod
-    def get_bert_kind(bert_kind_props: dict, model_name: str) -> List[str]:
-        bert_kind = ["aueb"]
-        if model_name.startswith("adu"):
-            bert_kind = bert_kind_props["adu"]
-        elif model_name.startswith("rel"):
-            bert_kind = bert_kind_props["rel"]
-        elif model_name.startswith("stance"):
-            bert_kind = bert_kind_props["stance"]
-        elif model_name.startswith("sim"):
-            bert_kind = bert_kind_props["sim"]
-        if type(bert_kind) == str:
-            bert_kind = [bert_kind]
-        return bert_kind
-
-    def _configure_training_data_and_model_path(self):
-        """
-        Reads the application properties to find for each model the train, test and dev datasets
-        """
-        self.adu_base_path: str = self._get_base_path(base_name="adu_model")
-        self.rel_base_path: str = self._get_base_path(base_name="rel_model")
-        self.stance_base_path: str = self._get_base_path(base_name="stance_model")
-        self.sim_base_path: str = self._get_base_path(base_name="sim_model")
-
-        config: dict = self.properties["config"]["adu_data"]
-        self.adu_train_csv: str = config["train_csv"]
-        self.adu_dev_csv: str = config["dev_csv"]
-        self.adu_test_csv: str = config["test_csv"]
-
-        config: dict = self.properties["config"]["rel_data"]
-        self.rel_train_csv: str = config["train_csv"]
-        self.rel_dev_csv: str = config["dev_csv"]
-        self.rel_test_csv: str = config["test_csv"]
-
-        config: dict = self.properties["config"]["stance_data"]
-        self.stance_train_csv: str = config["train_csv"]
-        self.stance_dev_csv: str = config["dev_csv"]
-        self.stance_test_csv: str = config["test_csv"]
-
-        config: dict = self.properties["config"]["sim_data"]
-        self.sim_train_csv: str = config["train_csv"]
-        self.sim_dev_csv: str = config["dev_csv"]
-        self.sim_test_csv: str = config["test_csv"]
+    def _config_elastic_search(self):
+        self.elastic_retrieve: ElasticSearchConfig = ElasticSearchConfig(properties=self.properties,
+                                                                         properties_file=self.properties_file,
+                                                                         resources_folder=self.resources_path,
+                                                                         elasticsearch="retrieve")
+        self.elastic_save: ElasticSearchConfig = ElasticSearchConfig(properties=self.properties,
+                                                                     properties_file=self.properties_file,
+                                                                     resources_folder=self.resources_path,
+                                                                     elasticsearch="save")
 
 
 class Notification:
 
     def __init__(self, app_config: AppConfig):
-        self.app_config = app_config
-        self.app_logger = app_config.app_logger
-        self.properties = app_config.properties
-        self.resources_path = app_config.resources_path
-        self.properties_file = app_config.properties_file
-        self.logs_path = app_config.logs_path
-        self.log_filename = app_config.log_filename
+        self.app_config: AppConfig = app_config
+        self.app_logger: logging.Logger = app_config.app_logger
+        self.properties: Dict = app_config.properties
+        self.resources_path: AnyStr = app_config.resources_path
+        self.properties_file: AnyStr = app_config.properties_file
+        self.logs_path: AnyStr = app_config.logs_path
+        self.log_filename: AnyStr = app_config.log_filename
         self._config_email(config=self.properties["config"])
 
     def _config_email(self, config):
@@ -246,20 +228,30 @@ class Notification:
         Args
             config (dict): configuration parameters for email
         """
-        config_email = config["email"]
-        self.sender_email = config_email.get("sender", "skthemeli@gmail.com")
-        self.receiver_email = config_email.get("receiver", "skthemeli@gmail.com")
-        self.password = config_email["password"]
+        config_email = config.get("email", None)
+        self.do_send_email = False
+        if config_email:
+            self.sender_email = config_email["sender"]
+            self.receiver_email = config_email["receiver"]
+            self.password = config_email["password"]
+            try:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+                    server.login(self.sender_email, self.password)
+                self.do_send_email = True
+            except (BaseException, Exception):
+                self.app_logger.error("Connecting to email account failed! Check your credentials!")
+                self.do_send_email = False
 
-    def notify_ics(self, ids_list, kind="arg_mining"):
+    def notify_ics(self, ids_list: List[AnyStr], kind: AnyStr = "arg_mining"):
         """
         Function to notify ICS API for any updates in the Elasticsearch. Uses different API endpoints based on the
         kind parameter. The possible notifications are: argument mining updates for new documents, clustering updates
         for cross-document relations
 
         Args
-            | ids_list: list of ids in the Elasticsearch (documents or relations)
-            | kind: the kind of update, possible values --> arg_mining, clustering
+            | ids_list (list): list of ids in the Elasticsearch (documents or relations)
+            | kind (str): the kind of update, possible values --> arg_mining, clustering
         """
         properties = self.properties["eval"]["notify"]
         # TODO url based on kind. Credentials?
@@ -283,7 +275,7 @@ class Notification:
         except(BaseException, Exception) as e:
             self.app_logger.error(f"Request to ICS failed: {e}")
 
-    def send_email(self, body, subject=None):
+    def send_email(self, body: AnyStr, subject: AnyStr = None):
         """
         Function to send a notification email upon completion of the program
 
@@ -291,6 +283,8 @@ class Notification:
             body (str): the body message
             subject (str): the subject of the email
         """
+        if not self.do_send_email:
+            return
         if not subject:
             subject = "Argument mining run"
 
@@ -334,7 +328,7 @@ class ElasticSearchConfig:
     Class to configure an Elasticsearch Client
     """
 
-    def __init__(self, properties, elasticsearch):
+    def __init__(self, properties: Dict, properties_file: AnyStr, resources_folder: AnyStr, elasticsearch: AnyStr):
         """
         Constructor of the ElasticSearchConfig class
 
@@ -344,16 +338,21 @@ class ElasticSearchConfig:
             The elastic_save parameters are configurations for the debatelab elasticsearch while the elastic_retrieve
             properties are the configurations, credentials etc of the socialobservatory elasticsearch.
         """
-        properties = properties["elastic_save"] if elasticsearch == "save" else properties["elastic_retrieve"]
-        self.username = properties["username"]
-        self.password = properties["password"]
-        self.host = properties["host"]
-        self.port = properties["port"]
-        self.ssh_port = properties["ssh"]["port"]
-        self.ssh_username = properties["ssh"]["username"]
-        self.ssh_password = properties["ssh"]["password"]
-        self.ssh_key = properties["ssh"]["key_path"]
-        self.connect = properties["connect"]
+        self.resources_folder: AnyStr = resources_folder
+        self.properties_file: AnyStr = properties_file
+        self.properties: Dict = properties
+        config_prop = properties["config"]
+        elastic_prop = config_prop["elastic_save"] if elasticsearch == "save" else config_prop["elastic_retrieve"]
+        self.username: AnyStr = elastic_prop["username"]
+        self.password: AnyStr = elastic_prop["password"]
+        self.host: AnyStr = elastic_prop["host"]
+        self.port: int = elastic_prop["port"]
+        self.ssh_port: int = elastic_prop["ssh"]["port"]
+        self.ssh_username: AnyStr = elastic_prop["ssh"]["username"]
+        self.ssh_password: AnyStr = elastic_prop["ssh"]["password"]
+        self.ssh_key: AnyStr = elastic_prop["ssh"]["key_path"]
+        self.connect: AnyStr = elastic_prop["connect"]
+
         try:
             self._init_ssh_tunnel()
             self._init_elasticsearch_client()
@@ -430,7 +429,16 @@ class ElasticSearchConfig:
             if not document["content"].startswith(document["title"]):
                 document["content"] = document["title"] + "\r\n\r\n" + document["content"]
             documents.append(document)
+        self.update_last_retrieve_date()
         return documents
+
+    def update_last_retrieve_date(self):
+        path_to_properties = join(self.resources_folder, self.properties_file)
+        # update last search date
+        if self.properties["eval"]["retrieve"] == "date":
+            self.properties["eval"]["last_date"] = datetime.now()
+            with open(path_to_properties, "w") as f:
+                yaml.dump(self.properties, f)
 
     def save_document(self, document):
         self.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,

@@ -1,4 +1,5 @@
 import json
+from datetime import datetime
 from enum import Enum
 from os.path import join
 from typing import List
@@ -6,7 +7,6 @@ from typing import List
 from genson import SchemaBuilder
 
 from utils.config import AppConfig
-from utils.utils import Utilities
 
 
 class ValidationError(Enum):
@@ -237,6 +237,31 @@ class JsonValidator:
         flag = True if not invalid_adus else False
         return flag, invalid_adus
 
+    def save_invalid_json(self, document, validation_errors, invalid_adus):
+        """
+        Function to save an invalid json object into the output_files directory
+
+        Args
+            document (dict)
+        """
+        self.app_logger.debug("Writing invalid document into file")
+        timestamp = datetime.now()
+        filename = f"{document['id']}_{timestamp}.json"
+        file_path = join(self.app_config.output_files, filename)
+        with open(file_path, "w", encoding='utf8') as f:
+            f.write(json.dumps(document, indent=4, sort_keys=False, ensure_ascii=False))
+        with open(f"{file_path}.txt", "w") as f:
+            for validation_error in validation_errors:
+                f.write(validation_error.value + "\n")
+            f.write(str(invalid_adus) + "\n")
+
+    def print_validation_results(self, document_ids, corrected_ids, invalid_document_ids, print_corrected=False):
+        self.app_logger.info(f"Total valid documents: {len(document_ids)}")
+        if print_corrected:
+            self.app_logger.info(f"Total corrected documents: {len(corrected_ids)}")
+        self.app_logger.info(f"Total invalid documents: {len(invalid_document_ids)}")
+        self.app_logger.warning(f"Invalid document ids: {invalid_document_ids}")
+
 
 class JsonCorrector:
     """
@@ -258,7 +283,6 @@ class JsonCorrector:
         self.segment_counter = counters["adu"]
         self.rel_counter = counters["rel"]
         self.stance_counter = counters["stance"]
-        self.utilities = Utilities(app_config=self.app_config)
 
     @staticmethod
     def can_document_be_corrected(validation_errors: List[ValidationError]):

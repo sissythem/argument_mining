@@ -6,9 +6,9 @@ import requests
 from flair.data import Sentence
 
 from pipeline.validation import JsonValidator
-from training.models import SequentialModel, ClassificationModel, TopicModel, Hdbscan, KmeansClustering, Agglomerative
+from training.models import SequentialModel, ClassificationModel, TopicModel, Agglomerative
 from utils.config import AppConfig, Notification
-from utils.utils import Utilities
+from utils import utils
 
 
 class DebateLab:
@@ -26,7 +26,6 @@ class DebateLab:
         self.app_config: AppConfig = app_config
         self.notification: Notification = Notification(app_config=app_config)
         self.app_logger = app_config.app_logger
-        self.utilities = Utilities(app_config=self.app_config)
 
         # load ADU model
         self.adu_model = SequentialModel(app_config=self.app_config, model_name="adu")
@@ -44,17 +43,7 @@ class DebateLab:
         self.topic_model = TopicModel(app_config=self.app_config)
 
         # initialize Clustering model
-        self.clustering = self.get_clustering_model()
-
-    def get_clustering_model(self):
-        algorithm = self.app_config.properties["clustering"]["algorithm"]
-        if algorithm == "hdbscan":
-            clustering = Hdbscan(app_config=self.app_config)
-        elif algorithm == "kmeans":
-            clustering = KmeansClustering(app_config=self.app_config)
-        else:
-            clustering = Agglomerative(app_config=self.app_config)
-        return clustering
+        self.clustering = Agglomerative(app_config=app_config)
 
     def run_pipeline(self, notify=False):
         """
@@ -70,7 +59,6 @@ class DebateLab:
         # retrive new documents
         documents = self.app_config.elastic_retrieve.retrieve_documents()
         # update yml properties file with the latest retrieve date
-        self.utilities.update_last_retrieve_date()
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(documents=documents)
         if notify:
@@ -113,9 +101,9 @@ class DebateLab:
                 document_ids.append(document["id"])
             else:
                 invalid_document_ids.append(document["id"])
-                self.utilities.save_invalid_json(document=document, validation_errors=validation_errors,
-                                                 invalid_adus=invalid_adus)
-        self.utilities.print_validation_results(document_ids, corrected_ids, invalid_document_ids)
+                validator.save_invalid_json(document=document, validation_errors=validation_errors,
+                                            invalid_adus=invalid_adus)
+        validator.print_validation_results(document_ids, corrected_ids, invalid_document_ids)
         if export_schema:
             validator.export_json_schema(document_ids=document_ids)
         return documents, document_ids
@@ -142,9 +130,9 @@ class DebateLab:
         self.app_logger.info("Predicting ADUs from document")
         segments, segment_counter = self._predict_adus(document=document)
         # assumes major_claim label should appear once -- concatenation due to sentence splitting
-        segments = self.utilities.concat_major_claim(segments=segments, title=document["title"],
-                                                     content=document["content"], counter=segment_counter)
-        major_claims, claims, premises = self.utilities.get_adus(segments)
+        segments = utils.concat_major_claim(segments=segments, title=document["title"],
+                                            content=document["content"], counter=segment_counter)
+        major_claims, claims, premises = utils.get_adus(segments)
         self.app_logger.info(
             f"Found {len(major_claims)} major claims, {len(claims)} claims and {len(premises)} premises")
         self.app_logger.info("Predicting relations between ADUs")
@@ -196,22 +184,23 @@ class DebateLab:
         adus = []
         self.app_logger.debug(f"Processing document with id: {document['id']} and name: {document}")
         segment_counter = 0
-        sentences = self.utilities.tokenize(text=document["content"], punct=False)
+        sentences = utils.tokenize(text=document["content"], punct=False)
+        sentences = utils.join_sentences(tokenized_sentences=sentences)
         for sentence in sentences:
             self.app_logger.debug(f"Predicting labels for sentence: {sentence}")
-            sentence = " ".join(list(sentence))
             sentence = Sentence(sentence)
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
-            segments = self.utilities.get_args_from_sentence(sentence)
+            segments = utils.get_args_from_sentence(sentence)
             if segments:
                 for segment in segments:
                     if segment["text"] and segment["label"]:
+                        segment["text"] = utils.join_sentences(tokenized_sentences=[segment["tokens"]])
                         self.app_logger.debug(f"Segment text: {segment['text']}")
                         self.app_logger.debug(f"Segment type: {segment['label']}")
                         segment_counter += 1
-                        start_idx, end_idx = self.utilities.find_segment_in_text(content=document["content"],
-                                                                                 text=segment["text"])
+                        start_idx, end_idx = utils.find_segment_in_text(content=document["content"],
+                                                                        text=segment["text"])
                         seg = {
                             "id": f"T{segment_counter}",
                             "type": segment["label"],
@@ -265,7 +254,7 @@ class DebateLab:
                 sentence = Sentence(sentence_pair)
                 self.rel_model.model.predict(sentence)
                 labels = sentence.get_labels()
-                label, conf = self.utilities.get_label_with_max_conf(labels=labels)
+                label, conf = utils.get_label_with_max_conf(labels=labels)
                 if label and label != "other":
                     counter += 1
                     rel_dict = {
@@ -299,7 +288,7 @@ class DebateLab:
                     sentence = Sentence(sentence_pair)
                     self.stance_model.model.predict(sentence)
                     labels = sentence.get_labels()
-                    label, conf = self.utilities.get_label_with_max_conf(labels=labels)
+                    label, conf = utils.get_label_with_max_conf(labels=labels)
                     if label and label != "other":
                         stance_counter += 1
                         stance_list = [{
@@ -322,8 +311,7 @@ class DebateLab:
             the Argument Mining pipeline
             | document_ids (list): list of the ids of the valid documents
         """
-        adus, doc_ids, adu_ids = self.utilities.collect_adu_for_clustering(documents=documents,
-                                                                           document_ids=document_ids)
+        adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
         clusters = self.clustering.get_clusters(n_clusters=n_clusters, sentences=adus)
         relations = self.get_cross_document_relations(clusters=clusters, sentences=adus, adu_ids=adu_ids,

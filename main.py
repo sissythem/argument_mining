@@ -6,7 +6,8 @@ import pandas as pd
 
 from pipeline.debatelab import DebateLab
 from training.models import SequentialModel, ClassificationModel
-from training.preprocessing import DataLoader
+from training.old_preprocessing import DataLoader
+from training.preprocessing import ClarinLoader, CsvCreator
 from utils.config import AppConfig, Notification
 
 
@@ -42,7 +43,7 @@ def error_analysis(path_to_resources):
         f.writelines(error_sentences)
 
 
-def preprocess(app_config):
+def old_preprocess(app_config):
     """
     Preprocess the data into CONLL format
 
@@ -58,6 +59,25 @@ def preprocess(app_config):
     data_loader.load_relations()
     logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
     data_loader.load_similarities()
+
+
+def preprocess(app_config):
+    """
+    Preprocess the data into CONLL format
+
+    Args
+        app_config (AppConfig): the application configuration
+    """
+    logger = app_config.app_logger
+    clarin_loader = ClarinLoader(app_config=app_config)
+    csv_loader = CsvCreator(app_config=app_config)
+    clarin_loader.load()
+    logger.info("Creating CSV file in CONLL format for ADUs classification")
+    csv_loader.load_adus()
+    logger.info("Creating CSV file in CONLL format for relations/stance classification")
+    csv_loader.load_relations_and_stance()
+    logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
+    # csv_loader.load_similarities()
 
 
 def train(app_config):

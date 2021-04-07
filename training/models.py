@@ -1,8 +1,10 @@
+import logging
 from os import mkdir
 from os.path import join, exists
-from typing import List, Tuple, Type, Union
+from typing import List, Type, Union, AnyStr, Dict
 
 import flair
+
 try:
     import hdbscan
     import umap
@@ -14,15 +16,17 @@ import torch
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings, \
-    TransformerDocumentEmbeddings, DocumentPoolEmbeddings, DocumentTFIDFEmbeddings  # , WordEmbeddings, BytePairEmbeddings
+    TransformerDocumentEmbeddings, DocumentPoolEmbeddings, DocumentTFIDFEmbeddings
+# , WordEmbeddings, BytePairEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
 from sklearn.cluster import KMeans, AgglomerativeClustering, Birch, OPTICS
-from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
+from transformers import AutoModel, AutoTokenizer
 
 from utils.config import AppConfig
-from utils.utils import Utilities
+from utils import utils
 
 
 class Model:
@@ -30,17 +34,16 @@ class Model:
     Super class for all model classes
     """
 
-    def __init__(self, app_config: AppConfig, model_name: str):
-        self.app_config = app_config
-        self.app_logger = app_config.app_logger
-        self.model_name = model_name
-        self.properties: dict = app_config.properties
-        self.model_properties: dict = self._get_model_properties()
-        self.resources_path: str = self.app_config.resources_path
-        self.utilities = Utilities(app_config=app_config)
-        self.model_file: str = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
+    def __init__(self, app_config: AppConfig, model_name: AnyStr):
+        self.app_config: AppConfig = app_config
+        self.app_logger: logging.Logger = app_config.app_logger
+        self.model_name: AnyStr = model_name
+        self.properties: Dict = app_config.properties
+        self.model_properties: Dict = self._get_model_properties()
+        self.resources_path: AnyStr = self.app_config.resources_path
+        self.model_file: AnyStr = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
 
-    def _get_model_properties(self) -> dict:
+    def _get_model_properties(self) -> Dict:
         if self.model_name == "adu":
             return self.properties["seq_model"]
         elif self.model_name == "rel" or self.model_name == "stance" or self.model_name == "sim":
@@ -54,7 +57,7 @@ class SupervisedModel(Model):
     Abstract class representing a supervised learning model
     """
 
-    def __init__(self, app_config: AppConfig, model_name: str):
+    def __init__(self, app_config: AppConfig, model_name: AnyStr):
         """
         Classifier class constructor
 
@@ -64,13 +67,13 @@ class SupervisedModel(Model):
         """
         super(SupervisedModel, self).__init__(app_config=app_config, model_name=model_name)
         # define training / dev / test CSV files
-        self.dev_csv, self.train_csv, self.test_csv = self.get_data_files()
-        self.use_tensorboard = self.model_properties.get("use_tensorboard", True)
+        self.data_folder: AnyStr = join(self.app_config.dataset_folder, model_name)
+        self.use_tensorboard: bool = self.model_properties.get("use_tensorboard", True)
         self._set_bert_model_names()
-        self.base_path: str = self._get_base_path()
+        self.base_path: AnyStr = self._get_base_path()
         self.model = None
         self.optimizer: Optimizer = self.get_optimizer(model_name=model_name)
-        self.device_name = app_config.device_name
+        self.device_name: AnyStr = app_config.device_name
         flair.device = torch.device(self.device_name)
 
     def train(self):
@@ -78,7 +81,7 @@ class SupervisedModel(Model):
         Define the training process of the model
         """
         # 1. get the corpus
-        corpus = self.get_corpus()
+        corpus: Corpus = self.get_corpus()
         self.app_logger.info("Corpus created")
         self.app_logger.info(f"First training sentence: {corpus.train[0]}")
 
@@ -127,8 +130,7 @@ class SupervisedModel(Model):
         self.app_logger.info(f"Model configuration properties: {self.model_properties}")
         return trainer
 
-    def download_model(self, model_name, dir_name) -> str:
-        from transformers import AutoModel, AutoTokenizer
+    def download_model(self, model_name: AnyStr, dir_name: AnyStr) -> AnyStr:
         tokenizer = AutoTokenizer.from_pretrained(model_name)
         model = AutoModel.from_pretrained(model_name)
         path = join(self.app_config.output_path, "models", dir_name)
@@ -138,7 +140,7 @@ class SupervisedModel(Model):
         model.save_pretrained(path)
         return path
 
-    def get_optimizer(self, model_name: str) -> Union[Type[Optimizer], Optimizer]:
+    def get_optimizer(self, model_name: AnyStr) -> Union[Type[Optimizer], Optimizer]:
         """
         Define the model's optimizer based on the application properties
 
@@ -160,17 +162,7 @@ class SupervisedModel(Model):
             optimizer = SGD
         return optimizer
 
-    def get_data_files(self) -> Tuple[str, str, str]:
-        if self.model_name == "adu":
-            return self.app_config.adu_dev_csv, self.app_config.adu_train_csv, self.app_config.adu_test_csv
-        elif self.model_name == "sim":
-            return self.app_config.sim_dev_csv, self.app_config.sim_train_csv, self.app_config.sim_test_csv
-        elif self.model_name == "rel":
-            return self.app_config.rel_dev_csv, self.app_config.rel_train_csv, self.app_config.rel_test_csv
-        elif self.model_name == "stance":
-            return self.app_config.stance_dev_csv, self.app_config.stance_train_csv, self.app_config.stance_test_csv
-
-    def _get_base_path(self) -> str:
+    def _get_base_path(self) -> AnyStr:
         if self.model_name == "adu":
             return self.app_config.adu_base_path
         elif self.model_name == "sim":
@@ -181,10 +173,10 @@ class SupervisedModel(Model):
             return self.app_config.stance_base_path
 
     def _set_bert_model_names(self, download: bool = False):
-        bert_kinds = self.app_config.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
-                                                   model_name=self.model_name)
+        bert_kinds = utils.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
+                                         model_name=self.model_name)
         if bert_kinds:
-            self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=bert_kinds)
+            self.bert_model_names = utils.get_bert_model_names(bert_kinds=bert_kinds)
         else:
             self.bert_model_names = ["nlpaueb/bert-base-greek-uncased-v1"]
         if download:
@@ -206,9 +198,9 @@ class SequentialModel(SupervisedModel):
 
     def get_corpus(self) -> Corpus:
         columns = {0: 'text', 1: 'ner'}
-        data_folder = join(self.resources_path, "data")
-        corpus: Corpus = ColumnCorpus(data_folder, columns, train_file=self.train_csv, test_file=self.test_csv,
-                                      dev_file=self.dev_csv)
+        # TODO rename test & dev datasets
+        corpus: Corpus = ColumnCorpus(self.data_folder, columns, train_file="train.csv", test_file="train.csv",
+                                      dev_file="train.csv")
         return corpus
 
     def get_dictionary(self, corpus: Corpus) -> Dictionary:
@@ -249,13 +241,13 @@ class ClassificationModel(SupervisedModel):
         super(ClassificationModel, self).__init__(app_config=app_config, model_name=model_name)
 
     def get_corpus(self) -> Corpus:
-        data_folder = join(self.resources_path, "data")
         # define columns
         column_name_map = {0: "text", 1: "label_topic"}
         # create Corpus
-        corpus: Corpus = CSVClassificationCorpus(data_folder=data_folder, column_name_map=column_name_map,
-                                                 skip_header=True, delimiter="\t", train_file=self.train_csv,
-                                                 test_file=self.test_csv, dev_file=self.dev_csv)
+        # TODO rename test & dev datasets
+        corpus: Corpus = CSVClassificationCorpus(data_folder=self.data_folder, column_name_map=column_name_map,
+                                                 skip_header=True, delimiter="\t", train_file="train.csv",
+                                                 test_file="train.csv", dev_file="train.csv")
         return corpus
 
     def get_dictionary(self, corpus: Corpus) -> Dictionary:
@@ -315,7 +307,7 @@ class Clustering(UnsupervisedModel):
         elif self.embedding_kind == "tfidf":
             pass
         else:
-            self.bert_model_names = self.utilities.get_bert_model_names(bert_kinds=[self.embedding_kind])
+            self.bert_model_names = utils.get_bert_model_names(bert_kinds=[self.embedding_kind])
             bert_name = self.bert_model_names[0][0]
             self.document_embeddings = TransformerDocumentEmbeddings(bert_name)
 
@@ -403,7 +395,7 @@ class OpticsClustering(Clustering):
         super(OpticsClustering, self).__init__(app_config=app_config)
 
     def get_clusters(self, sentences, n_clusters=None):
-        n_clusters = int(len(sentences) / 2)
+        # n_clusters = int(len(sentences) / 2)
         optics_model = OPTICS(metric="cosine")
         embeddings = self.get_embeddings(sentences=sentences)
         clusters = optics_model.fit(embeddings)
@@ -436,7 +428,7 @@ class TopicModel(Hdbscan):
         """
         topics = []
         if type(content) == str:
-            sentences = self.utilities.tokenize(text=content)
+            sentences = utils.tokenize(text=content)
             sentences = [" ".join(s) for s in sentences]
         else:
             sentences = content
@@ -461,8 +453,9 @@ class TopicModel(Hdbscan):
             self.app_logger.error(e)
             return topics
 
-    def _c_tf_idf(self, sentences, m, ngram_range=(1, 1)):
-        greek_stopwords = self.utilities.get_greek_stopwords()
+    @staticmethod
+    def _c_tf_idf(sentences, m, ngram_range=(1, 1)):
+        greek_stopwords = utils.get_greek_stopwords()
         count = CountVectorizer(ngram_range=ngram_range, stop_words=greek_stopwords).fit(sentences)
         t = count.transform(sentences).toarray()
         w = t.sum(axis=1)
