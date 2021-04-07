@@ -30,7 +30,7 @@ class DataUpSampler:
             file_kind (str): possible values are --> train, test, dev
             total_num(int or dict): the total number to augment the minority classes
         """
-        filename = f"{file_kind}_{task_kind}.csv"
+        filename = f"{file_kind}.csv"
         file_path = join(self.data_folder, task_kind, filename)
         df = pd.read_csv(file_path, sep="\t", index_col=None, header=None)
         if task_kind == "adu":
