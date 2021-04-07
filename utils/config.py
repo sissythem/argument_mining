@@ -230,7 +230,7 @@ class Notification:
         """
         config_email = config.get("email", None)
         self.do_send_email = False
-        if config_email:
+        if config_email and type(config_email) == dict:
             self.sender_email = config_email["sender"]
             self.receiver_email = config_email["receiver"]
             self.password = config_email["password"]
