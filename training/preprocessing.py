@@ -44,7 +44,8 @@ class DataUpSampler:
         filename = filename.replace(".csv", "")
         new_file = f"{filename}_oversample.csv"
         output_filepath = join(self.data_folder, new_file)
-        df.to_csv(output_filepath, sep='\t', index=False, header=True)
+        if not exists(output_filepath):
+            df.to_csv(output_filepath, sep='\t', index=False, header=True)
 
     @staticmethod
     def oversample_adus(data: pd.DataFrame, desired_lbl_count: Dict):
@@ -134,35 +135,36 @@ class CsvCreator:
     def load_adus(self):
         self.app_logger.debug("Running ADU preprocessing")
         resources = self.app_config.resources_path
-        documents_path = join(resources, self.pickle_file)
-        self.app_logger.debug("Loading documents from pickle file")
-        with open(documents_path, "rb") as f:
-            documents = pickle.load(f)
-        self.app_logger.debug("Documents are loaded")
-        df = pd.DataFrame(columns=["token", "label", "is_arg", "sp", "sentence", "document"])
-        row_counter = 0
-        sentence_counter = 0
-        for document in documents:
-            self.app_logger.debug(f"Processing document with id: {document.document_id}")
-            doc_sentence_counter = 0
-            for idx, sentence in enumerate(document.sentences):
-                self.app_logger.debug(f"Processing sentence: {sentence}")
-                labels = document.sentences_labels[idx]
-                for token, label in zip(sentence, labels):
-                    is_arg = "Y" if label != "O" else "N"
-                    sp = f"SP: {doc_sentence_counter}"
-                    sentence_counter_str = f"Sentence: {sentence_counter}"
-                    document_str = f"Doc: {document.document_id}"
-                    df.loc[row_counter] = [token, label, is_arg, sp, sentence_counter_str, document_str]
-                    row_counter += 1
-                    doc_sentence_counter += 1
-                df.loc[row_counter] = ["", "", "", "", "", ""]
-                sentence_counter += 1
-                row_counter += 1
-        self.app_logger.debug("Finished building dataframe. Saving...")
         out_file_path = join(resources, "data", "adu", "train.csv")
-        df.to_csv(out_file_path, sep='\t', index=False, header=False)
-        self.app_logger.debug("Dataframe saved!")
+        if not exists(out_file_path):
+            documents_path = join(resources, self.pickle_file)
+            self.app_logger.debug("Loading documents from pickle file")
+            with open(documents_path, "rb") as f:
+                documents = pickle.load(f)
+            self.app_logger.debug("Documents are loaded")
+            df = pd.DataFrame(columns=["token", "label", "is_arg", "sp", "sentence", "document"])
+            row_counter = 0
+            sentence_counter = 0
+            for document in documents:
+                self.app_logger.debug(f"Processing document with id: {document.document_id}")
+                doc_sentence_counter = 0
+                for idx, sentence in enumerate(document.sentences):
+                    self.app_logger.debug(f"Processing sentence: {sentence}")
+                    labels = document.sentences_labels[idx]
+                    for token, label in zip(sentence, labels):
+                        is_arg = "Y" if label != "O" else "N"
+                        sp = f"SP: {doc_sentence_counter}"
+                        sentence_counter_str = f"Sentence: {sentence_counter}"
+                        document_str = f"Doc: {document.document_id}"
+                        df.loc[row_counter] = [token, label, is_arg, sp, sentence_counter_str, document_str]
+                        row_counter += 1
+                        doc_sentence_counter += 1
+                    df.loc[row_counter] = ["", "", "", "", "", ""]
+                    sentence_counter += 1
+                    row_counter += 1
+            self.app_logger.debug("Finished building dataframe. Saving...")
+            df.to_csv(out_file_path, sep='\t', index=False, header=False)
+            self.app_logger.debug("Dataframe saved!")
         if self.oversampling_prop:
             adu_config = self.oversampling_prop.get("adu", None)
             if adu_config:
@@ -173,17 +175,19 @@ class CsvCreator:
         data_path = join(self.app_config.dataset_folder, "sim")
         data_csv = "UKP_ASPECT.tsv"
         data_file_path = join(data_path, data_csv)
-        df = pd.read_csv(data_file_path, sep="\t", header=0, index_col=None)
-        new_df = pd.DataFrame(columns=["sentence", "label", "topic"])
-        row_counter = 0
-        for index, row in df.iterrows():
-            topic, sentence1, sentence2, label = row
-            final_text = f"[CLS] {sentence1} [SEP] {sentence2}"
-            new_df.loc[row_counter] = [final_text, label, topic]
-            row_counter += 1
         output_filepath = join(data_path, "train.csv")
-        new_df.to_csv(output_filepath, sep='\t', index=False, header=False)
-        self.app_logger.debug("Dataframe saved!")
+        if not exists(output_filepath):
+            df = pd.read_csv(data_file_path, sep="\t", header=0, index_col=None)
+            new_df = pd.DataFrame(columns=["sentence", "label", "topic"])
+            row_counter = 0
+            for index, row in df.iterrows():
+                topic, sentence1, sentence2, label = row
+                final_text = f"[CLS] {sentence1} [SEP] {sentence2}"
+                new_df.loc[row_counter] = [final_text, label, topic]
+                row_counter += 1
+
+            new_df.to_csv(output_filepath, sep='\t', index=False, header=False)
+            self.app_logger.debug("Dataframe saved!")
         if do_oversample:
             # TODO if needed
             pass
@@ -223,6 +227,9 @@ class CsvCreator:
 
     def _save_rel_df(self, rel_list, folder, filename):
         data_path = join(self.app_config.dataset_folder, folder)
+        output_filepath = join(data_path, filename)
+        if exists(output_filepath):
+            return
         df = pd.DataFrame(columns=["token", "label", "sentence"])
         row_counter = 0
         sentence_counter = 0
@@ -239,7 +246,6 @@ class CsvCreator:
             df.loc[row_counter] = [final_text, relation, sentence_counter_str]
             row_counter += 1
             sentence_counter += 1
-        output_filepath = join(data_path, filename)
         df.to_csv(output_filepath, sep='\t', index=False, header=False)
         self.app_logger.debug("Dataframe saved!")
 
