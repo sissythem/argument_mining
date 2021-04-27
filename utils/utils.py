@@ -167,7 +167,7 @@ def bio_tag_lbl_per_token(tokens_labels_tuple, other_label="O"):
 
 
 # ************************************** BERT config *****************************************************
-def get_bert_model_names(bert_kinds):
+def get_bert_model_names(bert_kinds, local_path=None):
     bert_model_names = []
     for bert_kind in bert_kinds:
         if bert_kind == "base":
@@ -180,6 +180,8 @@ def get_bert_model_names(bert_kinds):
             bert_model_names.append(("joeddav/xlm-roberta-large-xnli", bert_kind))  # not good performance
         elif bert_kind == "base-multi":
             bert_model_names.append(("bert-base-multilingual-uncased", bert_kind))
+        elif bert_kind == "ours":
+            bert_model_names.append((local_path, bert_kind))
     return bert_model_names
 
 
