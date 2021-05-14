@@ -64,9 +64,10 @@ class DebateLab:
         if notify:
             self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
-        relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
-        if notify:
-            self.notification.notify_ics(ids_list=relations_ids, kind="clustering")
+        # relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
+        self.run_clustering_demo(documents=documents, document_ids=document_ids)
+        # if notify:
+        #     self.notification.notify_ics(ids_list=relations_ids, kind="clustering")
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************
@@ -301,6 +302,34 @@ class DebateLab:
         return json_obj, stance_counter
 
     # ************************************* Cross-document relations **********************************
+    def run_clustering_demo(self, documents, document_ids):
+        from os.path import join
+        import pandas as pd
+        adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
+        file_path = join(self.app_config.resources_path, "claims_similarity.tsv")
+        new_file_path = join(self.app_config.resources_path, "claims_similarity_v2.tsv")
+        df = pd.read_csv(file_path, sep="\t", header=0, index_col=None)
+        sentences1_ids, sentences1_doc_ids, sentences2_ids, sentences2_doc_ids = [], [], [], []
+        for idx, row in df.iterrows():
+            sentence1, sentence2, score = row
+            sentence1_id, sentence1_doc_id, sentence2_id, sentence2_doc_id = -1, -1, -1, -1
+            for i, adu in enumerate(adus):
+                if adu == sentence1:
+                    sentence1_id = adu_ids[i]
+                    sentence1_doc_id = doc_ids[i]
+                elif adu == sentence2:
+                    sentence2_id = adu_ids[i]
+                    sentence2_doc_id = doc_ids[i]
+            sentences1_ids.append(sentence1_id)
+            sentences1_doc_ids.append(sentence1_doc_id)
+            sentences2_ids.append(sentence2_id)
+            sentences2_doc_ids.append(sentence2_doc_id)
+        df["Sentence1_id"] = sentences1_ids
+        df["Sentence2_id"] = sentences2_ids
+        df["Sentence1_doc_id"] = sentences1_doc_ids
+        df["Sentence2_doc_id"] = sentences2_doc_ids
+        df.to_csv(new_file_path, sep="\t", header=True, index=None)
+
     def run_clustering(self, documents, document_ids, save=False):
         """
         Cross-document relations pipeline
@@ -337,7 +366,9 @@ class DebateLab:
                     "source": arg1[0],
                     "source_doc": arg1[1],
                     "target": arg2[0],
-                    "target_doc": arg2[1]
+                    "target_doc": arg2[1],
+                    "type": "similar",
+                    "score": 0.0
                 }
                 relations.append(relation)
         return relations

@@ -122,7 +122,7 @@ def clustering(sentences):
 
 def main():
     sentences = get_sentences()
-    lda(sentences=sentences)
+    clustering(sentences=sentences)
 
 
 if __name__ == '__main__':
