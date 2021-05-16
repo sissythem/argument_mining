@@ -305,7 +305,6 @@ class DebateLab:
     def run_clustering_demo(self, documents, document_ids):
         from os.path import join
         import pandas as pd
-        adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
         file_path = join(self.app_config.resources_path, "claims_similarity.tsv")
         new_file_path = join(self.app_config.resources_path, "claims_similarity_v2.tsv")
         df = pd.read_csv(file_path, sep="\t", header=0, index_col=None)
@@ -313,13 +312,22 @@ class DebateLab:
         for idx, row in df.iterrows():
             sentence1, sentence2, score = row
             sentence1_id, sentence1_doc_id, sentence2_id, sentence2_doc_id = -1, -1, -1, -1
-            for i, adu in enumerate(adus):
-                if adu == sentence1:
-                    sentence1_id = adu_ids[i]
-                    sentence1_doc_id = doc_ids[i]
-                elif adu == sentence2:
-                    sentence2_id = adu_ids[i]
-                    sentence2_doc_id = doc_ids[i]
+            for document in documents:
+                found_sentence = None
+                if sentence1 in document["content"]:
+                    sentence1_doc_id = document["id"]
+                    found_sentence = 1
+                if sentence2 in document["content"]:
+                    sentence2_doc_id = document["id"]
+                    found_sentence = 2
+                if found_sentence is not None:
+                    for adu in document["annotations"]["ADUs"]:
+                        if adu["segment"] == sentence1 or adu["segment"] in sentence1 or sentence1 in adu["segment"]\
+                                or adu["segment"][:10] == sentence1[:10]:
+                            sentence1_id = adu["id"]
+                        if adu["segment"] == sentence2 or adu["segment"] in sentence2 or sentence2 in adu["segment"] \
+                                or adu["segment"][:10] == sentence2[:10]:
+                            sentence2_id = adu["id"]
             sentences1_ids.append(sentence1_id)
             sentences1_doc_ids.append(sentence1_doc_id)
             sentences2_ids.append(sentence2_id)
@@ -329,6 +337,29 @@ class DebateLab:
         df["Sentence1_doc_id"] = sentences1_doc_ids
         df["Sentence2_doc_id"] = sentences2_doc_ids
         df.to_csv(new_file_path, sep="\t", header=True, index=None)
+        # df = pd.read_csv(new_file_path, sep="\t", header=0, index_col=None)
+        relations = []
+        cluster_counter = 0
+        for idx, row in df.iterrows():
+            sentence1, sentence2, label, sentence_id1, sentence_id2, sentence_doc_id1, sentence_doc_id2 = row
+            similarity_type = "similar" if label >= 0.5 else "different"
+            relation = {
+                "id": f"{sentence_doc_id1};{sentence_doc_id2};{sentence_id1};{sentence_id2}",
+                "cluster": cluster_counter,
+                "source": sentence_id1,
+                "source_doc": sentence_doc_id1,
+                "target": sentence_id2,
+                "target_doc": sentence_doc_id2,
+                "type": similarity_type,
+                "score": float(label)
+            }
+            cluster_counter += 1
+            relations.append(relation)
+        path = self.app_config.output_files
+        for relation in relations:
+            relation_path = join(path, f"{relation['id']}.json")
+            with open(relation_path, "w") as f:
+                f.write(json.dumps(relation))
 
     def run_clustering(self, documents, document_ids, save=False):
         """
