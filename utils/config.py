@@ -446,7 +446,6 @@ class ElasticSearchConfig:
                                         body=document)
 
     def save_relation(self, relation):
-        # TODO change index
-        self.elasticsearch_client.index(index='debatelab', ignore=400, refresh=True,
+        self.elasticsearch_client.index(index='debatelab-crossdoc-relations', ignore=400, refresh=True,
                                         doc_type='docket', id=relation["id"],
                                         body=relation)

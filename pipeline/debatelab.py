@@ -342,6 +342,9 @@ class DebateLab:
         cluster_counter = 0
         for idx, row in df.iterrows():
             sentence1, sentence2, label, sentence_id1, sentence_id2, sentence_doc_id1, sentence_doc_id2 = row
+            if sentence_id1 == -1 or sentence_id2 == -1 or sentence_doc_id1 == -1 or sentence_doc_id2 == -1 or \
+                    (sentence_id1 == sentence_id2 and sentence_doc_id1 == sentence_doc_id2):
+                continue
             similarity_type = "similar" if label >= 0.5 else "different"
             relation = {
                 "id": f"{sentence_doc_id1};{sentence_doc_id2};{sentence_id1};{sentence_id2}",
