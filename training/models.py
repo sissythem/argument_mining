@@ -16,7 +16,7 @@ import torch
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
 from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings, \
-    TransformerDocumentEmbeddings, DocumentPoolEmbeddings, DocumentTFIDFEmbeddings
+    TransformerDocumentEmbeddings, DocumentPoolEmbeddings  # , DocumentTFIDFEmbeddings
 # , WordEmbeddings, BytePairEmbeddings
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
@@ -314,8 +314,8 @@ class Clustering(UnsupervisedModel):
             self.document_embeddings = TransformerDocumentEmbeddings(bert_name, local_files_only=local_files_only)
 
     def get_embeddings(self, sentences):
-        if self.embedding_kind == "tfidf":
-            self.document_embeddings = DocumentTFIDFEmbeddings(train_dataset=sentences)
+        # if self.embedding_kind == "tfidf":
+        #     self.document_embeddings = DocumentTFIDFEmbeddings(train_dataset=sentences)
         sentence_embeddings = []
         for sentence in sentences:
             flair_sentence = Sentence(sentence)
