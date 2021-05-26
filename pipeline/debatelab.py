@@ -357,12 +357,14 @@ class DebateLab:
                 "score": float(label)
             }
             cluster_counter += 1
-            relations.append(relation)
-        path = self.app_config.output_files
-        for relation in relations:
             relation_path = join(path, f"{relation['id']}.json")
             with open(relation_path, "w") as f:
                 f.write(json.dumps(relation))
+            self.app_config.elastic_save.save_relation(relation)
+            relations.append(relation["id"])
+        path = self.app_config.output_files
+        for relation in relations:
+        return relations
 
     def run_clustering(self, documents, document_ids, save=False):
         """
