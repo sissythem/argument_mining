@@ -311,7 +311,7 @@ class Clustering(UnsupervisedModel):
             local_files_only = True if bert_path is not None else False
             self.bert_model_names = utils.get_bert_model_names(bert_kinds=[self.embedding_kind], local_path=bert_path)
             bert_name = self.bert_model_names[0][0]
-            self.document_embeddings = TransformerDocumentEmbeddings(bert_name, local_files_only=local_files_only)
+            self.document_embeddings = TransformerDocumentEmbeddings(bert_name)
 
     def get_embeddings(self, sentences):
         # if self.embedding_kind == "tfidf":
