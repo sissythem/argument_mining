@@ -346,12 +346,16 @@ class DebateLab:
                     (sentence_id1 == sentence_id2 and sentence_doc_id1 == sentence_doc_id2):
                 continue
             similarity_type = "similar" if label >= 0.5 else "different"
+            if similarity_type == "different":
+                continue
             relation = {
                 "id": f"{sentence_doc_id1};{sentence_doc_id2};{sentence_id1};{sentence_id2}",
                 "cluster": cluster_counter,
                 "source": sentence_id1,
+                "source_segment": sentence1,
                 "source_doc": sentence_doc_id1,
                 "target": sentence_id2,
+                "target_segment": sentence2,
                 "target_doc": sentence_doc_id2,
                 "type": similarity_type,
                 "score": float(label)
