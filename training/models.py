@@ -199,8 +199,9 @@ class SequentialModel(SupervisedModel):
     def get_corpus(self) -> Corpus:
         columns = {0: 'text', 1: 'ner'}
         # TODO rename test & dev datasets
-        corpus: Corpus = ColumnCorpus(self.data_folder, columns, train_file="train.csv", test_file="train.csv",
-                                      dev_file="train.csv")
+        corpus: Corpus = ColumnCorpus(self.data_folder, columns, train_file="train_oversample.csv",
+                                      test_file="train_oversample.csv",
+                                      dev_file="train_oversample.csv")
         return corpus
 
     def get_dictionary(self, corpus: Corpus) -> Dictionary:
