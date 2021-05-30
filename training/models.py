@@ -1,6 +1,5 @@
 import logging
-from os import mkdir
-from os.path import join, exists
+from os.path import join
 from typing import List, Type, Union, AnyStr, Dict
 
 import flair
@@ -23,7 +22,6 @@ from flair.trainers import ModelTrainer
 from sklearn.cluster import KMeans, AgglomerativeClustering, Birch, OPTICS
 from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
-from transformers import AutoModel, AutoTokenizer
 
 from utils.config import AppConfig
 from utils import utils
@@ -40,6 +38,7 @@ class Model:
         self.model_name: AnyStr = model_name
         self.properties: Dict = app_config.properties
         self.model_properties: Dict = self._get_model_properties()
+        self.transformer_name = self.model_properties["bert_kind"][self.model_name]
         self.resources_path: AnyStr = self.app_config.resources_path
         self.model_file: AnyStr = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
 
@@ -69,7 +68,6 @@ class SupervisedModel(Model):
         # define training / dev / test CSV files
         self.data_folder: AnyStr = join(self.app_config.dataset_folder, model_name)
         self.use_tensorboard: bool = self.model_properties.get("use_tensorboard", True)
-        self._set_bert_model_names()
         self.base_path: AnyStr = self._get_base_path()
         self.model = None
         self.optimizer: Optimizer = self.get_optimizer(model_name=model_name)
@@ -130,16 +128,6 @@ class SupervisedModel(Model):
         self.app_logger.info(f"Model configuration properties: {self.model_properties}")
         return trainer
 
-    def download_model(self, model_name: AnyStr, dir_name: AnyStr) -> AnyStr:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModel.from_pretrained(model_name)
-        path = join(self.app_config.output_path, "models", dir_name)
-        if not exists(path):
-            mkdir(path)
-        tokenizer.save_pretrained(path)
-        model.save_pretrained(path)
-        return path
-
     def get_optimizer(self, model_name: AnyStr) -> Union[Type[Optimizer], Optimizer]:
         """
         Define the model's optimizer based on the application properties
@@ -172,19 +160,6 @@ class SupervisedModel(Model):
         elif self.model_name == "stance":
             return self.app_config.stance_base_path
 
-    def _set_bert_model_names(self, download: bool = False):
-        bert_kinds = utils.get_bert_kind(bert_kind_props=self.model_properties["bert_kind"],
-                                         model_name=self.model_name)
-        if bert_kinds:
-            self.bert_model_names = utils.get_bert_model_names(bert_kinds=bert_kinds)
-        else:
-            self.bert_model_names = ["nlpaueb/bert-base-greek-uncased-v1"]
-        if download:
-            for idx, pair in enumerate(self.bert_model_names):
-                model, kind = pair[0], pair[1]
-                path = self.download_model(model_name=model, dir_name=kind)
-                self.bert_model_names[idx] = (path, kind)
-
 
 class SequentialModel(SupervisedModel):
 
@@ -211,9 +186,7 @@ class SequentialModel(SupervisedModel):
         return tag_dictionary
 
     def get_embeddings(self):
-        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(bert_name[0]) for bert_name in
-                                                  self.bert_model_names]
-
+        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(self.transformer_name)]
         embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
         return embeddings
 
@@ -247,8 +220,8 @@ class ClassificationModel(SupervisedModel):
         # create Corpus
         # TODO rename test & dev datasets
         corpus: Corpus = CSVClassificationCorpus(data_folder=self.data_folder, column_name_map=column_name_map,
-                                                 skip_header=True, delimiter="\t", train_file="train.csv",
-                                                 test_file="train.csv", dev_file="train.csv")
+                                                 skip_header=True, delimiter="\t", train_file="train_oversample.csv",
+                                                 test_file="train_oversample.csv", dev_file="train_oversample.csv")
         return corpus
 
     def get_dictionary(self, corpus: Corpus) -> Dictionary:
@@ -257,8 +230,7 @@ class ClassificationModel(SupervisedModel):
 
     def get_embeddings(self):
         # initialize the document embeddings
-        bert_name = self.bert_model_names[0][0]
-        document_embeddings = TransformerDocumentEmbeddings(bert_name, fine_tune=True)
+        document_embeddings = TransformerDocumentEmbeddings(self.transformer_name)
         return document_embeddings
 
     def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:

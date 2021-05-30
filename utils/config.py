@@ -25,8 +25,6 @@ from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search
 from sshtunnel import SSHTunnelForwarder
 
-from utils import utils
-
 
 class AppConfig:
     """
@@ -60,11 +58,10 @@ class AppConfig:
         self.app_logger: logging.Logger = self._config_logger()
         self.app_logger.info(f"Run id: {self.run}")
 
-        # training data
-        self.adu_base_path: str = self._get_base_path(base_name="adu_model")
-        self.rel_base_path: str = self._get_base_path(base_name="rel_model")
-        self.stance_base_path: str = self._get_base_path(base_name="stance_model")
-        self.sim_base_path: str = self._get_base_path(base_name="sim_model")
+        self.adu_base_path: str = self._get_base_path(base_name="adu")
+        self.rel_base_path: str = self._get_base_path(base_name="rel")
+        self.stance_base_path: str = self._get_base_path(base_name="stance")
+        self.sim_base_path: str = self._get_base_path(base_name="sim")
 
         # config elasticsearch
         self._config_elastic_search()
@@ -175,13 +172,13 @@ class AppConfig:
             str: the path to the directory of the model
         """
         # Create a base path:
-        if base_name == "adu_model":
+        if base_name == "adu":
             properties = self.properties["seq_model"]
         else:
             properties = self.properties["class_model"]
-        bert_kind = "-".join(utils.get_bert_kind(bert_kind_props=properties["bert_kind"], model_name=base_name))
+        bert_kind = properties["bert_kind"][base_name].replace("/", "-")
         embedding_names = f"bert-{bert_kind}"
-        layers = properties["rnn_layers"] if base_name == "adu_model" else properties["layers"]
+        layers = properties["rnn_layers"] if base_name == "adu" else properties["layers"]
         base_path = f"{base_name}-" + '-'.join([
             str(embedding_names),
             'hs=' + str(properties["hidden_size"]),

@@ -166,40 +166,6 @@ def bio_tag_lbl_per_token(tokens_labels_tuple, other_label="O"):
     return tokens, labels
 
 
-# ************************************** BERT config *****************************************************
-def get_bert_model_names(bert_kinds, local_path=None):
-    bert_model_names = []
-    for bert_kind in bert_kinds:
-        if bert_kind == "base":
-            bert_model_names.append(("bert-base-uncased", bert_kind))
-        elif bert_kind == "aueb":
-            bert_model_names.append(("nlpaueb/bert-base-greek-uncased-v1", bert_kind))
-        elif bert_kind == "nli":
-            bert_model_names.append(("facebook/bart-large-mnli", bert_kind))
-        elif bert_kind == "multi-nli":
-            bert_model_names.append(("joeddav/xlm-roberta-large-xnli", bert_kind))  # not good performance
-        elif bert_kind == "base-multi":
-            bert_model_names.append(("bert-base-multilingual-uncased", bert_kind))
-        elif bert_kind == "ours":
-            bert_model_names.append((local_path, bert_kind))
-    return bert_model_names
-
-
-def get_bert_kind(bert_kind_props: Dict, model_name: AnyStr) -> List[AnyStr]:
-    bert_kind = ["aueb"]
-    if model_name.startswith("adu"):
-        bert_kind = bert_kind_props["adu"]
-    elif model_name.startswith("rel"):
-        bert_kind = bert_kind_props["rel"]
-    elif model_name.startswith("stance"):
-        bert_kind = bert_kind_props["stance"]
-    elif model_name.startswith("sim"):
-        bert_kind = bert_kind_props["sim"]
-    if type(bert_kind) == str:
-        bert_kind = [bert_kind]
-    return bert_kind
-
-
 # **************************** Segment Extraction **************************************
 def get_label_with_max_conf(labels):
     max_lbl, max_conf = "", 0.0
