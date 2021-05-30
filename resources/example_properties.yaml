@@ -56,7 +56,7 @@ eval:
     password: "debateLabPassw0rd"
 seq_model:
   bert_kind:
-    adu: [ "nlpaueb/bert-base-greek-uncased-v1" ] # base, nli, aueb
+    adu: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb
   hidden_size: 256
   rnn_layers: 2
   dropout: 0.5
