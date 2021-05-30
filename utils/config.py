@@ -160,7 +160,7 @@ class AppConfig:
             mkdir(join(self.dataset_folder, "adu"))
             mkdir(join(self.dataset_folder, "rel"))
             mkdir(join(self.dataset_folder, "stance"))
-            mkdir(join(self.dataset_folder, "sim"))
+            # mkdir(join(self.dataset_folder, "sim"))
         if not exists(self.results_folder):
             mkdir(self.results_folder)
 
