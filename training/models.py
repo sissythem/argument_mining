@@ -14,12 +14,13 @@ import pandas as pd
 import torch
 from flair.data import Corpus, Dictionary, Sentence
 from flair.datasets import ColumnCorpus, CSVClassificationCorpus
-from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, FastTextEmbeddings, \
-    TransformerDocumentEmbeddings, DocumentPoolEmbeddings  # , DocumentTFIDFEmbeddings
-# , WordEmbeddings, BytePairEmbeddings
+from flair.embeddings import TokenEmbeddings, StackedEmbeddings, TransformerWordEmbeddings, \
+    TransformerDocumentEmbeddings
+from flair.models.similarity_learning_model import CosineSimilarity
 from flair.models import SequenceTagger, TextClassifier
 from flair.trainers import ModelTrainer
-from sklearn.cluster import KMeans, AgglomerativeClustering, Birch, OPTICS
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
@@ -38,7 +39,8 @@ class Model:
         self.model_name: AnyStr = model_name
         self.properties: Dict = app_config.properties
         self.model_properties: Dict = self._get_model_properties()
-        self.transformer_name = self.model_properties["bert_kind"][self.model_name]
+        self.transformer_name = self.model_properties["bert_kind"][self.model_name] if self.model_name != "clustering" \
+            else self.model_properties["bert_kind"]
         self.resources_path: AnyStr = self.app_config.resources_path
         self.model_file: AnyStr = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
 
@@ -172,7 +174,7 @@ class SequentialModel(SupervisedModel):
         self.tag_type = 'ner'
 
     def get_corpus(self) -> Corpus:
-        columns = {0: 'text', 1: 'ner'}
+        columns = {0: 'text', 1: self.tag_type}
         # TODO rename test & dev datasets
         corpus: Corpus = ColumnCorpus(self.data_folder, columns, train_file="train_oversample.csv",
                                       test_file="train_oversample.csv",
@@ -263,32 +265,9 @@ class Clustering(UnsupervisedModel):
     def __init__(self, app_config: AppConfig, model_name="clustering"):
         super(Clustering, self).__init__(app_config=app_config, model_name=model_name)
         self.n_clusters = self.model_properties["n_clusters"]
-        self.embedding_kind = self.model_properties["embeddings"]
-        if self.embedding_kind == "fasttext":
-            path_to_embeddings = join(self.resources_path, "embeddings", "wiki.el.bin")
-            self.document_embeddings = DocumentPoolEmbeddings([
-                FastTextEmbeddings(path_to_embeddings, use_local=True)
-            ])
-            # self.document_embeddings = DocumentPoolEmbeddings(
-            #     [
-            #         # standard FastText word embeddings for English
-            #         WordEmbeddings('en'),
-            #         # Byte pair embeddings for English
-            #         BytePairEmbeddings('en'),
-            #     ]
-            # )
-        elif self.embedding_kind == "tfidf":
-            pass
-        else:
-            bert_path = self.model_properties.get("bert_path", None)
-            local_files_only = True if bert_path is not None else False
-            self.bert_model_names = utils.get_bert_model_names(bert_kinds=[self.embedding_kind], local_path=bert_path)
-            bert_name = self.bert_model_names[0][0]
-            self.document_embeddings = TransformerDocumentEmbeddings(bert_name)
+        self.document_embeddings = TransformerDocumentEmbeddings(self.transformer_name)
 
     def get_embeddings(self, sentences):
-        # if self.embedding_kind == "tfidf":
-        #     self.document_embeddings = DocumentTFIDFEmbeddings(train_dataset=sentences)
         sentence_embeddings = []
         for sentence in sentences:
             flair_sentence = Sentence(sentence)
@@ -300,7 +279,7 @@ class Clustering(UnsupervisedModel):
         embeddings = np.asarray(sentence_embeddings)
         return embeddings
 
-    def get_clusters(self, sentences, n_clusters=None):
+    def get_clusters(self, sentences, n_clusters=None, **kwargs):
         raise NotImplementedError
 
 
@@ -309,7 +288,7 @@ class Hdbscan(Clustering):
     def __init__(self, app_config: AppConfig):
         super(Hdbscan, self).__init__(app_config=app_config)
 
-    def get_clusters(self, sentences, n_clusters=None):
+    def get_clusters(self, sentences, n_clusters=None, **kwargs):
         if n_clusters is None:
             n_clusters = self.n_clusters
         embeddings = self.get_embeddings(sentences=sentences)
@@ -325,24 +304,12 @@ class Hdbscan(Clustering):
             self.app_logger.error(e)
 
 
-class KmeansClustering(Clustering):
-
-    def __init__(self, app_config):
-        super(KmeansClustering, self).__init__(app_config=app_config)
-        self.kmeans_model = KMeans(n_clusters=self.n_clusters)
-
-    def get_clusters(self, sentences, n_clusters=None):
-        embeddings = self.get_embeddings(sentences=sentences)
-        clusters = self.kmeans_model.fit(embeddings)
-        return clusters
-
-
 class Agglomerative(Clustering):
 
     def __init__(self, app_config: AppConfig):
         super(Agglomerative, self).__init__(app_config=app_config)
 
-    def get_clusters(self, sentences, n_clusters=None):
+    def get_clusters(self, sentences, n_clusters=None, **kwargs):
         n_clusters = int(len(sentences) / 2)
         agglomerative_model = AgglomerativeClustering(linkage="complete", affinity="cosine",
                                                       n_clusters=n_clusters, compute_distances=True)
@@ -351,30 +318,79 @@ class Agglomerative(Clustering):
         return clusters
 
 
-class BirchClustering(Clustering):
+class CustomAgglomerative(Clustering):
 
     def __init__(self, app_config: AppConfig):
-        super(BirchClustering, self).__init__(app_config=app_config)
+        super(CustomAgglomerative, self).__init__(app_config=app_config)
+        self.cosine_similarity = CosineSimilarity()
 
-    def get_clusters(self, sentences, n_clusters=None):
-        n_clusters = int(len(sentences) / 2)
-        birch_model = Birch(threshold=0.7, n_clusters=n_clusters)
+    def get_clusters(self, sentences, n_clusters=None, **kwargs):
         embeddings = self.get_embeddings(sentences=sentences)
-        clusters = birch_model.fit(embeddings)
-        return clusters
+        data_pairs = self._agglomerative_clustering(sentences=sentences, embeddings=embeddings,
+                                                    docs_ids=kwargs["doc_ids"], sentences_ids=kwargs["sentences_ids"])
+        return data_pairs
 
+    def _agglomerative_clustering(self, sentences, embeddings, docs_ids, sentences_ids):
+        sims = cosine_similarity(embeddings)
+        # purge diagonal
+        for k in range(len(sims)):
+            sims[k, k] = -1
+        pairs = []
+        simils = []
+        m = np.zeros(sims.shape, dtype=bool)
+        while False in m:
+            # get max sim
+            a = np.ma.array(sims, mask=m)
+            idx = np.argmax(a)
+            idxs = np.unravel_index(idx, sims.shape)
+            row = idxs[0]
+            if len(idxs) > 1:
+                col = idxs[1]
+                pairs.append((row, col))
+                simils.append(sims[row, col])
+                for x in (row, col):
+                    m[:, x] = True
+                    m[x, :] = True
 
-class OpticsClustering(Clustering):
-
-    def __init__(self, app_config: AppConfig):
-        super(OpticsClustering, self).__init__(app_config=app_config)
-
-    def get_clusters(self, sentences, n_clusters=None):
-        # n_clusters = int(len(sentences) / 2)
-        optics_model = OPTICS(metric="cosine")
-        embeddings = self.get_embeddings(sentences=sentences)
-        clusters = optics_model.fit(embeddings)
-        return clusters
+        self.app_logger.info(f"Number of pairs: {len(pairs)}")
+        self.app_logger.info(list(zip(pairs, simils)))
+        count = 1
+        data_pairs = []
+        for pair, sim in zip(pairs, simils):
+            if sim < 0.5:
+                continue
+            elif sim > 1.0:
+                sim = 1.0
+            data = {}
+            idx_1 = pair[0]
+            idx_2 = pair[1]
+            sentence1 = sentences[idx_1]
+            sentence2 = sentences[idx_2]
+            vector1 = embeddings[idx_1]
+            vector2 = embeddings[idx_2]
+            doc_id1 = docs_ids[idx_1]
+            doc_id2 = docs_ids[idx_2]
+            sentence1_id = sentences_ids[idx_1]
+            sentence2_id = sentences_ids[idx_2]
+            data["sentence1"] = sentence1
+            data["sentence2"] = sentence2
+            data["embeddings1"] = vector1
+            data["embeddings2"] = vector2
+            data["doc_id1"] = doc_id1
+            data["doc_id2"] = doc_id2
+            data["sentence1_id "] = sentence1_id
+            data["sentence2_id "] = sentence2_id
+            data["cluster"] = count
+            data["type"] = "similar"
+            data["score"] = sim
+            data_pairs.append(data)
+            self.app_logger.info(f"Similar pair no {count} with similarity {sim}")
+            self.app_logger.info(f"Sentence1: {sentence1}")
+            self.app_logger.info(f"Sentence2: {sentence2}")
+            self.app_logger.info(
+                "===========================================================================================================")
+            count += 1
+        return data_pairs
 
 
 class TopicModel(Hdbscan):

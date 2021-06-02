@@ -1,6 +1,7 @@
 .idea/
 .vscode/
 venv/
+wvenv/
 output/
 runs/
 __pycache__/

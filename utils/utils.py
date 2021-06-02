@@ -179,18 +179,81 @@ def get_label_with_max_conf(labels):
     return max_lbl, max_conf
 
 
-def find_segment_in_text(content, text):
-    try:
-        start_idx = content.index(text)
-    except(Exception, BaseException):
+def find_segment_in_text(content, target, previous_end_idx):
+    raw_target = target
+    # newlines to spaces
+    target = re.sub("\n", " ", target)
+    # single spaces
+    target = re.sub("\s+", " ", target)
+
+    # initial matching window
+    matching_window = 2
+    match = None
+
+    while True:
+        # print(matching_window)
+        x_curr = target[:matching_window]
+        pattern = re.sub("\s", r"\\s+", x_curr)
+        print(x_curr, "->", pattern, end=" ")
+
         try:
-            start_idx = content.index(text[:10])
-        except(Exception, BaseException):
-            start_idx = None
-    if start_idx:
-        end_idx = start_idx + len(text)
-    else:
-        start_idx, end_idx = "", ""
+            matches = [k for k in re.findall(pattern, content)]
+        except Exception as ex:
+            print(ex)
+            return None
+
+        num_matches = len(matches)
+        print(num_matches, "candidates")
+        if len(target) == 1 and num_matches > 1:
+            raise ValueError("Single-character searchable with multiple candidates!")
+
+        if num_matches > 1:
+            matching_window += 1
+            if matching_window == len(target) + 1:
+                print("Cannot find unique!")
+                match = [m for m in re.finditer(pattern, content)]
+                break
+        else:
+            if num_matches == 1:
+                match = re.search(pattern, content)
+            elif num_matches == 0:
+                print("No match found!")
+                return None, None
+            break
+    start_idx, end_idx = -1, -1
+
+    if match is not None and type(match) is not list:
+        match = [match]
+    indices = []
+    for m in match:
+        idx = m.span()[0]
+        indices.append(idx)
+        # print("Index:", idx)
+        # print("First 10 chars:", target[idx: idx + 10])
+    if not indices:
+        return start_idx, end_idx
+    if len(indices) > 1:
+        import math
+        min_diff = math.inf
+        min_diff_idx = None
+        for idx in indices:
+            diff = abs(previous_end_idx - idx)
+            if diff < min_diff:
+                min_diff = diff
+                min_diff_idx = idx
+        indices = [min_diff_idx]
+    start_idx = indices[0]
+
+    end_idx = (start_idx + len(target))
+    # txt_from_content = content[start_idx:end_idx]
+    # additional = txt_from_content.count("\r")
+    # if additional > 0:
+    #     end_idx += additional
+    # additional = txt_from_content.count("\n")
+    # if additional > 0:
+    #     end_idx += additional
+    if start_idx == -1:
+        print()
     return start_idx, end_idx
 
 
@@ -268,7 +331,7 @@ def concat_major_claim(segments, title, content, counter):
     already_found_mc = False
     if not mc_exists:
         counter += 1
-        start_idx, end_idx = find_segment_in_text(content=content, text=major_claim_txt)
+        start_idx, end_idx = find_segment_in_text(content=content, text=major_claim_txt, previous_end_idx=0)
         major_claim = {
             "id": f"T{counter}",
             "type": "major_claim",

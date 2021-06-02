@@ -1,12 +1,13 @@
 import json
 from itertools import combinations
+from os.path import join
 
 import numpy as np
 import requests
 from flair.data import Sentence
 
 from pipeline.validation import JsonValidator
-from training.models import SequentialModel, ClassificationModel, TopicModel, Agglomerative
+from training.models import SequentialModel, ClassificationModel, TopicModel, CustomAgglomerative
 from utils.config import AppConfig, Notification
 from utils import utils
 
@@ -43,7 +44,7 @@ class DebateLab:
         self.topic_model = TopicModel(app_config=self.app_config)
 
         # initialize Clustering model
-        self.clustering = Agglomerative(app_config=app_config)
+        self.clustering = CustomAgglomerative(app_config=app_config)
 
     def run_pipeline(self, notify=False):
         """
@@ -65,7 +66,7 @@ class DebateLab:
             self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
         # relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
-        self.run_clustering_demo(documents=documents, document_ids=document_ids)
+        self.run_manual_clustering(documents=documents, document_ids=document_ids)
         # if notify:
         #     self.notification.notify_ics(ids_list=relations_ids, kind="clustering")
         self.app_logger.info("Evaluation is finished!")
@@ -102,8 +103,10 @@ class DebateLab:
                 document_ids.append(document["id"])
             else:
                 invalid_document_ids.append(document["id"])
-                validator.save_invalid_json(document=document, validation_errors=validation_errors,
-                                            invalid_adus=invalid_adus)
+                # validator.save_invalid_json(document=document, validation_errors=validation_errors,
+                #                             invalid_adus=invalid_adus)
+                with open(join(self.app_config.output_files, document["id"]), "w") as f:
+                    f.write(json.dumps(document))
         validator.print_validation_results(document_ids, corrected_ids, invalid_document_ids)
         if export_schema:
             validator.export_json_schema(document_ids=document_ids)
@@ -187,20 +190,31 @@ class DebateLab:
         segment_counter = 0
         sentences = utils.tokenize(text=document["content"])
         sentences = utils.join_sentences(tokenized_sentences=sentences)
+        previous_end_idx = 0
         for sentence in sentences:
             self.app_logger.debug(f"Predicting labels for sentence: {sentence}")
+            if sentence.startswith("Θέλουμε αεροδρόμιο που θα συμβάλει (στα μέτρα του ως ένα έργο υποδομής)"):
+                print()
             sentence = Sentence(sentence)
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
             segments = utils.get_args_from_sentence(sentence)
             if segments:
                 for segment in segments:
+                    if len(segment["text"]) == 1:
+                        continue
                     if segment["text"] and segment["label"]:
                         self.app_logger.debug(f"Segment text: {segment['text']}")
                         self.app_logger.debug(f"Segment type: {segment['label']}")
+                        text = segment["text"].split()
+                        segment["text"] = utils.join_sentences([text])[0]
                         segment_counter += 1
                         start_idx, end_idx = utils.find_segment_in_text(content=document["content"],
-                                                                        text=segment["text"])
+                                                                        text=segment["text"],
+                                                                        previous_end_idx=previous_end_idx)
+                        if start_idx == -1 and end_idx == -1:
+                            continue
+                        previous_end_idx = end_idx
                         seg = {
                             "id": f"T{segment_counter}",
                             "type": segment["label"],
@@ -302,73 +316,33 @@ class DebateLab:
         return json_obj, stance_counter
 
     # ************************************* Cross-document relations **********************************
-    def run_clustering_demo(self, documents, document_ids):
-        from os.path import join
-        import pandas as pd
-        file_path = join(self.app_config.resources_path, "claims_similarity.tsv")
-        new_file_path = join(self.app_config.resources_path, "claims_similarity_v2.tsv")
-        df = pd.read_csv(file_path, sep="\t", header=0, index_col=None)
-        sentences1_ids, sentences1_doc_ids, sentences2_ids, sentences2_doc_ids = [], [], [], []
-        for idx, row in df.iterrows():
-            sentence1, sentence2, score = row
-            sentence1_id, sentence1_doc_id, sentence2_id, sentence2_doc_id = -1, -1, -1, -1
-            for document in documents:
-                found_sentence = None
-                if sentence1 in document["content"]:
-                    sentence1_doc_id = document["id"]
-                    found_sentence = 1
-                if sentence2 in document["content"]:
-                    sentence2_doc_id = document["id"]
-                    found_sentence = 2
-                if found_sentence is not None:
-                    for adu in document["annotations"]["ADUs"]:
-                        if adu["segment"] == sentence1 or adu["segment"] in sentence1 or sentence1 in adu["segment"]\
-                                or adu["segment"][:10] == sentence1[:10]:
-                            sentence1_id = adu["id"]
-                        if adu["segment"] == sentence2 or adu["segment"] in sentence2 or sentence2 in adu["segment"] \
-                                or adu["segment"][:10] == sentence2[:10]:
-                            sentence2_id = adu["id"]
-            sentences1_ids.append(sentence1_id)
-            sentences1_doc_ids.append(sentence1_doc_id)
-            sentences2_ids.append(sentence2_id)
-            sentences2_doc_ids.append(sentence2_doc_id)
-        df["Sentence1_id"] = sentences1_ids
-        df["Sentence2_id"] = sentences2_ids
-        df["Sentence1_doc_id"] = sentences1_doc_ids
-        df["Sentence2_doc_id"] = sentences2_doc_ids
-        df.to_csv(new_file_path, sep="\t", header=True, index=None)
-        # df = pd.read_csv(new_file_path, sep="\t", header=0, index_col=None)
-        relations = []
-        cluster_counter = 0
-        for idx, row in df.iterrows():
-            sentence1, sentence2, label, sentence_id1, sentence_id2, sentence_doc_id1, sentence_doc_id2 = row
-            label = 0.8
-            if sentence_id1 == -1 or sentence_id2 == -1 or sentence_doc_id1 == -1 or sentence_doc_id2 == -1 or \
-                    (sentence_id1 == sentence_id2 and sentence_doc_id1 == sentence_doc_id2):
-                continue
-            similarity_type = "similar" if label >= 0.5 else "different"
-            if similarity_type == "different":
-                continue
+    def run_manual_clustering(self, documents, document_ids, save=False):
+        adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
+        data_pairs = self.clustering.get_clusters(sentences=adus, doc_ids=doc_ids, sentences_ids=adu_ids)
+        relations, relation_ids = [], []
+        for pair in data_pairs:
+            relation_id = f"{pair['doc_id1']};{pair['doc_id2']};{pair['sentence1_id']};{pair['sentence2_id']}"
             relation = {
-                "id": f"{sentence_doc_id1};{sentence_doc_id2};{sentence_id1};{sentence_id2}",
-                "cluster": cluster_counter,
-                "source": sentence_id1,
-                "source_segment": sentence1,
-                "source_doc": sentence_doc_id1,
-                "target": sentence_id2,
-                "target_segment": sentence2,
-                "target_doc": sentence_doc_id2,
-                "type": similarity_type,
-                "score": float(label)
+                "id": relation_id,
+                "cluster": pair['cluster'],
+                "source": pair["sentence1_id"],
+                "source_doc": pair["doc_id1"],
+                "source_segment": pair["sentence1"],
+                "target": pair["sentence2_id"],
+                "target_doc": pair["doc_id2"],
+                "target_segment": pair["sentence2"],
+                "type": pair["type"],
+                "score": pair["score"]
             }
-            cluster_counter += 1
-            path = self.app_config.output_files
-            relation_path = join(path, f"{relation['id']}.json")
-            with open(relation_path, "w") as f:
-                f.write(json.dumps(relation))
-            self.app_config.elastic_save.save_relation(relation)
-            relations.append(relation["id"])
-        return relations
+            if save:
+                self.app_config.elastic_save.save_relation(relation=relation)
+            else:
+                pth = self.app_config.output_files
+                with open(join(pth, relation_id), "w") as f:
+                    f.write(json.dumps(relation))
+            relations.append(relation)
+            relation_ids.append(relation_id)
+        return relations, relation_ids
 
     def run_clustering(self, documents, document_ids, save=False):
         """

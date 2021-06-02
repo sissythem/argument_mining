@@ -1,3 +1,4 @@
+import json
 from itertools import combinations
 from os.path import join
 
@@ -98,7 +99,73 @@ class Clustering:
             logger.info(
                 "===========================================================================================================")
             count += 1
-
+    def run_clustering_demo(self, documents, document_ids):
+        from os.path import join
+        import pandas as pd
+        file_path = join(self.app_config.resources_path, "claims_similarity.tsv")
+        new_file_path = join(self.app_config.resources_path, "claims_similarity_v2.tsv")
+        df = pd.read_csv(file_path, sep="\t", header=0, index_col=None)
+        sentences1_ids, sentences1_doc_ids, sentences2_ids, sentences2_doc_ids = [], [], [], []
+        for idx, row in df.iterrows():
+            sentence1, sentence2, score = row
+            sentence1_id, sentence1_doc_id, sentence2_id, sentence2_doc_id = -1, -1, -1, -1
+            for document in documents:
+                found_sentence = None
+                if sentence1 in document["content"]:
+                    sentence1_doc_id = document["id"]
+                    found_sentence = 1
+                if sentence2 in document["content"]:
+                    sentence2_doc_id = document["id"]
+                    found_sentence = 2
+                if found_sentence is not None:
+                    for adu in document["annotations"]["ADUs"]:
+                        if adu["segment"] == sentence1 or adu["segment"] in sentence1 or sentence1 in adu["segment"] \
+                                or adu["segment"][:10] == sentence1[:10]:
+                            sentence1_id = adu["id"]
+                        if adu["segment"] == sentence2 or adu["segment"] in sentence2 or sentence2 in adu["segment"] \
+                                or adu["segment"][:10] == sentence2[:10]:
+                            sentence2_id = adu["id"]
+            sentences1_ids.append(sentence1_id)
+            sentences1_doc_ids.append(sentence1_doc_id)
+            sentences2_ids.append(sentence2_id)
+            sentences2_doc_ids.append(sentence2_doc_id)
+        df["Sentence1_id"] = sentences1_ids
+        df["Sentence2_id"] = sentences2_ids
+        df["Sentence1_doc_id"] = sentences1_doc_ids
+        df["Sentence2_doc_id"] = sentences2_doc_ids
+        df.to_csv(new_file_path, sep="\t", header=True, index=None)
+        # df = pd.read_csv(new_file_path, sep="\t", header=0, index_col=None)
+        relations = []
+        cluster_counter = 0
+        for idx, row in df.iterrows():
+            sentence1, sentence2, label, sentence_id1, sentence_id2, sentence_doc_id1, sentence_doc_id2 = row
+            label = 0.8
+            if sentence_id1 == -1 or sentence_id2 == -1 or sentence_doc_id1 == -1 or sentence_doc_id2 == -1 or \
+                    (sentence_id1 == sentence_id2 and sentence_doc_id1 == sentence_doc_id2):
+                continue
+            similarity_type = "similar" if label >= 0.5 else "different"
+            if similarity_type == "different":
+                continue
+            relation = {
+                "id": f"{sentence_doc_id1};{sentence_doc_id2};{sentence_id1};{sentence_id2}",
+                "cluster": cluster_counter,
+                "source": sentence_id1,
+                "source_segment": sentence1,
+                "source_doc": sentence_doc_id1,
+                "target": sentence_id2,
+                "target_segment": sentence2,
+                "target_doc": sentence_doc_id2,
+                "type": similarity_type,
+                "score": float(label)
+            }
+            cluster_counter += 1
+            path = self.app_config.output_files
+            relation_path = join(path, f"{relation['id']}.json")
+            with open(relation_path, "w") as f:
+                f.write(json.dumps(relation))
+            self.app_config.elastic_save.save_relation(relation)
+            relations.append(relation["id"])
+        return relations
 
 def get_sentences():
     path_to_csv = join(app_config.output_path, "test", "claims.csv")

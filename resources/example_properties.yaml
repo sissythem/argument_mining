@@ -91,6 +91,5 @@ class_model:
   shuffle: False
 clustering:
   n_clusters: 10
-  algorithm: "hdbscan" # options: kmeans, agglomerative, hdbscan
-  embeddings: "nlpaueb/bert-base-greek-uncased-v1" # options: aueb, base-multi, fasttext, tfidf
-  bert_path: ""
+  algorithm: "agglomerative" # options: kmeans, agglomerative, hdbscan
+  bert_kind: "nlpaueb/bert-base-greek-uncased-v1" # options: aueb, base-multi, fasttext, tfidf
