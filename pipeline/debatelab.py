@@ -62,11 +62,12 @@ class DebateLab:
         # update yml properties file with the latest retrieve date
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(documents=documents)
+        self.app_logger.info(f"Valid document ids: {document_ids}")
         if notify:
             self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
         # relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
-        self.run_manual_clustering(documents=documents, document_ids=document_ids)
+        # self.run_manual_clustering(documents=documents, document_ids=document_ids)
         # if notify:
         #     self.notification.notify_ics(ids_list=relations_ids, kind="clustering")
         self.app_logger.info("Evaluation is finished!")
@@ -103,10 +104,8 @@ class DebateLab:
                 document_ids.append(document["id"])
             else:
                 invalid_document_ids.append(document["id"])
-                # validator.save_invalid_json(document=document, validation_errors=validation_errors,
-                #                             invalid_adus=invalid_adus)
-                with open(join(self.app_config.output_files, document["id"]), "w") as f:
-                    f.write(json.dumps(document))
+                validator.save_invalid_json(document=document, validation_errors=validation_errors,
+                                            invalid_adus=invalid_adus)
         validator.print_validation_results(document_ids, corrected_ids, invalid_document_ids)
         if export_schema:
             validator.export_json_schema(document_ids=document_ids)
