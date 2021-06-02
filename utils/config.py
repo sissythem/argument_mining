@@ -351,15 +351,14 @@ class ElasticSearchConfig:
             self._init_ssh_tunnel()
             self._init_elasticsearch_client()
             self.connected = True
-        except (BaseException, Exception):
+        except (BaseException, Exception) as e:
             try:
                 self._init_elastic_search_client_http()
                 self.connected = True
             except(BaseException, Exception):
                 self.connected = False
-            self.connected = False
 
-    def _init_elasticsearch_client(self, timeout=60):
+    def _init_elasticsearch_client(self, timeout=120):
         """
         Initialization of the Elasticsearch client
 
@@ -372,7 +371,7 @@ class ElasticSearchConfig:
             'http_auth': (self.username, self.password)
         }], timeout=timeout)
 
-    def _init_elastic_search_client_http(self, timeout=60):
+    def _init_elastic_search_client_http(self, timeout=120):
         self.elasticsearch_client = Elasticsearch([{
             'host': self.host,
             'port': self.port,

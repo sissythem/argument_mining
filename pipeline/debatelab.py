@@ -72,7 +72,7 @@ class DebateLab:
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************
-    def run_argument_mining(self, documents, export_schema=False, save=False):
+    def run_argument_mining(self, documents, export_schema=False, save=True):
         """
         Argument Mining pipeline:
         | 1. Predict ADUs for each document
@@ -209,8 +209,8 @@ class DebateLab:
                         text = segment["text"].split()
                         segment["text"] = utils.join_sentences([text])[0]
                         segment_counter += 1
-                        start_idx, end_idx = utils.find_segment_in_text(content=document["content"],
-                                                                        text=segment["text"],
+                        start_idx, end_idx = utils.find_segment_in_text(target=document["content"],
+                                                                        content=segment["text"],
                                                                         previous_end_idx=previous_end_idx)
                         if start_idx == -1 and end_idx == -1:
                             continue

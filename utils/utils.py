@@ -331,7 +331,7 @@ def concat_major_claim(segments, title, content, counter):
     already_found_mc = False
     if not mc_exists:
         counter += 1
-        start_idx, end_idx = find_segment_in_text(content=content, text=major_claim_txt, previous_end_idx=0)
+        start_idx, end_idx = find_segment_in_text(target=content, content=major_claim_txt, previous_end_idx=0)
         major_claim = {
             "id": f"T{counter}",
             "type": "major_claim",
