@@ -179,8 +179,22 @@ def get_label_with_max_conf(labels):
     return max_lbl, max_conf
 
 
+def locate_end(adu, content, end_idx):
+    window_len = min(len(adu), 10)
+    adu_slice = adu[-window_len:]
+    jitter_length = 5
+    candidates = list(range(end_idx - jitter_length, end_idx + jitter_length + 1))
+    variable_end_idx = end_idx
+    while True:
+        content_slice = content[variable_end_idx - window_len:variable_end_idx]
+        if adu_slice == content_slice:
+            return variable_end_idx
+        if not candidates:
+            return None
+        variable_end_idx = candidates.pop(0)
+
+
 def find_segment_in_text(content, target, previous_end_idx):
-    raw_target = target
     # newlines to spaces
     target = re.sub("\n", " ", target)
     # single spaces
@@ -194,7 +208,9 @@ def find_segment_in_text(content, target, previous_end_idx):
         # print(matching_window)
         x_curr = target[:matching_window]
         pattern = re.sub("\s", r"\\s+", x_curr)
-        print(x_curr, "->", pattern, end=" ")
+        for s in "()":
+            pattern = pattern.replace(s, "\\" + s)
+        # print(x_curr, "->", pattern, end=" ")
 
         try:
             matches = [k for k in re.findall(pattern, content)]
@@ -203,7 +219,7 @@ def find_segment_in_text(content, target, previous_end_idx):
             return None
 
         num_matches = len(matches)
-        print(num_matches, "candidates")
+        # print(num_matches, "candidates")
         if len(target) == 1 and num_matches > 1:
             raise ValueError("Single-character searchable with multiple candidates!")
 
@@ -254,6 +270,13 @@ def find_segment_in_text(content, target, previous_end_idx):
     #     end_idx += additional
     if start_idx == -1:
         print()
+    corrected_idx = locate_end(target, content, end_idx)
+    if corrected_idx is None:
+        print("Cannot correct index!")
+    else:
+        if corrected_idx != end_idx:
+            print("Corrected end index")
+        end_idx = corrected_idx
     return start_idx, end_idx
 
 
