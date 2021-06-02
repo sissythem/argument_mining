@@ -196,11 +196,12 @@ class AppConfig:
         self.elastic_retrieve: ElasticSearchConfig = ElasticSearchConfig(properties=self.properties,
                                                                          properties_file=self.properties_file,
                                                                          resources_folder=self.resources_path,
-                                                                         elasticsearch="retrieve")
+                                                                         elasticsearch="retrieve",
+                                                                         logger=self.app_logger)
         self.elastic_save: ElasticSearchConfig = ElasticSearchConfig(properties=self.properties,
                                                                      properties_file=self.properties_file,
                                                                      resources_folder=self.resources_path,
-                                                                     elasticsearch="save")
+                                                                     elasticsearch="save", logger=self.app_logger)
 
 
 class Notification:
@@ -322,7 +323,8 @@ class ElasticSearchConfig:
     Class to configure an Elasticsearch Client
     """
 
-    def __init__(self, properties: Dict, properties_file: AnyStr, resources_folder: AnyStr, elasticsearch: AnyStr):
+    def __init__(self, logger, properties: Dict, properties_file: AnyStr, resources_folder: AnyStr,
+                 elasticsearch: AnyStr):
         """
         Constructor of the ElasticSearchConfig class
 
@@ -332,6 +334,7 @@ class ElasticSearchConfig:
             The elastic_save parameters are configurations for the debatelab elasticsearch while the elastic_retrieve
             properties are the configurations, credentials etc of the socialobservatory elasticsearch.
         """
+        self.logger = logger
         self.resources_folder: AnyStr = resources_folder
         self.properties_file: AnyStr = properties_file
         self.properties: Dict = properties
@@ -351,11 +354,17 @@ class ElasticSearchConfig:
             self._init_ssh_tunnel()
             self._init_elasticsearch_client()
             self.connected = True
+            self.logger.info(f"Connected to ssh client to {elasticsearch} documents")
         except (BaseException, Exception) as e:
+            self.logger.error(f"An error occurred while trying to connect via ssh: {e}")
             try:
+                self.logger.warning("Could not connect via ssh. Trying via http...")
                 self._init_elastic_search_client_http()
                 self.connected = True
-            except(BaseException, Exception):
+                self.logger.info(f"Connected to elasticsearch via http to {elasticsearch} documents")
+            except(BaseException, Exception) as e:
+                self.logger.warning("Could not connect to ElasticSearch with ssh or http")
+                self.logger.error(e)
                 self.connected = False
 
     def _init_elasticsearch_client(self, timeout=120):
