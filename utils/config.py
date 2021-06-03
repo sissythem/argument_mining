@@ -351,9 +351,8 @@ class ElasticSearchConfig:
         self.connect: AnyStr = elastic_prop["connect"]
 
         try:
-            # self._init_ssh_tunnel()
-            # self._init_elasticsearch_client()
-            self._init_elastic_search_client_http()
+            self._init_ssh_tunnel()
+            self._init_elasticsearch_client()
             self.connected = True
             self.logger.info(f"Connected to ssh client to {elasticsearch} documents")
         except (BaseException, Exception) as e:
