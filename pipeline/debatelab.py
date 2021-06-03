@@ -100,6 +100,8 @@ class DebateLab:
             if corrected:
                 corrected_ids.append(document_ids)
             if not validation_errors and save:
+                with open(join(self.app_config.output_files, f"{document['id']}.json"), "w") as f:
+                    f.write(json.dumps(document))
                 self.app_config.elastic_save.save_document(document=document)
                 document_ids.append(document["id"])
             else:
