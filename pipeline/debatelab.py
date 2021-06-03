@@ -133,8 +133,6 @@ class DebateLab:
         self.app_logger.info("Predicting ADUs from document")
         segments, segment_counter = self._predict_adus(document=document)
         # assumes major_claim label should appear once -- concatenation due to sentence splitting
-        segments = utils.concat_major_claim(segments=segments, title=document["title"],
-                                            content=document["content"], counter=segment_counter)
         major_claims, claims, premises = utils.get_adus(segments)
         self.app_logger.info(
             f"Found {len(major_claims)} major claims, {len(claims)} claims and {len(premises)} premises")
@@ -188,6 +186,7 @@ class DebateLab:
         self.app_logger.debug(f"Processing document with id: {document['id']} and name: {document}")
         segment_counter = 0
         sentences = utils.tokenize_with_spans(text=document["content"])
+        found_mc = False
         for sentence in sentences:
             self.app_logger.debug(f"Predicting labels for sentence: {sentence}")
             sentence = CustomSentence(sentence)
@@ -199,6 +198,10 @@ class DebateLab:
                     if len(segment["text"]) == 1:
                         continue
                     if segment["text"] and segment["label"]:
+                        if not found_mc and segment["label"] == "major_claim":
+                            found_mc = True
+                        elif found_mc and segment["label"] == "major_claim":
+                            continue
                         self.app_logger.debug(f"Segment text: {segment['text']}")
                         self.app_logger.debug(f"Segment type: {segment['label']}")
                         segment_counter += 1
@@ -214,6 +217,20 @@ class DebateLab:
                             "confidence": segment["mean_conf"]
                         }
                         adus.append(seg)
+        if not found_mc:
+            seg = {
+                "id": "T1",
+                "type": "major_claim",
+                "starts": 0,
+                "ends": len(document["title"]),
+                "segment": document["title"],
+                "confidence": 0.99
+            }
+            segment_counter = 2
+            for adu in adus:
+                adu["id"] = f"T{segment_counter}"
+                segment_counter += 1
+            adus.insert(0, seg)
         return adus, segment_counter
 
     def _predict_relations(self, major_claims, claims, premises):

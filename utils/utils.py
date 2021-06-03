@@ -278,47 +278,6 @@ def get_adus(segments):
     return major_claims, claims, premises
 
 
-def concat_major_claim(segments, title, content, counter):
-    if not segments:
-        return []
-    new_segments = []
-    major_claim_txt = ""
-    major_claims = [mc for mc in segments if mc["type"] == "major_claim"]
-    mc_exists = False
-    if major_claims:
-        mc_exists = True
-        for mc in major_claims:
-            major_claim_txt += f" {mc['segment']}"
-    else:
-        major_claim_txt = title
-    major_claim_txt = replace_multiple_spaces_with_single_space(text=major_claim_txt)
-    already_found_mc = False
-    if not mc_exists:
-        counter += 1
-        start_idx, end_idx = find_segment_in_text(target=content, content=major_claim_txt, previous_end_idx=0)
-        major_claim = {
-            "id": f"T{counter}",
-            "type": "major_claim",
-            "starts": str(start_idx),
-            "ends": str(end_idx),
-            "segment": major_claim_txt,
-            "confidence": 0.99
-        }
-        new_segments.append(major_claim)
-        already_found_mc = True
-    for adu in segments:
-        if adu["type"] == "major_claim":
-            if not already_found_mc:
-                adu["segment"] = major_claim_txt
-                new_segments.append(adu)
-                already_found_mc = True
-            else:
-                continue
-        else:
-            new_segments.append(adu)
-    return new_segments
-
-
 # *************************************** Clustering *******************************************
 def collect_adu_for_clustering(documents, document_ids):
     # TODO uses only claims
