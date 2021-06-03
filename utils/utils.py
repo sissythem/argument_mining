@@ -23,6 +23,10 @@ def tokenize(text, punct=True):
     return list(tokeniser.tokenise_no_punc(text)) if not punct else list(tokeniser.tokenise(text))
 
 
+def tokenize_with_spans(text):
+    return tokeniser.tokenise_spans(text)
+
+
 def get_punctuation_symbols() -> Set[AnyStr]:
     """
     Function to get a set with punctuation symbols
@@ -47,17 +51,22 @@ def join_sentences(tokenized_sentences: List[Tuple[AnyStr]]) -> List[AnyStr]:
         | list: a list of strings (i.e. the sentences)
     """
     sentences = []
-    punc = get_punctuation_symbols()
     for sentence in tokenized_sentences:
-        sentence = "".join(w if set(w) <= punc else f" {w}" for w in sentence).lstrip()
-        sentence = sentence.replace("( ", " (")
-        sentence = sentence.replace("« ", " «")
-        sentence = sentence.replace(" »", "» ")
-        sentence = sentence.replace('" ', ' "')
-        sentence = sentence.replace("\n", " ")
-        sentence = re.sub(" +", " ", sentence)
+        sentence = join_sentence(sentence=sentence)
         sentences.append(sentence)
     return sentences
+
+
+def join_sentence(sentence: Union[List[AnyStr], Tuple[AnyStr]]) -> AnyStr:
+    punc = get_punctuation_symbols()
+    sentence = "".join(w if set(w) <= punc else f" {w}" for w in sentence).lstrip()
+    sentence = sentence.replace("( ", " (")
+    sentence = sentence.replace("« ", " «")
+    sentence = sentence.replace(" »", "» ")
+    sentence = sentence.replace('" ', ' "')
+    sentence = sentence.replace("\n", " ")
+    sentence = re.sub(" +", " ", sentence)
+    return sentence
 
 
 def replace_multiple_spaces_with_single_space(text):
@@ -194,89 +203,21 @@ def locate_end(adu, content, end_idx):
         variable_end_idx = candidates.pop(0)
 
 
-def find_segment_in_text(content, target, previous_end_idx):
-    # newlines to spaces
-    target = re.sub("\n", " ", target)
-    # single spaces
-    target = re.sub("\s+", " ", target)
-
-    # initial matching window
-    matching_window = 2
-    match = None
-
-    while True:
-        # print(matching_window)
-        x_curr = target[:matching_window]
-        pattern = re.sub("\s", r"\\s+", x_curr)
-        for s in "()":
-            pattern = pattern.replace(s, "\\" + s)
-        # print(x_curr, "->", pattern, end=" ")
-
-        try:
-            matches = [k for k in re.findall(pattern, content)]
-        except Exception as ex:
-            print(ex)
-            return None
-
-        num_matches = len(matches)
-        # print(num_matches, "candidates")
-        if len(target) == 1 and num_matches > 1:
-            raise ValueError("Single-character searchable with multiple candidates!")
-
-        if num_matches > 1:
-            matching_window += 1
-            if matching_window == len(target) + 1:
-                print("Cannot find unique!")
-                match = [m for m in re.finditer(pattern, content)]
-                break
-        else:
-            if num_matches == 1:
-                match = re.search(pattern, content)
-            elif num_matches == 0:
-                print("No match found!")
-                return None, None
-            break
+def find_segment_in_text(segment, sentence):
+    segment_tokens = segment["tokens"]
     start_idx, end_idx = -1, -1
-
-    if match is not None and type(match) is not list:
-        match = [match]
-    indices = []
-    for m in match:
-        idx = m.span()[0]
-        indices.append(idx)
-        # print("Index:", idx)
-        # print("First 10 chars:", target[idx: idx + 10])
-    if not indices:
-        return start_idx, end_idx
-    if len(indices) > 1:
-        import math
-        min_diff = math.inf
-        min_diff_idx = None
-        for idx in indices:
-            diff = abs(previous_end_idx - idx)
-            if diff < min_diff:
-                min_diff = diff
-                min_diff_idx = idx
-        indices = [min_diff_idx]
-    start_idx = indices[0]
-
-    end_idx = (start_idx + len(target))
-    # txt_from_content = content[start_idx:end_idx]
-    # additional = txt_from_content.count("\r")
-    # if additional > 0:
-    #     end_idx += additional
-    # additional = txt_from_content.count("\n")
-    # if additional > 0:
-    #     end_idx += additional
-    if start_idx == -1:
-        print()
-    corrected_idx = locate_end(target, content, end_idx)
-    if corrected_idx is None:
-        print("Cannot correct index!")
-    else:
-        if corrected_idx != end_idx:
-            print("Corrected end index")
-        end_idx = corrected_idx
+    first_token = segment_tokens[0]
+    last_token = segment_tokens[-1]
+    for token in sentence.tokens:
+        if first_token == token.text:
+            start_idx = token.start
+        elif start_idx != -1 and last_token == token.text:
+            end_idx = token.end
+            break
+    if start_idx < sentence.start_idx:
+        start_idx = sentence.start_idx
+    if end_idx > sentence.end_idx or end_idx < sentence.start_idx:
+        end_idx = sentence.end_idx
     return start_idx, end_idx
 
 

@@ -8,8 +8,9 @@ from flair.data import Sentence
 
 from pipeline.validation import JsonValidator
 from training.models import SequentialModel, ClassificationModel, TopicModel, CustomAgglomerative
-from utils.config import AppConfig, Notification
+from training.preprocessing import CustomSentence
 from utils import utils
+from utils.config import AppConfig, Notification
 
 
 class DebateLab:
@@ -59,7 +60,6 @@ class DebateLab:
         # TODO retrieve previous day's articles, save now to properties --> retrieve_kind="date"
         # retrive new documents
         documents = self.app_config.elastic_retrieve.retrieve_documents()
-        # update yml properties file with the latest retrieve date
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(documents=documents)
         self.app_logger.info(f"Valid document ids: {document_ids}")
@@ -187,14 +187,10 @@ class DebateLab:
         adus = []
         self.app_logger.debug(f"Processing document with id: {document['id']} and name: {document}")
         segment_counter = 0
-        sentences = utils.tokenize(text=document["content"])
-        sentences = utils.join_sentences(tokenized_sentences=sentences)
-        previous_end_idx = 0
+        sentences = utils.tokenize_with_spans(text=document["content"])
         for sentence in sentences:
             self.app_logger.debug(f"Predicting labels for sentence: {sentence}")
-            if sentence.startswith("Θέλουμε αεροδρόμιο που θα συμβάλει (στα μέτρα του ως ένα έργο υποδομής)"):
-                print()
-            sentence = Sentence(sentence)
+            sentence = CustomSentence(sentence)
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
             segments = utils.get_args_from_sentence(sentence)
@@ -205,15 +201,10 @@ class DebateLab:
                     if segment["text"] and segment["label"]:
                         self.app_logger.debug(f"Segment text: {segment['text']}")
                         self.app_logger.debug(f"Segment type: {segment['label']}")
-                        text = segment["text"].split()
-                        segment["text"] = utils.join_sentences([text])[0]
                         segment_counter += 1
-                        start_idx, end_idx = utils.find_segment_in_text(target=document["content"],
-                                                                        content=segment["text"],
-                                                                        previous_end_idx=previous_end_idx)
+                        start_idx, end_idx = utils.find_segment_in_text(segment=segment, sentence=sentence)
                         if start_idx == -1 and end_idx == -1:
                             continue
-                        previous_end_idx = end_idx
                         seg = {
                             "id": f"T{segment_counter}",
                             "type": segment["label"],

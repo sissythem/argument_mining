@@ -3,7 +3,7 @@ import pickle
 import random
 from os.path import join, exists
 from typing import List, Dict, AnyStr, Union, Tuple
-
+from flair.data import Sentence
 import numpy as np
 import pandas as pd
 from imblearn.over_sampling import RandomOverSampler
@@ -494,3 +494,26 @@ class ClarinLoader:
             return None
         return Relation(relation_id=annotation_id, document_id=document_id, arg1=arg1,
                         arg2=arg2, kind=kind, relation_type=relation_type)
+
+
+class CustomSentence(Sentence):
+
+    def __init__(self, sentence_tuple):
+        tokens_tuple, start_idx, end_idx = sentence_tuple
+        self.start_idx = start_idx
+        self.end_idx = end_idx
+        only_tokens = [token[0] for token in tokens_tuple]
+        self.text = utils.join_sentence(sentence=only_tokens)
+        self.tokens = []
+        for token in tokens_tuple:
+            tok = CustomToken(text=token[0], start=token[1], end=token[2])
+            self.tokens.append(tok)
+        super(CustomSentence, self).__init__(self.text)
+
+
+class CustomToken:
+
+    def __init__(self, text, start, end):
+        self.text = text
+        self.start = start
+        self.end = end

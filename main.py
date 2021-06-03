@@ -27,7 +27,7 @@ def error_analysis(path_to_resources):
         df[3] = np.where(df[1] == df[2], 0, 1)
         sentences.append(df)
     sentences_df = pd.concat(sentences)
-    sentences_df.to_csv(join(path_to_resources, "results.csv"), sep="\t", index=False, header=False)
+    sentences_df.to_csv(join(path_to_resources, "resources/results/results.tsv"), sep="\t", index=False, header=False)
     error_sentences = []
     for sentence_df in sentences:
         if 1 in sentence_df[3].values:

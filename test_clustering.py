@@ -102,8 +102,8 @@ class Clustering:
     def run_clustering_demo(self, documents, document_ids):
         from os.path import join
         import pandas as pd
-        file_path = join(self.app_config.resources_path, "claims_similarity.tsv")
-        new_file_path = join(self.app_config.resources_path, "claims_similarity_v2.tsv")
+        file_path = join(self.app_config.resources_path, "resources/data/sim/claims_similarity.tsv")
+        new_file_path = join(self.app_config.resources_path, "resources/data/sim/claims_similarity_v2.tsv")
         df = pd.read_csv(file_path, sep="\t", header=0, index_col=None)
         sentences1_ids, sentences1_doc_ids, sentences2_ids, sentences2_doc_ids = [], [], [], []
         for idx, row in df.iterrows():
