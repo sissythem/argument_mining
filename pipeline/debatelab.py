@@ -47,7 +47,7 @@ class DebateLab:
         # initialize Clustering model
         self.clustering = CustomAgglomerative(app_config=app_config)
 
-    def run_pipeline(self, notify=False):
+    def run_pipeline(self, notify=True):
         """
         Function to execute the DebateLab pipeline.
 
@@ -67,7 +67,7 @@ class DebateLab:
             self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
         # relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
-        # self.run_manual_clustering(documents=documents, document_ids=document_ids)
+        self.run_manual_clustering(documents=documents, document_ids=document_ids)
         # if notify:
         #     self.notification.notify_ics(ids_list=relations_ids, kind="clustering")
         self.app_logger.info("Evaluation is finished!")
@@ -100,8 +100,6 @@ class DebateLab:
             if corrected:
                 corrected_ids.append(document_ids)
             if not validation_errors and save:
-                with open(join(self.app_config.output_files, f"{document['id']}.json"), "w") as f:
-                    f.write(json.dumps(document))
                 self.app_config.elastic_save.save_document(document=document)
                 document_ids.append(document["id"])
             else:

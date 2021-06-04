@@ -395,7 +395,7 @@ class ClarinLoader:
         self.json_file = json_file
         self.pickle_file = pickle_file
 
-    def load(self) -> List[Dict]:
+    def load(self) -> List[Document]:
         """
         Loads the Clarin dataset either from a pickle file (existing processing) or from the json
 
