@@ -63,8 +63,8 @@ class DebateLab:
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(documents=documents)
         self.app_logger.info(f"Valid document ids: {document_ids}")
-        if notify:
-            self.notification.notify_ics(ids_list=document_ids)
+        # if notify:
+        #     self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
         # relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
         self.run_manual_clustering(documents=documents, document_ids=document_ids)
@@ -73,7 +73,7 @@ class DebateLab:
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************
-    def run_argument_mining(self, documents, export_schema=False, save=True):
+    def run_argument_mining(self, documents, export_schema=False, save=False):
         """
         Argument Mining pipeline:
         | 1. Predict ADUs for each document
