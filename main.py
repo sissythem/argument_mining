@@ -6,7 +6,6 @@ import pandas as pd
 
 from pipeline.debatelab import DebateLab
 from training.models import SequentialModel, ClassificationModel
-from training.old_preprocessing import DataLoader
 from training.preprocessing import ClarinLoader, CsvCreator
 from utils.config import AppConfig, Notification
 
@@ -41,24 +40,6 @@ def error_analysis(path_to_resources):
             error_sentences.append(total_text + "\n\n")
     with open(join(path_to_resources, "errors.txt"), "w") as f:
         f.writelines(error_sentences)
-
-
-def old_preprocess(app_config):
-    """
-    Preprocess the data into CONLL format
-
-    Args
-        app_config (AppConfig): the application configuration
-    """
-    logger = app_config.app_logger
-    data_loader = DataLoader(app_config=app_config)
-    data_loader.load()
-    logger.info("Creating CSV file in CONLL format for ADUs classification")
-    data_loader.load_adus()
-    logger.info("Creating CSV file in CONLL format for relations/stance classification")
-    data_loader.load_relations()
-    logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
-    data_loader.load_similarities()
 
 
 def preprocess(app_config):

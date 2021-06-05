@@ -10,4 +10,4 @@ public/
 docs/build/
 !resources/example_properties.yaml
 !resources/kasteli_34_urls.txt
-!resources/kasteli.json
+!resources/data/initial/kasteli.json

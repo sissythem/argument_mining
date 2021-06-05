@@ -14,11 +14,10 @@ from utils.config import AppConfig
 
 class DataUpSampler:
 
-    def __init__(self, app_config: AppConfig, pickle_file="documents.pkl"):
+    def __init__(self, app_config: AppConfig):
         self.app_config: AppConfig = app_config
         self.app_logger = app_config.app_logger
         self.data_folder = app_config.dataset_folder
-        self.pickle_file = pickle_file
 
     def oversample(self, task_kind: AnyStr, file_kind: AnyStr, total_num: Union[Dict, int]):
         """
@@ -131,14 +130,13 @@ class CsvCreator:
         self.pickle_file = pickle_file
         self.oversampling_prop = app_config.properties["prep"]["oversampling"]
         if self.oversampling_prop is not None and self.oversampling_prop and type(self.oversampling_prop) == dict:
-            self.upsampling = DataUpSampler(app_config=app_config, pickle_file=pickle_file)
+            self.upsampling = DataUpSampler(app_config=app_config)
 
     def load_adus(self):
         self.app_logger.debug("Running ADU preprocessing")
-        resources = self.app_config.resources_path
-        out_file_path = join(resources, "data", "adu", "train.csv")
+        out_file_path = join(self.app_config.dataset_folder, "adu", "train.csv")
         if not exists(out_file_path):
-            documents_path = join(resources, self.pickle_file)
+            documents_path = join(self.app_config.dataset_folder, "initial", self.pickle_file)
             self.app_logger.debug("Loading documents from pickle file")
             with open(documents_path, "rb") as f:
                 documents = pickle.load(f)
@@ -206,8 +204,7 @@ class CsvCreator:
                 self.upsampling.oversample(task_kind="stance", file_kind="train", total_num=stance_num)
 
     def _get_relations(self):
-        resources = self.app_config.resources_path
-        documents_path = join(resources, self.pickle_file)
+        documents_path = join(self.app_config.dataset_folder, "initial", self.pickle_file)
         self.app_logger.debug("Loading documents from pickle file")
         with open(documents_path, "rb") as f:
             documents = pickle.load(f)
@@ -402,12 +399,11 @@ class ClarinLoader:
         Returns
             | list: the loaded documents
         """
-        resources_folder = self.app_config.resources_path
-        path_to_pickle = join(resources_folder, self.pickle_file)
+        path_to_pickle = join(self.app_config.dataset_folder, "initial", self.pickle_file)
         if exists(path_to_pickle):
             with open(path_to_pickle, "rb") as f:
                 return pickle.load(f)
-        path_to_data = join(resources_folder, self.json_file)
+        path_to_data = join(self.app_config.dataset_folder, "initial", self.json_file)
         with open(path_to_data, "r") as f:
             content = json.loads(f.read())
         documents = content["data"]["documents"]
@@ -415,7 +411,7 @@ class ClarinLoader:
         for doc in documents:
             document = self.create_document(doc=doc)
             docs.append(document)
-        with open(join(resources_folder, self.pickle_file), "wb") as f:
+        with open(join(self.app_config.dataset_folder, "initial", self.pickle_file), "wb") as f:
             pickle.dump(docs, f)
         return docs
 
