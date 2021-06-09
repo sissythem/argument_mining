@@ -378,8 +378,8 @@ class CustomAgglomerative(Clustering):
             data["embeddings2"] = vector2
             data["doc_id1"] = doc_id1
             data["doc_id2"] = doc_id2
-            data["sentence1_id "] = sentence1_id
-            data["sentence2_id "] = sentence2_id
+            data["sentence1_id"] = sentence1_id
+            data["sentence2_id"] = sentence2_id
             data["cluster"] = count
             data["type"] = "similar"
             data["score"] = sim
