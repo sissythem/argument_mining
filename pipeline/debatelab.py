@@ -324,10 +324,13 @@ class DebateLab:
 
     # ************************************* Cross-document relations **********************************
     def run_manual_clustering(self, documents, document_ids, save=False):
+        self.app_logger.info("Running manual clustering -- agglomerative")
         adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
+        self.app_logger.info("Collected claims for clustering")
         data_pairs = self.clustering.get_clusters(sentences=adus, doc_ids=doc_ids, sentences_ids=adu_ids)
         relations, relation_ids = [], []
         for pair in data_pairs:
+            self.app_logger.debug(f"Creating relation for pair {pair}")
             relation_id = f"{pair['doc_id1']};{pair['doc_id2']};{pair['sentence1_id']};{pair['sentence2_id']}"
             relation = {
                 "id": relation_id,

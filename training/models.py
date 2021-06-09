@@ -325,9 +325,11 @@ class CustomAgglomerative(Clustering):
         self.cosine_similarity = CosineSimilarity()
 
     def get_clusters(self, sentences, n_clusters=None, **kwargs):
+        self.app_logger.info("Starting clustering")
         embeddings = self.get_embeddings(sentences=sentences)
         data_pairs = self._agglomerative_clustering(sentences=sentences, embeddings=embeddings,
                                                     docs_ids=kwargs["doc_ids"], sentences_ids=kwargs["sentences_ids"])
+        self.app_logger.info(f"Finished clustering with {len(data_pairs)} of pairs")
         return data_pairs
 
     def _agglomerative_clustering(self, sentences, embeddings, docs_ids, sentences_ids):
