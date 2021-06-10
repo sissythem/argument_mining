@@ -323,7 +323,7 @@ class DebateLab:
         return json_obj, stance_counter
 
     # ************************************* Cross-document relations **********************************
-    def run_manual_clustering(self, documents, document_ids, save=False):
+    def run_manual_clustering(self, documents, document_ids, save=True):
         self.app_logger.info("Running manual clustering -- agglomerative")
         adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
         self.app_logger.info("Collected claims for clustering")
@@ -346,10 +346,6 @@ class DebateLab:
             }
             if save:
                 self.app_config.elastic_save.save_relation(relation=relation)
-            else:
-                pth = self.app_config.output_files
-                with open(join(pth, relation_id), "w") as f:
-                    f.write(json.dumps(relation))
             relations.append(relation)
             relation_ids.append(relation_id)
         return relations, relation_ids
