@@ -1,6 +1,5 @@
 import json
 from itertools import combinations
-from os.path import join
 
 import numpy as np
 import requests
@@ -63,13 +62,13 @@ class DebateLab:
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(documents=documents)
         self.app_logger.info(f"Valid document ids: {document_ids}")
-        # if notify:
-        #     self.notification.notify_ics(ids_list=document_ids)
+        if notify:
+            self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
         # relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
-        self.run_manual_clustering(documents=documents, document_ids=document_ids)
-        # if notify:
-        #     self.notification.notify_ics(ids_list=relations_ids, kind="clustering")
+        relations, relation_ids = self.run_manual_clustering(documents=documents, document_ids=document_ids)
+        if notify:
+            self.notification.notify_ics(ids_list=relation_ids, kind="clustering")
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************

@@ -248,12 +248,12 @@ class Notification:
             | ids_list (list): list of ids in the Elasticsearch (documents or relations)
             | kind (str): the kind of update, possible values --> arg_mining, clustering
         """
+        routing_key = "dlabqueue" if kind == "arg_mining" else "dlab-cross-docs"
         properties = self.properties["eval"]["notify"]
-        # TODO url based on kind. Credentials?
-        url = properties["url_arg_mining"] if kind == "arg_mining" else properties["url_clustering"]
+        url = properties["url"]
         username = properties["username"]
         password = properties["password"]
-        data = {"properties": {"delivery_mode": 2}, "routing_key": "dlabqueue", "payload": json.dumps(ids_list),
+        data = {"properties": {"delivery_mode": 2}, "routing_key": routing_key, "payload": json.dumps(ids_list),
                 "payload_encoding": "string"}
         creds = f"{username}:{password}"
         creds_bytes = creds.encode("ascii")

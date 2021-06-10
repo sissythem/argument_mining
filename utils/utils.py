@@ -280,7 +280,6 @@ def get_adus(segments):
 
 # *************************************** Clustering *******************************************
 def collect_adu_for_clustering(documents, document_ids):
-    # TODO uses only claims
     adus, adu_ids, doc_ids = [], [], []
     for document in documents:
         if document["id"] in document_ids:
