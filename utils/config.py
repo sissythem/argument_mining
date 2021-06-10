@@ -249,6 +249,7 @@ class Notification:
             | kind (str): the kind of update, possible values --> arg_mining, clustering
         """
         routing_key = "dlabqueue" if kind == "arg_mining" else "dlab-cross-docs"
+        self.app_logger.info(f"Notification to queue: {routing_key}")
         properties = self.properties["eval"]["notify"]
         url = properties["url"]
         username = properties["username"]

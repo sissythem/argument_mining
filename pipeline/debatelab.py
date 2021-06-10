@@ -329,8 +329,8 @@ class DebateLab:
         data_pairs = self.clustering.get_clusters(sentences=adus, doc_ids=doc_ids, sentences_ids=adu_ids)
         relations, relation_ids = [], []
         for pair in data_pairs:
-            self.app_logger.debug(f"Creating relation for pair {pair}")
             relation_id = f"{pair['doc_id1']};{pair['doc_id2']};{pair['sentence1_id']};{pair['sentence2_id']}"
+            self.app_logger.debug(f"Saving cross document relation with id:{relation_id}")
             relation = {
                 "id": relation_id,
                 "cluster": pair['cluster'],
