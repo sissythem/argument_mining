@@ -73,7 +73,7 @@ class DebateLab:
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************
-    def run_argument_mining(self, documents, export_schema=False, save=False):
+    def run_argument_mining(self, documents, export_schema=False, save=True):
         """
         Argument Mining pipeline:
         | 1. Predict ADUs for each document
