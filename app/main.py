@@ -4,10 +4,10 @@ from os.path import join
 import numpy as np
 import pandas as pd
 
-from pipeline.debatelab import DebateLab
-from training.models import SequentialModel, ClassificationModel
-from training.preprocessing import ClarinLoader, CsvCreator
-from utils.config import AppConfig, Notification
+from src.pipeline.debatelab import DebateLab
+from src.training.models import SequentialModel, ClassificationModel
+from src.training.preprocessing import ClarinLoader, CsvCreator
+from src.utils.config import AppConfig, Notification
 
 
 def error_analysis(path_to_resources):
@@ -17,7 +17,7 @@ def error_analysis(path_to_resources):
     Args
         path_to_resources (str): the full path to the resources folder
     """
-    path_to_results = join(path_to_resources, "results", "test.tsv")
+    path_to_results = join(path_to_resources, "resources/results", "test.tsv")
     results = pd.read_csv(path_to_results, sep=" ", index_col=None, header=None, skip_blank_lines=False)
     df_list = np.split(results, results[results.isnull().all(1)].index)
     sentences = []

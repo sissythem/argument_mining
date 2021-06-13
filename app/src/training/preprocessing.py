@@ -8,8 +8,8 @@ import numpy as np
 import pandas as pd
 from imblearn.over_sampling import RandomOverSampler
 
-from utils import utils
-from utils.config import AppConfig
+from src.utils import utils
+from src.utils.config import AppConfig
 
 
 class DataUpSampler:

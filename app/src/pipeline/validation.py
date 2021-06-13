@@ -6,7 +6,7 @@ from typing import List
 
 from genson import SchemaBuilder
 
-from utils.config import AppConfig
+from src.utils.config import AppConfig
 
 
 class ValidationError(Enum):

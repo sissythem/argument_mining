@@ -5,7 +5,10 @@ from typing import Union, List, Dict, Tuple, AnyStr, Set
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
+from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.manifold import TSNE
 
 try:
     from ellogon import tokeniser
@@ -315,7 +318,7 @@ def preprocess_sentences(sentences, top_n_words=100):
     return preprocessed_sentences
 
 
-def visualize(cluster, embeddings):
+def visualize_topics(cluster, embeddings):
     # Prepare data
     result = pd.DataFrame(embeddings, columns=['x', 'y'])
     result['labels'] = cluster.labels_
@@ -328,3 +331,30 @@ def visualize(cluster, embeddings):
     plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
     plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
     plt.colorbar()
+
+
+def visualize_embeddings(method, embeddings):
+    if method == "tnse":
+        tnse_embeddings = TSNE(n_components=2).fit_transform(embeddings)
+        plt.figure(figsize=(16, 10))
+        sns.scatterplot(
+            x=tnse_embeddings[:, 0], y=tnse_embeddings[:, 1],
+            # hue="y",
+            palette=sns.color_palette("hls", 10),
+            # data=embeddings,
+            legend="full",
+            alpha=0.3
+        )
+        plt.show()
+    elif method == "pca":
+        pca_embeddings = PCA(n_components=2).fit_transform(embeddings)
+        plt.figure(figsize=(16, 10))
+        sns.scatterplot(
+            x=pca_embeddings[:, 0], y=pca_embeddings[:, 1],
+            # hue="y",
+            palette=sns.color_palette("hls", 10),
+            # data=embeddings,
+            legend="full",
+            alpha=0.3
+        )
+        plt.show()

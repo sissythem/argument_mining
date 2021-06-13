@@ -24,8 +24,8 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
-from utils.config import AppConfig
-from utils import utils
+from src.utils.config import AppConfig
+from src.utils import utils
 
 
 class Model:

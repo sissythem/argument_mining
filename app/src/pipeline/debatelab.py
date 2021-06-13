@@ -5,11 +5,11 @@ import numpy as np
 import requests
 from flair.data import Sentence
 
-from pipeline.validation import JsonValidator
-from training.models import SequentialModel, ClassificationModel, TopicModel, CustomAgglomerative
-from training.preprocessing import CustomSentence
-from utils import utils
-from utils.config import AppConfig, Notification
+from src.pipeline.validation import JsonValidator
+from src.training.models import SequentialModel, ClassificationModel, TopicModel, CustomAgglomerative
+from src.training.preprocessing import CustomSentence
+from src.utils import utils
+from src.utils.config import AppConfig, Notification
 
 
 class DebateLab:

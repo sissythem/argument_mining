@@ -12,7 +12,7 @@ from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from os import environ, getcwd
+from os import environ
 from os import mkdir
 from os.path import exists, join
 from pathlib import Path
@@ -123,11 +123,7 @@ class AppConfig:
         """
         Creates the various paths to application directories, e.g. output, resources, logs etc
         """
-        curr_dir = Path(getcwd())
-        parent = str(curr_dir.parent)
-        curr_dir = str(curr_dir)
-        self.app_path = curr_dir if curr_dir.endswith("mining") else parent
-
+        self.app_path = Path(__file__).parent.parent.parent
         self.resources_path: AnyStr = join(self.app_path, "resources")
         self.output_path: AnyStr = join(self.app_path, "output")
         self.logs_path: AnyStr = join(self.output_path, "logs")
@@ -429,7 +425,7 @@ class ElasticSearchConfig:
 
     def retrieve_documents(self, previous_date=None, retrieve_kind="file"):
         if retrieve_kind == "file":
-            file_path = join(getcwd(), "resources", "kasteli_34_urls.txt")
+            file_path = join(self.resources_folder, "kasteli_34_urls.txt")
             # read the list of urls from the file:
             with open(file_path, "r") as f:
                 urls = [line.rstrip() for line in f]
