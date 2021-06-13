@@ -197,10 +197,11 @@ class DebateLab:
                     if len(segment["text"]) == 1:
                         continue
                     if segment["text"] and segment["label"]:
-                        if not found_mc and segment["label"] == "major_claim":
-                            found_mc = True
-                        elif found_mc and segment["label"] == "major_claim":
+                        tokens = segment["text"].split()
+                        if len(tokens) <= 2:
                             continue
+                        if segment["label"] == "major_claim":
+                            found_mc = True
                         self.app_logger.debug(f"Segment text: {segment['text']}")
                         self.app_logger.debug(f"Segment type: {segment['label']}")
                         segment_counter += 1
@@ -216,20 +217,54 @@ class DebateLab:
                             "confidence": segment["mean_conf"]
                         }
                         adus.append(seg)
-        if not found_mc:
-            seg = {
-                "id": "T1",
-                "type": "major_claim",
-                "starts": 0,
-                "ends": len(document["title"]),
-                "segment": document["title"],
-                "confidence": 0.99
-            }
-            segment_counter = 2
+        return self._check_major_claim(adus=adus, title=document["title"], mc_exists=found_mc,
+                                       segment_counter=segment_counter)
+
+    def _check_major_claim(self, adus, title, mc_exists, segment_counter):
+        if not mc_exists:
+            return self._handle_missing_major_claim(adus, title)
+        else:
+            major_claims = []
             for adu in adus:
-                adu["id"] = f"T{segment_counter}"
-                segment_counter += 1
-            adus.insert(0, seg)
+                if adu["type"] == "major_claim":
+                    major_claims.append(adu)
+            if len(major_claims) == 1:
+                return adus, segment_counter
+            return self._handle_multiple_major_claims(major_claims=major_claims, adus=adus)
+
+    def _handle_multiple_major_claims(self, major_claims, adus):
+        major_claim = {"id": "T1", "type": "major_claim", "segment": ""}
+        confs = []
+        for idx, mc in enumerate(major_claims):
+            if idx == 0:
+                major_claim["starts"] = mc["starts"]
+            else:
+                if mc["starts"] > major_claim["ends"] + 3:
+                    break
+            confs.append(mc["confidence"])
+            major_claim["ends"] = mc["ends"]
+            major_claim["segment"] += " " + mc["segment"]
+        major_claim["confidence"] = np.mean(confs)
+        major_claim["segment"] = utils.replace_multiple_spaces_with_single_space(text=major_claim["segment"])
+        return self._insert_major_claim(adus=adus, seg=major_claim)
+
+    def _handle_missing_major_claim(self, adus, title):
+        seg = {
+            "id": "T1",
+            "type": "major_claim",
+            "starts": 0,
+            "ends": len(title),
+            "segment": title,
+            "confidence": 0.99
+        }
+        return self._insert_major_claim(adus, seg)
+
+    def _insert_major_claim(self, adus, seg):
+        segment_counter = 2
+        for adu in adus:
+            adu["id"] = f"T{segment_counter}"
+            segment_counter += 1
+        adus.insert(0, seg)
         return adus, segment_counter
 
     def _predict_relations(self, major_claims, claims, premises):
