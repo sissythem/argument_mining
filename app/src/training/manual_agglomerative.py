@@ -7,7 +7,7 @@ from flair.embeddings import TransformerDocumentEmbeddings
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-path_to_csv = join(getcwd(), "output", "test", "../output/test/claims.csv")
+path_to_csv = join(getcwd(), "output", "test", "claims.csv")
 df = pd.read_csv(path_to_csv, sep="\t", header=0, index_col=None)
 sentences = list(set(list(df["claims"])))
 document_embeddings = TransformerDocumentEmbeddings("bert-base-multilingual-uncased", fine_tune=False)

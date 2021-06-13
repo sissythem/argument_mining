@@ -1,0 +1,94 @@
+# ----------- DO NOT MODIFY THIS FILE! Copy it and name it properties.yaml ---------------------------
+config:
+  email:
+    # if you do not want to configure your email you can just set email: False
+    sender: "example@gmail.com"
+    receiver: "example@gmail.com"
+    password: "password"
+  elastic_save:
+    username: "debatelab"
+    password: "password"
+    host: "143.233.226.60"
+    port: 9200
+    connect: "key" # options: key, password
+    ssh:
+      port: 222
+      username: "debatelab"
+      password: "password"
+      key_path: "/path/to/key"
+  elastic_retrieve:
+    username: "elastic"
+    password: "password"
+    host: "socialwebobservatory.iit.demokritos.gr"
+    port: 9200
+    connect: "password" # options: password, key
+    ssh:
+      port: 222
+      username: "debatelab"
+      password: "password"
+      key_path: "/path/to/key"
+tasks: [ "prep", "train", "eval" ]
+prep:
+  oversampling:
+    # if you do not want oversampling just set it to false and remove the config of the models
+    # if you want only some models just add only those models and remove the remaining
+    adu:
+      B-major_claim: 1000
+      I-major_claim: 1000
+      B-claim: 1000
+      I-claim: 1000
+      B-premise: 1000
+      I-premise: 1000
+    rel: 8705
+    stance: 289
+train:
+  models: [ "adu", "rel", "stance", "sim" ]
+eval:
+  model: "best" # options: best, final
+  retrieve: "file" # options: file, date
+  last_date: ""
+  ner_endpoint: "http://petasis.dyndns.org:7100/predict-ner"
+  max_correction_tries: 3
+  notify:
+    url: "https://isl.ics.forth.gr/debatelab_mq/api/exchanges/dlab/amq.default/publish"
+    username: "debateLab3ServerUser"
+    password: "debateLabPassw0rd"
+seq_model:
+  bert_kind:
+    adu: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb
+  hidden_size: 256
+  rnn_layers: 2
+  dropout: 0.5
+  use_crf: True
+  learning_rate: 0.0001
+  mini_batch_size: 32
+  num_workers: 8
+  max_epochs: 150
+  patience: 10
+  optimizer: Adam
+  use_tensorboard: True
+  train_with_dev: False
+  save_final_model: True
+  shuffle: False
+class_model:
+  bert_kind:
+    rel: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb, base-multi
+    stance: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb, base-multi
+    sim: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb, base-multi, multi-nli
+  hidden_size: 256
+  layers: 2
+  use_crf: False
+  learning_rate: 0.0001
+  mini_batch_size: 32
+  num_workers: 8
+  max_epochs: 150
+  patience: 10
+  optimizer: Adam
+  use_tensorboard: True
+  train_with_dev: False
+  save_final_model: True
+  shuffle: False
+clustering:
+  n_clusters: 10
+  algorithm: "agglomerative" # options: kmeans, agglomerative, hdbscan
+  bert_kind: "nlpaueb/bert-base-greek-uncased-v1" # options: aueb, base-multi, fasttext, tfidf
