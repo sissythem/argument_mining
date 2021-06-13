@@ -1,5 +1,5 @@
 Utility methods
 ===============
 
-.. automodule:: utils.utils
+.. automodule:: src.utils.utils
    :members:

@@ -1,7 +1,7 @@
 Argument Mining pipeline
 ========================
 
-.. automodule:: pipeline.debatelab
+.. automodule:: src.pipeline.debatelab
    :members:
    :special-members:
    :private-members:

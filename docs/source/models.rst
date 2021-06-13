@@ -1,7 +1,7 @@
 Argument Mining models
 ======================
 
-.. automodule:: training.models
+.. automodule:: src.training.models
    :members:
    :special-members:
    :private-members:

@@ -1,7 +1,7 @@
 Document Validation
 ===================
 
-.. automodule:: pipeline.validation
+.. automodule:: src.pipeline.validation
    :members:
    :special-members:
    :private-members:

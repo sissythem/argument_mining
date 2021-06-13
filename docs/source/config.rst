@@ -1,7 +1,7 @@
 Application Configuration
 =========================
 
-.. automodule:: utils.config
+.. automodule:: src.utils.config
    :members:
    :special-members:
    :private-members:
