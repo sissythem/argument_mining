@@ -309,7 +309,7 @@ class DebateLab:
             if modify_source_list:
                 source = self._modify_source_adus(adu2, already_predicted, initial_source)
             for adu1 in source:
-                sentence_pair = f"[CLS] {adu1[0]} [SEP] {adu2[0]}"
+                sentence_pair = f"[CLS] {adu1['segment']} [SEP] {adu2['segment']}"
                 self.app_logger.debug(f"Predicting relation for sentence pair: {sentence_pair}")
                 sentence = Sentence(sentence_pair)
                 self.rel_model.model.predict(sentence)
@@ -320,8 +320,8 @@ class DebateLab:
                     rel_dict = {
                         "id": f"R{counter}",
                         "type": label,
-                        "arg1": adu1[1],
-                        "arg2": adu2[1],
+                        "arg1": adu1["id"],
+                        "arg2": adu2["id"],
                         "confidence": conf
                     }
                     relations.append(rel_dict)
@@ -385,7 +385,7 @@ class DebateLab:
         if major_claims and claims:
             for major_claim in major_claims:
                 for claim in claims:
-                    sentence_pair = "[CLS] " + claim[0] + " [SEP] " + major_claim[0]
+                    sentence_pair = "[CLS] " + claim["segment"] + " [SEP] " + major_claim["segment"]
                     self.app_logger.debug(f"Predicting stance for sentence pair: {sentence_pair}")
                     sentence = Sentence(sentence_pair)
                     self.stance_model.model.predict(sentence)
@@ -399,7 +399,7 @@ class DebateLab:
                             "confidence": conf
                         }]
                         for segment in json_obj["annotations"]["ADUs"]:
-                            if segment["id"] == claim[1]:
+                            if segment["id"] == claim["id"]:
                                 segment["stance"] = stance_list
         return json_obj, stance_counter
 

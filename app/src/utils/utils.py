@@ -275,9 +275,9 @@ def get_next_segment(tokens, current_idx=None, current_label=None, segment=None)
 
 
 def get_adus(segments):
-    major_claims = [(segment["segment"], segment["id"]) for segment in segments if segment["type"] == "major_claim"]
-    claims = [(segment["segment"], segment["id"]) for segment in segments if segment["type"] == "claim"]
-    premises = [(segment["segment"], segment["id"]) for segment in segments if segment["type"] == "premise"]
+    major_claims = [segment for segment in segments if segment["type"] == "major_claim"]
+    claims = [segment for segment in segments if segment["type"] == "claim"]
+    premises = [segment for segment in segments if segment["type"] == "premise"]
     return major_claims, claims, premises
 
 
