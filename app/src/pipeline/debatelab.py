@@ -46,7 +46,7 @@ class DebateLab:
         # initialize Clustering model
         self.clustering = CustomAgglomerative(app_config=app_config)
 
-    def run_pipeline(self, notify=True):
+    def run_pipeline(self, notify=False):
         """
         Function to execute the DebateLab pipeline.
 
@@ -65,14 +65,13 @@ class DebateLab:
         if notify:
             self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
-        # relations_ids = self.run_clustering(documents=documents, document_ids=document_ids)
         relations, relation_ids = self.run_manual_clustering(documents=documents, document_ids=document_ids)
         if notify:
             self.notification.notify_ics(ids_list=relation_ids, kind="clustering")
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************
-    def run_argument_mining(self, documents, export_schema=False, save=True):
+    def run_argument_mining(self, documents, export_schema=False, save=False):
         """
         Argument Mining pipeline:
         | 1. Predict ADUs for each document
@@ -400,7 +399,7 @@ class DebateLab:
         return json_obj, stance_counter
 
     # ************************************* Cross-document relations **********************************
-    def run_manual_clustering(self, documents, document_ids, save=True):
+    def run_manual_clustering(self, documents, document_ids, save=False):
         self.app_logger.info("Running manual clustering -- agglomerative")
         adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
         self.app_logger.info("Collected claims for clustering")
