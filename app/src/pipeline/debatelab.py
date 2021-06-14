@@ -350,15 +350,11 @@ class DebateLab:
         return source
 
     def _keep_k_closest(self, source, target_start, target_end, k=5):
-        source = sorted(source, key=lambda key: key['starts'], reverse=False)
+        source = sorted(source, key=lambda key: int(key['starts']), reverse=False)
         largest_end_idx = source[-1]["ends"]
-        if type(target_start) == str:
-            target_start = int(target_start)
-        if type(target_end) == str:
-            target_end = int(target_end)
         for s in source:
-            s["distance_from_start"] = abs(target_start - s["ends"])
-            s["distance_from_end"] = abs(target_end - s["starts"])
+            s["distance_from_start"] = abs(int(target_start) - int(s["ends"]))
+            s["distance_from_end"] = abs(int(target_end) - int(s["starts"]))
         source_from_start = sorted(source, key=lambda key: key['distance_from_start'], reverse=False)
         source_from_end = sorted(source, key=lambda key: key['distance_from_end'], reverse=False)
         if int(target_start) == 0:

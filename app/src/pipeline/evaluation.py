@@ -114,6 +114,17 @@ def get_json_from_elasticsearch():
     return documents
 
 
+def get_documents_from_folder(folder):
+    filenames = listdir(folder)
+    documents = []
+    for filename in filenames:
+        file_path = join(folder, filename)
+        with open(file_path, "r") as f:
+            data = json.loads(f.read())
+            documents.append(data)
+    return documents
+
+
 def get_evidence_by_claim(relations, sort=True):
     rel_dict = {}
     for relation in relations:
@@ -144,6 +155,7 @@ def get_adu(adus, adu_id, logs):
 def main():
     logs = []
     documents = get_json_from_elasticsearch()
+    documents = get_documents_from_folder(folder=join(getcwd(), "json"))
     for document in documents:
         annotations = document["annotations"]
         adus = annotations["ADUs"]
