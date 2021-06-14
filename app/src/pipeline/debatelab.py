@@ -284,11 +284,12 @@ class DebateLab:
         if major_claims and claims:
             relations, rel_counter = self._get_relations(source=claims, target=major_claims, counter=rel_counter)
         if claims and premises:
-            rel, rel_counter = self._get_relations(source=premises, target=claims, counter=rel_counter)
+            rel, rel_counter = self._get_relations(source=premises, target=claims, counter=rel_counter,
+                                                   modify_source_list=True)
             relations += rel
         return relations, rel_counter
 
-    def _get_relations(self, source, target, counter):
+    def _get_relations(self, source, target, counter, modify_source_list=False):
         """
         Performs combinations creating pairs of source/target ADUs to predict their relations. If the predicted label
         is either support or attack, the relations list is updated with a new entry.
@@ -301,8 +302,12 @@ class DebateLab:
         Returns
             tuple: the list of the predicted relations and the counter with the new value
         """
+        initial_source = source
         relations = []
+        already_predicted = []
         for adu2 in target:
+            if modify_source_list:
+                source = self._modify_source_adus(adu2, already_predicted, initial_source)
             for adu1 in source:
                 sentence_pair = f"[CLS] {adu1[0]} [SEP] {adu2[0]}"
                 self.app_logger.debug(f"Predicting relation for sentence pair: {sentence_pair}")
@@ -320,7 +325,43 @@ class DebateLab:
                         "confidence": conf
                     }
                     relations.append(rel_dict)
+                    already_predicted.append(adu1)
         return relations, counter
+
+    def _modify_source_adus(self, adu2, already_predicted, source):
+        adu2_start = adu2["starts"]
+        adu2_end = adu2["ends"]
+        source = self._remove_already_predicted(source=source, already_predicted=already_predicted)
+        source = self._keep_k_closest(source=source, target_start=adu2_start, target_end=adu2_end)
+        return source
+
+    def _remove_already_predicted(self, source, already_predicted):
+        if source and already_predicted:
+            final_source = []
+            for s in source:
+                found = False
+                for pred in already_predicted:
+                    if pred["id"] == s["id"]:
+                        found = True
+                        break
+                if not found:
+                    final_source.append(s)
+            return final_source
+        return source
+
+    def _keep_k_closest(self, source, target_start, target_end, k=5):
+        source = sorted(source, key=lambda k: k['starts'], reverse=False)
+        if type(target_start) == str:
+            target_start = int(target_start)
+        if type(target_end) == str:
+            target_end = int(target_end)
+        for s in source:
+            s["distance_from_start"] = abs(target_start - s["ends"])
+            s["distance_from_end"] = abs(target_end - s["starts"])
+        source_from_start = sorted(source, key=lambda key: key['distance_from_start'], reverse=False)
+        source_from_end = sorted(source, key=lambda key: key['distance_from_end'], reverse=False)
+        final_source = source_from_start[:k] + source_from_end[:k]
+        return final_source
 
     def _predict_stance(self, major_claims, claims, json_obj):
         """
