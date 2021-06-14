@@ -239,7 +239,7 @@ class DebateLab:
             if idx == 0:
                 major_claim["starts"] = mc["starts"]
             else:
-                if mc["starts"] > major_claim["ends"] + 3:
+                if int(mc["starts"]) > int(major_claim["ends"]) + 5:
                     break
             confs.append(mc["confidence"])
             major_claim["ends"] = mc["ends"]
