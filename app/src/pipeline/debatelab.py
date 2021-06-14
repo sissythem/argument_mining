@@ -350,7 +350,8 @@ class DebateLab:
         return source
 
     def _keep_k_closest(self, source, target_start, target_end, k=5):
-        source = sorted(source, key=lambda k: k['starts'], reverse=False)
+        source = sorted(source, key=lambda key: key['starts'], reverse=False)
+        largest_end_idx = source[-1]["ends"]
         if type(target_start) == str:
             target_start = int(target_start)
         if type(target_end) == str:
@@ -360,7 +361,12 @@ class DebateLab:
             s["distance_from_end"] = abs(target_end - s["starts"])
         source_from_start = sorted(source, key=lambda key: key['distance_from_start'], reverse=False)
         source_from_end = sorted(source, key=lambda key: key['distance_from_end'], reverse=False)
-        final_source = source_from_start[:k] + source_from_end[:k]
+        if int(target_start) == 0:
+            final_source = source_from_end[:k]
+        elif int(target_end) == largest_end_idx:
+            final_source = source_from_start[:k]
+        else:
+            final_source = source_from_start[:k] + source_from_end[:k]
         return final_source
 
     def _predict_stance(self, major_claims, claims, json_obj):
