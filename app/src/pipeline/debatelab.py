@@ -307,6 +307,8 @@ class DebateLab:
         for adu2 in target:
             if modify_source_list:
                 source = self._modify_source_adus(adu2, already_predicted, initial_source)
+                if not source:
+                    break
             for adu1 in source:
                 sentence_pair = f"[CLS] {adu1['segment']} [SEP] {adu2['segment']}"
                 self.app_logger.debug(f"Predicting relation for sentence pair: {sentence_pair}")
@@ -331,6 +333,8 @@ class DebateLab:
         adu2_start = adu2["starts"]
         adu2_end = adu2["ends"]
         source = self._remove_already_predicted(source=source, already_predicted=already_predicted)
+        if not source:
+            return source
         source = self._keep_k_closest(source=source, target_start=adu2_start, target_end=adu2_end)
         return source
 
