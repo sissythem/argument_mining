@@ -338,7 +338,8 @@ class DebateLab:
         source = self._keep_k_closest(source=source, target_start=adu2_start, target_end=adu2_end)
         return source
 
-    def _remove_already_predicted(self, source, already_predicted):
+    @staticmethod
+    def _remove_already_predicted(source, already_predicted):
         if source and already_predicted:
             final_source = []
             for s in source:
@@ -352,20 +353,37 @@ class DebateLab:
             return final_source
         return source
 
-    def _keep_k_closest(self, source, target_start, target_end, k=5):
+    @staticmethod
+    def _keep_k_closest(source, target_start, target_end, k=5):
         source = sorted(source, key=lambda key: int(key['starts']), reverse=False)
-        largest_end_idx = source[-1]["ends"]
         for s in source:
             s["distance_from_start"] = abs(int(target_start) - int(s["ends"]))
             s["distance_from_end"] = abs(int(target_end) - int(s["starts"]))
         source_from_start = sorted(source, key=lambda key: key['distance_from_start'], reverse=False)
+        if source_from_start:
+            source_from_start = source_from_start[:k]
         source_from_end = sorted(source, key=lambda key: key['distance_from_end'], reverse=False)
-        if int(target_start) == 0:
-            final_source = source_from_end[:k]
-        elif int(target_end) == largest_end_idx:
-            final_source = source_from_start[:k]
+        if source_from_end:
+            source_from_end = source_from_end[:k]
+        if source_from_start and source_from_end:
+            combined_source = source_from_start + source_from_end
+            final_source = []
+            for source in combined_source:
+                if final_source:
+                    found = False
+                    for s in final_source:
+                        if s["id"] == source["id"]:
+                            found = True
+                    if not found:
+                        final_source.append(source)
+                else:
+                    final_source.append(source)
+        elif source_from_start and not source_from_end:
+            final_source = source_from_start
+        elif not source_from_start and source_from_end:
+            final_source = source_from_end
         else:
-            final_source = source_from_start[:k] + source_from_end[:k]
+            final_source = source
         return final_source
 
     def _predict_stance(self, major_claims, claims, json_obj):
