@@ -4,3 +4,7 @@ pyyaml==5.4.1
 sphinx==3.5.3
 sphinx-rtd-theme==0.5.2
 recommonmark==0.7.1
+sshtunnel==0.3.1
+elasticsearch==7.10.1
+elasticsearch-dsl==7.3.0
+requests==2.25.1
