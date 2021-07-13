@@ -1,7 +1,7 @@
 FROM nginx
 
 RUN apt-get update && apt-get install -y build-essential supervisor unzip uwsgi python3 python3-pip python3-setuptools \
-    procps vim git curl libxml2-dev libxslt-dev libcurl4-openssl-dev libssl-dev python-pycurl
+    procps vim git curl libxml2-dev libxslt-dev libcurl4-openssl-dev libssl-dev python-pycurl llvm
 
 USER root
 RUN groupadd appusers
@@ -58,6 +58,7 @@ RUN echo "nginx ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # enter
 WORKDIR ${HOME}
+
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["supervisord"]
-#CMD tail -f /dev/null
+CMD tail -f /dev/null
