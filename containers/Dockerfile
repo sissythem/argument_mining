@@ -61,4 +61,4 @@ WORKDIR ${HOME}
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["supervisord"]
-CMD tail -f /dev/null
+#CMD tail -f /dev/null
