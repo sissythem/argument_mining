@@ -7,8 +7,12 @@ from os.path import join, exists
 from string import punctuation
 
 from elasticsearch import Elasticsearch
+
 # from elasticsearch_dsl import Search, Q
-from ellogon import tokeniser
+try:
+    from ellogon import tokeniser
+except(BaseException, Exception):
+    pass
 from genson import SchemaBuilder
 from sshtunnel import SSHTunnelForwarder
 
@@ -173,3 +177,7 @@ def main(connection_type="http", export=("articles", "schema"), do_validation=Fa
         export_schema(data=articles)
     if connection_type == "ssh":
         stop(tunnel=tunnel, elastic_server_client=elastic_client)
+
+
+if __name__ == '__main__':
+    main(connection_type="http", export=("articles"), do_validation=False, with_sentences=True)

@@ -21,3 +21,9 @@ I-premise --> 8906, O --> 19401
   * non argumentative tokens: 19401
 * relation labels: support --> 781, attack --> 84, other --> 8705
 * stance labels: for --> 289, against --> 42
+
+
+## Deploy token in DebateLab Group
+
+* username: docker
+* token: EMtm3PdDnpx8CX8wGs2q

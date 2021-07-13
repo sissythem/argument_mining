@@ -1,5 +1,8 @@
 from elasticsearch import Elasticsearch
-from ellogon import tokeniser
+try:
+    from ellogon import tokeniser
+except(BaseException, Exception):
+    pass
 
 
 def elastic_http():

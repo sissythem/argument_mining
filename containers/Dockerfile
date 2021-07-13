@@ -12,12 +12,11 @@ ENV HOME=/opt/repo
 # Copy the application
 ARG RELEASE=master
 
-RUN git clone --branch $RELEASE --single-branch
-RUN python3 -m pip install -r ./argument-mining-service/requirements.txt
+RUN git clone --branch $RELEASE --single-branch https://docker:EMtm3PdDnpx8CX8wGs2q@gitlab.com/debatelab/argument-mining.git
+RUN python3 -m pip install -r ./argument-mining/requirements.txt
 RUN mkdir ${HOME}/src
-RUN cp -r ./argument-mining-service/app/* ${HOME}/src/
-RUN cp ./argument-mining-service/app/.env ${HOME}/src/
-RUN rm -rf argument-mining-service/
+RUN cp -r ./argument-mining/app/* ${HOME}/src/
+RUN rm -rf argument-mining/
 
 # Copy the configuration file from the current directory and paste
 # it inside the container to use it as Nginx's default config.
