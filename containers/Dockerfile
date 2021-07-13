@@ -10,7 +10,7 @@ RUN usermod -a -G appusers nginx
 ENV HOME=/opt/repo
 
 # Copy the application
-ARG RELEASE=master
+ARG RELEASE=main
 
 RUN git clone --branch $RELEASE --single-branch https://docker:EMtm3PdDnpx8CX8wGs2q@gitlab.com/debatelab/argument-mining.git
 RUN python3 -m pip install -r ./argument-mining/requirements.txt
