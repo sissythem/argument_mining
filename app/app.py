@@ -1,34 +1,30 @@
-import logging
-import uvicorn
+import json
 from os import getcwd
 from os.path import join
-from logging.config import dictConfig
 
+import uvicorn
 from fastapi import FastAPI
-from fastapi.logger import logger
 
-gunicorn_logger = logging.getLogger('gunicorn.error')
-logger.handlers = gunicorn_logger.handlers
-logging.config.fileConfig('logging.conf', disable_existing_loggers=False)
-
-if __name__ != "main":
-    logger.setLevel(gunicorn_logger.level)
-else:
-    logger.setLevel(logging.DEBUG)
+from src.utils.config import AppConfig
 
 app = FastAPI()
+config = AppConfig()
+logger = config.app_logger
 
 
-@app.route('/')
+@app.get('/')
 def hello_world():
     return 'Hello World!'
 
 
-@app.route('/predict', methods=["POST"])
+@app.post('/predict')
 def predict():
     # title = request.args.get("title")
-    with open(join(getcwd(), "resources", "example.json"), "r") as f:
-        return f.read(), 200
+    app_path = getcwd()
+    if app_path.endswith("mining"):
+        app_path = join(app_path, "app")
+    with open(join(app_path, "resources", "example.json"), "r") as f:
+        return json.loads(f.read())
 
 
 if __name__ == "__main__":

@@ -11,5 +11,5 @@ RUN python3 -m pip install -r ./argument-mining/requirements.txt
 EXPOSE 80
 WORKDIR ./argument-mining/app
 
-CMD docker-entrypoint.sh
-#CMD tail -f /dev/null
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
+# CMD tail -f /dev/null
