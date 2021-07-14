@@ -1,5 +1,3 @@
-import logging
-from os.path import join
 from typing import List, Type, Union, AnyStr, Dict
 
 import flair
@@ -9,7 +7,6 @@ try:
     import umap
 except (BaseException, Exception):
     pass
-import numpy as np
 import pandas as pd
 import torch
 from flair.data import Corpus, Dictionary, Sentence
@@ -24,18 +21,13 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
-import io
 import logging
 import os
-import zipfile
-from os import getcwd, makedirs
-from os.path import join, exists
-import random
+from os.path import join
 
 import numpy as np
 from sentence_transformers import SentenceTransformer, models, evaluation, losses
 from sentence_transformers.datasets import ParallelSentencesDataset
-import sentence_transformers
 from torch.utils.data import DataLoader
 from src.utils.config import AppConfig
 from src.utils import utils
@@ -511,6 +503,18 @@ class EmbeddingAlignment(Model):
         train_dataloader, train_loss = self.get_train_dataloader_and_loss()
         dev_src, dev_trg = self.read_tsv(self.dev_file)
         test_src, test_trg = self.read_tsv(self.test_file)
+        evaluators = self.get_evaluators(dev_src=dev_src, dev_trg=dev_trg, test_src=test_src, test_trg=test_trg)
+        self.student_model.fit(train_objectives=[(train_dataloader, train_loss)],
+                               evaluator=evaluation.SequentialEvaluator(evaluators,
+                                                                        main_score_function=lambda scores: np.mean(
+                                                                            scores)),
+                               epochs=self.model_properties["num_epochs"],
+                               warmup_steps=self.model_properties["num_warmup_steps"],
+                               evaluation_steps=self.model_properties["num_evaluation_steps"],
+                               output_path=self.app_config.student_path,
+                               save_best_model=True,
+                               optimizer_params={'lr': 2e-5, 'eps': 1e-6, 'correct_bias': False}
+                               )
 
     def read_tsv(self, path):
         src, trg = [], []
@@ -548,3 +552,30 @@ class EmbeddingAlignment(Model):
         train_dataloader = DataLoader(train_data, shuffle=True, batch_size=self.model_properties["train_batch_size"])
         train_loss = losses.MSELoss(model=self.student_model)
         return train_dataloader, train_loss
+
+    def get_evaluators(self, dev_src, dev_trg, test_src, test_trg):
+        evaluators = []
+
+        # dev evaluators
+        dev_mse = evaluation.MSEEvaluator(dev_src, dev_trg, name=os.path.basename(self.dev_file),
+                                          teacher_model=self.teacher_model,
+                                          batch_size=self.model_properties["inference_batch_size"])
+        # TranslationEvaluator computes the embeddings for all parallel sentences.
+        # It then check if the embedding of source[i] is the closest to target[i] out of all available target sentences
+        dev_trans_acc = evaluation.TranslationEvaluator(dev_src, dev_trg, name=os.path.basename(self.dev_file),
+                                                        batch_size=self.model_properties["inference_batch_size"])
+        evaluators.extend([dev_mse, dev_trans_acc])
+
+        # test evaluators
+
+        test_mse = evaluation.MSEEvaluator(
+            test_src, test_trg, name="test_mse.csv", teacher_model=self.teacher_model,
+            batch_size=self.model_properties["inference_batch_size"])
+        test_trans_acc = evaluation.TranslationEvaluator(
+            test_src, test_trg, name="test_transl.csv", batch_size=self.model_properties["inference_batch_size"])
+
+        # test_evaluator = evaluation.EmbeddingSimilarityEvaluator(test_src, test_trg, data['scores'],
+        #                                                             batch_size=inference_batch_size, name="test",
+        #                                                             show_progress_bar=False)
+        evaluators.extend([test_mse, test_trans_acc])
+        return evaluators
