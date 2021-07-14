@@ -9,7 +9,7 @@ RUN git clone --branch $RELEASE --single-branch https://docker:EMtm3PdDnpx8CX8wG
 RUN python3 -m pip install -r ./argument-mining/requirements.txt
 
 EXPOSE 80
-WORKDIR ./company-name-matching
+WORKDIR ./argument-mining/app
 
 CMD docker-entrypoint.sh
 #CMD tail -f /dev/null
