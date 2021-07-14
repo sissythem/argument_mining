@@ -24,6 +24,19 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
+import io
+import logging
+import os
+import zipfile
+from os import getcwd, makedirs
+from os.path import join, exists
+import random
+
+import numpy as np
+from sentence_transformers import SentenceTransformer, models, evaluation, losses
+from sentence_transformers.datasets import ParallelSentencesDataset
+import sentence_transformers
+from torch.utils.data import DataLoader
 from src.utils.config import AppConfig
 from src.utils import utils
 
@@ -39,8 +52,9 @@ class Model:
         self.model_name: AnyStr = model_name
         self.properties: Dict = app_config.properties
         self.model_properties: Dict = self._get_model_properties()
-        self.transformer_name = self.model_properties["bert_kind"][self.model_name] if self.model_name != "clustering" \
-            else self.model_properties["bert_kind"]
+        if "bert_kind" in self.model_properties.keys():
+            self.transformer_name = self.model_properties["bert_kind"][self.model_name] if \
+                self.model_name != "clustering" else self.model_properties["bert_kind"]
         self.resources_path: AnyStr = self.app_config.resources_path
         self.model_file: AnyStr = "best-model.pt" if self.properties["eval"]["model"] == "best" else "final-model.pt"
 
@@ -51,6 +65,8 @@ class Model:
             return self.properties["class_model"]
         elif self.model_name == "clustering":
             return self.properties["clustering"]
+        elif self.model_name == "alignment":
+            return self.properties["alignment"]
 
 
 class SupervisedModel(Model):
@@ -72,7 +88,7 @@ class SupervisedModel(Model):
         self.use_tensorboard: bool = self.model_properties.get("use_tensorboard", True)
         self.base_path: AnyStr = self._get_base_path()
         self.model = None
-        self.optimizer: Optimizer = self.get_optimizer(model_name=model_name)
+        self.optimizer: Optimizer = self.get_optimizer()
         self.device_name: AnyStr = app_config.device_name
         flair.device = torch.device(self.device_name)
 
@@ -130,7 +146,7 @@ class SupervisedModel(Model):
         self.app_logger.info(f"Model configuration properties: {self.model_properties}")
         return trainer
 
-    def get_optimizer(self, model_name: AnyStr) -> Union[Type[Optimizer], Optimizer]:
+    def get_optimizer(self) -> Union[Type[Optimizer], Optimizer]:
         """
         Define the model's optimizer based on the application properties
 
@@ -140,11 +156,7 @@ class SupervisedModel(Model):
         Returns
             optimizer: the optimizer class
         """
-        if model_name == "adu":
-            properties = self.properties["seq_model"]
-        else:
-            properties = self.properties["class_model"]
-        optimizer_name = properties["optimizer"]
+        optimizer_name = self.model_properties.get("optimizer", None)
         optimizer = Adam
         if optimizer_name == "Adam":
             optimizer = Adam
@@ -477,3 +489,62 @@ class TopicModel(Hdbscan):
                        .rename({"Topic": "Topic", "Sentence": "Size"}, axis='columns')
                        .sort_values("Size", ascending=False))
         return topic_sizes
+
+
+class EmbeddingAlignment(Model):
+
+    def __init__(self, app_config, model_name="alignment"):
+        super(EmbeddingAlignment, self).__init__(app_config=app_config, model_name=model_name)
+        self.data_folder: AnyStr = join(self.app_config.dataset_folder, model_name)
+        self.teacher_model_name = self.model_properties["teacher_model"]
+        self.student_model_name = self.model_properties["student_model"]
+        self.train_file = join(self.data_folder, "train.tsv")
+        self.dev_file = join(self.data_folder, "dev.tsv")
+        self.test_file = join(self.data_folder, "test.tsv")
+        self.data_limit = np.Inf
+        self.teacher_model = None
+        self.student_model = None
+
+    def train(self):
+        self.teacher_model = self.get_teacher_model()
+        self.student_model = self.get_student_model()
+        train_dataloader, train_loss = self.get_train_dataloader_and_loss()
+        dev_src, dev_trg = self.read_tsv(self.dev_file)
+        test_src, test_trg = self.read_tsv(self.test_file)
+
+    def read_tsv(self, path):
+        src, trg = [], []
+        self.app_logger.info(f"Reading data from {path}.")
+        with open(path, 'r', encoding='utf8') as f_in:
+            for line in f_in:
+                splits = line.strip().split('\t')
+                if splits[0] != "" and splits[1] != "":
+                    src.append(splits[0])
+                    trg.append(splits[1])
+                if len(src) >= self.data_limit:
+                    break
+        self.app_logger.info(f"Got {len(src)} data.")
+        return src, trg
+
+    def get_teacher_model(self):
+        self.app_logger.info("Load teacher model")
+        return SentenceTransformer(self.teacher_model_name)
+
+    def get_student_model(self):
+        self.app_logger.info("Create student model from scratch")
+        word_embedding_model = models.Transformer(self.student_model_name,
+                                                  max_seq_length=self.model_properties["max_seq_length"])
+        pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension())
+        return SentenceTransformer(modules=[word_embedding_model, pooling_model], device="cpu")
+
+    def get_train_dataloader_and_loss(self):
+        train_data = ParallelSentencesDataset(student_model=self.student_model, teacher_model=self.teacher_model,
+                                              batch_size=self.model_properties["inference_batch_size"],
+                                              use_embedding_cache=True)
+        train_data.load_data(self.train_file,
+                             max_sentences=min(self.model_properties["max_sentences_per_language"], self.data_limit),
+                             max_sentence_length=self.model_properties["train_max_sentence_len"])
+
+        train_dataloader = DataLoader(train_data, shuffle=True, batch_size=self.model_properties["train_batch_size"])
+        train_loss = losses.MSELoss(model=self.student_model)
+        return train_dataloader, train_loss
