@@ -12,6 +12,12 @@ config = AppConfig()
 logger = config.app_logger
 
 
+@app.on_event("startup")
+async def startup_event():
+    # TODO train
+    pass
+
+
 @app.get('/')
 def hello_world():
     return 'Hello World!'
