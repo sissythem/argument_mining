@@ -1,9 +1,12 @@
 .idea/
 .vscode/
 venv/
-app/__pycache__/
+app/src/__pycache__/
 app/resources/
 app/output/
+app/src/utils/__pycache__/
+app/src/training/__pycache__/
+app/src/pipeline/__pycache__/
 public/
 docs/build/
 !app/resources/example_properties.yaml

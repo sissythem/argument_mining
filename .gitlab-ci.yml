@@ -1,8 +1,8 @@
-image: python:3.8
-
 test:
+  image: python:3.8
   stage: test
   script:
+  - apt update && apt install -y build-essential libpoppler-cpp-dev pkg-config python3-dev
   - pip install -r requirements.txt
   - sphinx-build -b html -a ./docs/source public
   only:
@@ -11,8 +11,10 @@ test:
   - main
 
 pages:
+  image: python:3.8
   stage: deploy
   script:
+  - apt update && apt install -y build-essential libpoppler-cpp-dev pkg-config python3-dev
   - pip install -r requirements.txt
   - sphinx-build -b html -a ./docs/source public
   artifacts:
@@ -20,3 +22,20 @@ pages:
     - public
   only:
   - main
+
+
+build_latest:
+  variables:
+    DOCKER_DRIVER: overlay2
+  services:
+    - docker:dind
+  image: docker:latest
+  stage: build
+  before_script:
+    - docker login registry.gitlab.com -u docker -p EMtm3PdDnpx8CX8wGs2q
+    - cd containers/api
+  script:
+    - docker build -t registry.gitlab.com/debetelab/argument-mining:latest .
+    - docker push registry.gitlab.com/debetelab/argument-mining:latest
+  only:
+    - main
