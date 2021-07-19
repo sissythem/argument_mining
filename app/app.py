@@ -1,6 +1,6 @@
 import json
-# from os import getcwd
-# from os.path import join
+from os import getcwd
+from os.path import join
 from typing import AnyStr, Dict, List, Union
 
 import requests
@@ -59,9 +59,12 @@ def predict(pipeline_request: PipelineRequest):
     if type(links) == str or type(links) == bytes:
         links = [links]
     links = [link.decode('utf8') if type(link) == bytes else link for link in links]
-    response = requests.post(url=crawler_url, json={"links": links})
-    if response.status_code != 200:
-        return response
+    try:
+        response = requests.post(url=crawler_url, json={"links": links})
+        if response.status_code != 200:
+            return demo()
+    except(BaseException, Exception):
+        return demo()
     document = json.loads(response.text)
     debatelab = DebateLab(app_config=config)
     validator = JsonValidator(app_config=config)
@@ -75,12 +78,13 @@ def predict(pipeline_request: PipelineRequest):
         raise ValidationException(message="ADU & relation predictions did not pass validation", document=document,
                                   validation_errors=validation_errors)
 
-    # # TODO remove demo code below
-    # app_path = getcwd()
-    # if app_path.endswith("mining"):
-    #     app_path = join(app_path, "app")
-    # with open(join(app_path, "resources", "example.json"), "r") as f:
-    #     return json.loads(f.read())
+
+def demo():
+    app_path = getcwd()
+    if app_path.endswith("mining"):
+        app_path = join(app_path, "app")
+    with open(join(app_path, "resources", "example.json"), "r") as f:
+        return json.loads(f.read())
 
 
 if __name__ == "__main__":

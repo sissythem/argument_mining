@@ -26,16 +26,18 @@ RUN cd /opt && \
     cd /opt && \
     svn checkout svn://svn.code.sf.net/p/ellogon/code/runtime Ellogon --quiet
 
+RUN cd /app
+
 # Copy the application
 ARG RELEASE=main
 
 RUN git clone --branch $RELEASE --single-branch https://docker:EMtm3PdDnpx8CX8wGs2q@gitlab.com/debatelab/argument-mining.git
-RUN rm -rf ./argument-mining/.git/
-RUN rm -rf ./argument-mining/docs/
-RUN python3 -m pip install -r ./argument-mining/requirements.txt
+RUN rm -rf /app/argument-mining/.git/
+RUN rm -rf /app/argument-mining/docs/
+RUN python3 -m pip install -r /app/argument-mining/requirements.txt
 
 EXPOSE 80
-WORKDIR ./argument-mining/app
+WORKDIR /app/argument-mining/app
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
 # CMD tail -f /dev/null
