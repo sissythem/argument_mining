@@ -6,7 +6,7 @@ import pandas as pd
 
 from src.pipeline.debatelab import DebateLab
 from src.training.models import SequentialModel, ClassificationModel
-from src.training.preprocessing import ClarinLoader, CsvCreator
+from src.training.preprocessing import ClarinLoader, EssayLoader, CsvCreator
 from src.utils.config import AppConfig, Notification
 
 
@@ -50,13 +50,18 @@ def preprocess(app_config):
         app_config (AppConfig): the application configuration
     """
     logger = app_config.app_logger
-    clarin_loader = ClarinLoader(app_config=app_config)
+    dataset = app_config.properties["prep"]["dataset"]
+    if dataset == "kasteli":
+        clarin_loader = ClarinLoader(app_config=app_config)
+        clarin_loader.load()
+    elif dataset == "essays":
+        essays_loader = EssayLoader(app_config=app_config)
+        essays_loader.load()
     csv_loader = CsvCreator(app_config=app_config)
-    clarin_loader.load()
     logger.info("Creating CSV file in CONLL format for ADUs classification")
-    csv_loader.load_adus()
+    csv_loader.load_adus(folder=dataset)
     logger.info("Creating CSV file in CONLL format for relations/stance classification")
-    csv_loader.load_relations_and_stance()
+    csv_loader.load_relations_and_stance(folder=dataset)
     logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
     # csv_loader.load_similarities()
 

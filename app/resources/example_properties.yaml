@@ -29,6 +29,7 @@ config:
       key_path: "/path/to/key"
 tasks: [ "prep", "train", "eval" ]
 prep:
+  dataset: "kasteli" # options: kasteli, essays
   oversampling:
     # if you do not want oversampling just set it to false and remove the config of the models
     # if you want only some models just add only those models and remove the remaining

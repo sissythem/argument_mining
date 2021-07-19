@@ -1,6 +1,8 @@
+import hashlib
 import json
 import pickle
 import random
+from os import listdir
 from os.path import join, exists
 from typing import List, Dict, AnyStr, Union, Tuple
 from flair.data import Sentence
@@ -132,11 +134,11 @@ class CsvCreator:
         if self.oversampling_prop is not None and self.oversampling_prop and type(self.oversampling_prop) == dict:
             self.upsampling = DataUpSampler(app_config=app_config)
 
-    def load_adus(self):
+    def load_adus(self, folder="kasteli"):
         self.app_logger.debug("Running ADU preprocessing")
         out_file_path = join(self.app_config.dataset_folder, "adu", "train.csv")
         if not exists(out_file_path):
-            documents_path = join(self.app_config.dataset_folder, "initial", self.pickle_file)
+            documents_path = join(self.app_config.dataset_folder, "initial", folder, self.pickle_file)
             self.app_logger.debug("Loading documents from pickle file")
             with open(documents_path, "rb") as f:
                 documents = pickle.load(f)
@@ -191,8 +193,8 @@ class CsvCreator:
             # TODO if needed
             pass
 
-    def load_relations_and_stance(self):
-        relations, stances = self._get_relations()
+    def load_relations_and_stance(self, folder="kasteli"):
+        relations, stances = self._get_relations(folder=folder)
         self._save_rel_df(rel_list=relations, folder="rel", filename="train.csv")
         self._save_rel_df(rel_list=stances, folder="stance", filename="train.csv")
         if self.oversampling_prop:
@@ -203,8 +205,8 @@ class CsvCreator:
             if stance_num is not None and type(stance_num) == int:
                 self.upsampling.oversample(task_kind="stance", file_kind="train", total_num=stance_num)
 
-    def _get_relations(self):
-        documents_path = join(self.app_config.dataset_folder, "initial", self.pickle_file)
+    def _get_relations(self, folder):
+        documents_path = join(self.app_config.dataset_folder, "initial", folder, self.pickle_file)
         self.app_logger.debug("Loading documents from pickle file")
         with open(documents_path, "rb") as f:
             documents = pickle.load(f)
@@ -386,9 +388,10 @@ class Document:
 
 class ClarinLoader:
 
-    def __init__(self, app_config: AppConfig, json_file="kasteli.json", pickle_file="documents.pkl"):
+    def __init__(self, app_config: AppConfig, folder="kasteli", json_file="kasteli.json", pickle_file="documents.pkl"):
         self.app_config: AppConfig = app_config
         self.app_logger = self.app_config.app_logger
+        self.dataset_path = join(self.app_config.dataset_folder, "initial", folder)
         self.json_file = json_file
         self.pickle_file = pickle_file
 
@@ -399,11 +402,11 @@ class ClarinLoader:
         Returns
             | list: the loaded documents
         """
-        path_to_pickle = join(self.app_config.dataset_folder, "initial", self.pickle_file)
+        path_to_pickle = join(self.dataset_path, self.pickle_file)
         if exists(path_to_pickle):
             with open(path_to_pickle, "rb") as f:
                 return pickle.load(f)
-        path_to_data = join(self.app_config.dataset_folder, "initial", self.json_file)
+        path_to_data = join(self.dataset_path, self.json_file)
         with open(path_to_data, "r") as f:
             content = json.loads(f.read())
         documents = content["data"]["documents"]
@@ -411,7 +414,7 @@ class ClarinLoader:
         for doc in documents:
             document = self.create_document(doc=doc)
             docs.append(document)
-        with open(join(self.app_config.dataset_folder, "initial", self.pickle_file), "wb") as f:
+        with open(join(self.dataset_path, self.pickle_file), "wb") as f:
             pickle.dump(docs, f)
         return docs
 
@@ -490,6 +493,175 @@ class ClarinLoader:
             return None
         return Relation(relation_id=annotation_id, document_id=document_id, arg1=arg1,
                         arg2=arg2, kind=kind, relation_type=relation_type)
+
+
+class EssayLoader:
+
+    def __init__(self, app_config: AppConfig, pickle_file="documents.pkl"):
+        self.app_config: AppConfig = app_config
+        self.app_logger = self.app_config.app_logger
+        self.dataset_path = join(self.app_config.dataset_folder, "initial", "essays")
+        self.eng_data_path = join(self.dataset_path, "english")
+        self.gr_data_path = join(self.dataset_path, "greek")
+        self.pickle_file = pickle_file
+
+    def load(self):
+        path_to_pickle = join(self.dataset_path, self.pickle_file)
+        if exists(path_to_pickle):
+            with open(path_to_pickle, "rb") as f:
+                return pickle.load(f)
+        eng_data = self.get_json(path=self.eng_data_path)
+        gr_data = self.get_json(path=self.gr_data_path)
+        documents = {**eng_data, **gr_data}
+        docs = []
+        for key, doc in documents.items():
+            document = self.create_document(doc=doc, name=key)
+            docs.append(document)
+        with open(join(self.dataset_path, self.pickle_file), "wb") as f:
+            pickle.dump(docs, f)
+        return docs
+
+    def create_document(self, doc: Dict, name: AnyStr):
+        """
+        Process a document dict into a Document object
+
+        Args
+            | doc (dict): the document data
+
+        Returns
+            | Document: a Document object
+        """
+        document = Document(logger=self.app_logger, document_id=doc["id"], name=name, content=doc["content"],
+                            annotations=doc["annotations"])
+        document.sentences = utils.tokenize(text=document.content)
+        self.app_logger.debug(f"Processing document with id {document.document_id}")
+        adus = document.annotations["ADUs"]
+        relations = document.annotations["Relations"]
+        major_claim_id = -1
+        for adu in adus:
+            segment_id = adu["id"]
+            segment_type = adu["type"]
+            if segment_type == "MajorClaim":
+                major_claim_id = segment_id
+            if segment_type == "MajorClaim":
+                segment_type = "major_claim"
+            elif segment_type == "Claim":
+                segment_type = "claim"
+            else:
+                segment_type = "premise"
+            starts = adu["starts"]
+            ends = adu["ends"]
+            segment = adu["segment"]
+            segment = self.create_segment(document_id=doc["id"], segment_id=segment_id, segment_type=segment_type,
+                                          starts=starts, ends=ends, text=segment)
+            if segment:
+                document.segments.append(segment)
+        for relation in relations:
+            if not relation:
+                continue
+            rel_type = relation["type"]
+            rel_type = "support" if rel_type == "supports" else "attack"
+            rel = self.create_relation(segments=document.segments, relation_id=relation["id"], rel_type=rel_type,
+                                       kind="relation", document_id=document.document_id, arg1_id=relation["arg1"],
+                                       arg2_id=relation["arg2"])
+            if rel:
+                document.relations.append(rel)
+        rel_counter = int(document.relations[-1].relation_id.replace("R", ""))
+        for adu in adus:
+            if "stance" not in adu.keys() or not adu["stance"]:
+                continue
+            stance = adu["stance"][0]
+            stance_type = "for" if stance["type"] == "For" else "against"
+            rel_type = "support" if stance_type == "for" else "attack"
+            st = self.create_relation(segments=document.segments, relation_id=stance["id"], rel_type=stance_type,
+                                      kind="stance", document_id=document.document_id, arg1_id=adu["id"],
+                                      arg2_id=major_claim_id)
+            rel_counter += 1
+            rel = self.create_relation(segments=document.segments, relation_id=rel_counter, rel_type=rel_type,
+                                       kind="relation", document_id=document.document_id, arg1_id=adu["id"],
+                                       arg2_id=major_claim_id)
+            if st:
+                document.stance.append(st)
+            if rel:
+                document.relations.append(rel)
+        document.segments.sort(key=lambda x: x.char_start)
+        document.update_segments()
+        document.segments.sort(key=lambda x: x.char_start)
+        return document
+
+    @staticmethod
+    def create_segment(document_id, segment_id, segment_type, starts, ends, text):
+        if not text or text == "nan" or type(text) == float:
+            return None
+        segment = Segment(segment_id=segment_id, document_id=document_id, text=text,
+                          char_start=starts, char_end=ends, arg_type=segment_type)
+        segment.sentences = utils.tokenize(text=segment.text)
+        segment.sentences, segment.sentences_labels = utils.bio_tagging(sentences=segment.sentences,
+                                                                        label=segment.arg_type)
+        return segment
+
+    @staticmethod
+    def create_relation(segments, relation_id, rel_type, kind, document_id, arg1_id, arg2_id):
+        arg1, arg2 = None, None
+        for seg in segments:
+            if seg.segment_id == arg1_id:
+                arg1 = seg
+            elif seg.segment_id == arg2_id:
+                arg2 = seg
+        if arg1 is None or arg2 is None:
+            return None
+        return Relation(relation_id=relation_id, document_id=document_id, arg1=arg1, arg2=arg2, kind=kind,
+                        relation_type=rel_type)
+
+    def get_json(self, path):
+        files = listdir(path)
+        processed_files = {}
+        if files:
+            for file in files:
+                if file.endswith(".txt") or file.endswith(".ann"):
+                    filename = file.split(".")[0]
+                    # if filename does not already exists in the processed_files dict
+                    # add fields
+                    if filename not in processed_files.keys():
+                        hash_id = hashlib.md5(filename.encode())
+                        processed_files[filename] = {"id": hash_id.hexdigest(), "link": "", "description": "",
+                                                     "date": "",
+                                                     "tags": [], "publishedAt": "", "crawledAt": "", "domain": "",
+                                                     "netloc": ""}
+                    # add content and title
+                    if file.endswith(".txt"):
+                        with open(join(path, file), "r") as f:
+                            lines = f.readlines()
+                            lines = [line for line in lines if line and line != "\n"]
+                        processed_files[filename]["content"] = " ".join(lines)
+                    elif file.endswith(".ann"):
+                        df = pd.read_csv(join(path, file), index_col=None, header=None, sep="\t")
+                        data = self.process_df(df)
+                        processed_files[filename]["annotations"] = data
+                        processed_files[filename]["annotations"]["document_link"] = ""
+        return processed_files
+
+    @staticmethod
+    def process_df(df):
+        data = {"ADUs": [], "Relations": []}
+        for index, row in df.iterrows():
+            if row[0].startswith("T"):
+                adu_type = row[1].split(" ")
+                adu = {"id": row[0], "type": adu_type[0], "starts": adu_type[1], "ends": adu_type[2], "segment": row[2]}
+                data["ADUs"].append(adu)
+            elif row[0].startswith("R"):
+                rel_type = row[1].split(" ")
+                data["Relations"].append({"id": row[0], "type": rel_type[0], "arg1": rel_type[1].split(":")[1],
+                                          "arg2": rel_type[2].split(":")[1]})
+            else:  # stance
+                rel = row[1].split(" ")
+                if data["ADUs"]:
+                    for adu in data["ADUs"]:
+                        if adu["id"] == rel[1]:
+                            if "stance" not in adu.keys():
+                                adu["stance"] = []
+                            adu["stance"].append({"id": row[0], "type": rel[2]})
+        return data
 
 
 class CustomSentence(Sentence):

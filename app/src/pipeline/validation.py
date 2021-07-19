@@ -9,7 +9,7 @@ from genson import SchemaBuilder
 from src.utils.config import AppConfig
 
 
-class ValidationError(Enum):
+class ValidationError(str, Enum):
     """
     Possible validation errors in the produced json
     """
