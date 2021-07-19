@@ -3,10 +3,13 @@ FROM tiangolo/uvicorn-gunicorn-fastapi
 RUN apt-get update && apt-get install -y build-essential unzip vim git curl wget \
                                         subversion tcl8.6 tcllib  tcl-tls  tcl-trf \
                                         tcl-udp tcl-vfs  tdom  tcl-tclex tcl-memchan \
-                                        tcl-combat tcl-signal tcl-sugar libpgtcl \
+                                        itcl3 tcl-signal tcl-sugar libpgtcl \
                                         libsqlite-tcl mysqltcl tcl8.6-tdbc \
                                         tcl8.6-tdbc-mysql tcl8.6-tdbc-postgres \
                                         tcl8.6-tdbc-sqlite3 critcl
+
+RUN wget http://ports.ubuntu.com/pool/universe/c/combat/tcl-combat_0.8.1-1_all.deb
+RUN dpkg -i tcl-combat_0.8.1-1_all.deb
 
 # Compile & install rl_json library
 RUN cd && \
