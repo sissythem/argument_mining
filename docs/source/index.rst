@@ -15,6 +15,7 @@ Welcome to DebateLab Argument Mining's documentation!
    :caption: Contents:
 
    main
+   properties
    utils
    training
    pipeline
