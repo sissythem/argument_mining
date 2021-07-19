@@ -1,6 +1,27 @@
 FROM tiangolo/uvicorn-gunicorn-fastapi
 
-RUN apt-get update && apt-get install -y build-essential unzip vim git curl
+RUN apt-get update && apt-get install -y build-essential unzip vim git curl wget \
+                                        subversion tcl8.6 tcllib  tcl-tls  tcl-trf \
+                                        tcl-udp tcl-vfs  tdom  tcl-tclex tcl-memchan \
+                                        tcl-combat tcl-signal tcl-sugar libpgtcl \
+                                        libsqlite-tcl mysqltcl tcl8.6-tdbc \
+                                        tcl8.6-tdbc-mysql tcl8.6-tdbc-postgres \
+                                        tcl8.6-tdbc-sqlite3 critcl
+
+# Compile & install rl_json library
+RUN cd && \
+    git clone https://github.com/RubyLane/rl_json.git && \
+    cd rl_json && \
+    ./configure && \
+    make install && \
+    rm -rf ~/rl_json
+
+# Ellogon install (to test run: tclsh /opt/Ellogon/ellogon)
+RUN cd /opt && \
+    mkdir Ellogon && \
+    chown -R root:root Ellogon && \
+    cd /opt && \
+    svn checkout svn://svn.code.sf.net/p/ellogon/code/runtime Ellogon --quiet
 
 # Copy the application
 ARG RELEASE=main
