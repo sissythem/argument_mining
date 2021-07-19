@@ -35,7 +35,7 @@ build_latest:
     - docker login registry.gitlab.com -u docker -p PGAveGZ3yR7myXwZuZZe
     - cd container
   script:
-    - docker build -t registry.gitlab.com/debetelab/argument-mining:latest .
-    - docker push registry.gitlab.com/debetelab/argument-mining:latest
+    - docker build -t registry.gitlab.com/debatelab/argument-mining:latest .
+    - docker push registry.gitlab.com/debatelab/argument-mining:latest
   only:
     - main
