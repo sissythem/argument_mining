@@ -32,7 +32,7 @@ build_latest:
   image: docker:latest
   stage: build
   before_script:
-    - docker login registry.gitlab.com -u docker -p EMtm3PdDnpx8CX8wGs2q
+    - docker login registry.gitlab.com -u docker -p PGAveGZ3yR7myXwZuZZe
     - cd container
   script:
     - docker build -t registry.gitlab.com/debetelab/argument-mining:latest .

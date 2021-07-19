@@ -31,7 +31,7 @@ RUN cd /app
 # Copy the application
 ARG RELEASE=main
 
-RUN git clone --branch $RELEASE --single-branch https://docker:EMtm3PdDnpx8CX8wGs2q@gitlab.com/debatelab/argument-mining.git
+RUN git clone --branch $RELEASE --single-branch https://docker:PGAveGZ3yR7myXwZuZZe@gitlab.com/debatelab/argument-mining.git
 RUN rm -rf /app/argument-mining/.git/
 RUN rm -rf /app/argument-mining/docs/
 RUN python3 -m pip install -r /app/argument-mining/requirements.txt
