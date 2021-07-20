@@ -708,6 +708,17 @@ class DatasetSplitter:
         self.stance_folder = join(self.app_config.dataset_folder, "stance")
 
     def split(self):
+        adu_files = listdir(self.adu_folder)
+        if len(adu_files) < 3:
+            self.split_adu()
+        rel_files = listdir(self.rel_folder)
+        if len(rel_files) < 3:
+            self.split_rel()
+        stance_files = listdir(self.stance_folder)
+        if len(stance_files) < 3:
+            self.split_stance()
+
+    def split_adu(self):
         adu_df = pd.read_csv(join(self.adu_folder, "train.csv"), sep="\t", index_col=None, header=None,
                              encoding="utf-8", skip_blank_lines=False)
         adu_df.columns = ["token", "label", "binary", "num", "sentence", "doc"]
@@ -716,18 +727,22 @@ class DatasetSplitter:
         self.write_csv(df=train_df, task="adu", kind="train")
         self.write_csv(df=dev_df, task="adu", kind="dev")
         self.write_csv(df=test_df, task="adu", kind="test")
+
+    def split_rel(self):
         rel_df = pd.read_csv(join(self.rel_folder, "train.csv"), sep="\t", index_col=None, header=0,
                              encoding="utf-8")
         rel_df.columns = ["sentence", "label", "pair"]
         rel_df = rel_df.drop(columns=["pair"])
-        stance_df = pd.read_csv(join(self.stance_folder, "train.csv"), sep="\t", index_col=None, header=0,
-                                encoding="utf-8")
-        stance_df.columns = ["sentence", "label", "pair"]
-        stance_df = stance_df.drop(columns=["pair"])
         train_df, dev_df, test_df = self._split_single_line_instance_dataset(df=rel_df)
         self.write_csv(df=train_df, task="rel", kind="train")
         self.write_csv(df=dev_df, task="rel", kind="dev")
         self.write_csv(df=test_df, task="rel", kind="test")
+
+    def split_stance(self):
+        stance_df = pd.read_csv(join(self.stance_folder, "train.csv"), sep="\t", index_col=None, header=0,
+                                encoding="utf-8")
+        stance_df.columns = ["sentence", "label", "pair"]
+        stance_df = stance_df.drop(columns=["pair"])
         train_df, dev_df, test_df = self._split_single_line_instance_dataset(df=stance_df)
         self.write_csv(df=train_df, task="stance", kind="train")
         self.write_csv(df=dev_df, task="stance", kind="dev")
