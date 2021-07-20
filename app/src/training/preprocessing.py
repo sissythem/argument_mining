@@ -709,8 +709,13 @@ class DatasetSplitter:
 
     def split(self):
         adu_df = pd.read_csv(join(self.adu_folder, "train.csv"), sep="\t", index_col=None, header=None,
-                             encoding="utf-8")
-        self._split_token_level_dataset(df=adu_df)
+                             encoding="utf-8", skip_blank_lines=False)
+        adu_df.columns = ["token", "label", "binary", "num", "sentence", "doc"]
+        adu_df.drop(columns=["binary", "num", "sentence", "doc"])
+        train_df, dev_df, test_df = self._split_token_level_dataset(df=adu_df)
+        self.write_csv(df=train_df, task="adu", kind="train")
+        self.write_csv(df=dev_df, task="adu", kind="dev")
+        self.write_csv(df=test_df, task="adu", kind="test")
         rel_df = pd.read_csv(join(self.rel_folder, "train.csv"), sep="\t", index_col=None, header=0,
                              encoding="utf-8")
         rel_df.columns = ["sentence", "label", "pair"]
@@ -729,7 +734,26 @@ class DatasetSplitter:
         self.write_csv(df=test_df, task="stance", kind="test")
 
     def _split_token_level_dataset(self, df):
-        pass
+        new_df = self._keep_only_sentence_start(df=df)
+        train_df, dev_df, test_df = self._split_single_line_instance_dataset(df=new_df)
+        train_df = self._get_all_sentences_df(df=train_df, initial_df=df)
+        dev_df = self._get_all_sentences_df(df=dev_df, initial_df=df)
+        test_df = self._get_all_sentences_df(df=test_df, initial_df=df)
+        return train_df, dev_df, test_df
+
+    def _keep_only_sentence_start(self, df):
+        indices = []
+        labels = []
+        for idx, row in df.iterrows():
+            if idx == 0:
+                indices.append(idx)
+                labels.append(row["label"])
+            elif df.iloc[idx - 1].isnull().values.all():
+                indices.append(idx)
+                labels.append(row["label"])
+        data = {"idx": indices, "label": labels}
+        new_df = pd.DataFrame(data, columns=["idx", "label"])
+        return new_df
 
     def _split_single_line_instance_dataset(self, df):
         dev_size = self.split_properties["dev"]
@@ -743,6 +767,22 @@ class DatasetSplitter:
         dev_df = df.loc[x_valid.index]
         test_df = df.loc[x_test.index]
         return train_df, dev_df, test_df
+
+    def _get_all_sentences_df(self, df, initial_df):
+        indices = []
+        for i, row in df.iterrows():
+            idx = row["idx"]
+            indices += self._find_sentence_indices(df=initial_df, start_idx=idx)
+        return initial_df.loc[indices]
+
+    def _find_sentence_indices(self, df, start_idx):
+        temp_df = df.loc[start_idx:]
+        indices = [start_idx]
+        for idx, row in temp_df.iterrows():
+            indices.append(idx)
+            if df.iloc[idx].isnull().values.all():
+                break
+        return indices
 
     def write_csv(self, df, task, kind):
         path = join(self.app_config.dataset_folder, task)
