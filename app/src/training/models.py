@@ -180,9 +180,8 @@ class SequentialModel(SupervisedModel):
     def get_corpus(self) -> Corpus:
         columns = {0: 'text', 1: self.tag_type}
         # TODO rename test & dev datasets
-        corpus: Corpus = ColumnCorpus(self.data_folder, columns, train_file="train_oversample.csv",
-                                      test_file="train_oversample.csv",
-                                      dev_file="train_oversample.csv")
+        corpus: Corpus = ColumnCorpus(self.data_folder, columns, train_file="train.csv", test_file="train.csv",
+                                      dev_file="train.csv")
         return corpus
 
     def get_dictionary(self, corpus: Corpus) -> Dictionary:
@@ -226,8 +225,8 @@ class ClassificationModel(SupervisedModel):
         # create Corpus
         # TODO rename test & dev datasets
         corpus: Corpus = CSVClassificationCorpus(data_folder=self.data_folder, column_name_map=column_name_map,
-                                                 skip_header=True, delimiter="\t", train_file="train_oversample.csv",
-                                                 test_file="train_oversample.csv", dev_file="train_oversample.csv")
+                                                 skip_header=True, delimiter="\t", train_file="train.csv",
+                                                 test_file="train.csv", dev_file="train.csv")
         return corpus
 
     def get_dictionary(self, corpus: Corpus) -> Dictionary:

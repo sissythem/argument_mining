@@ -30,6 +30,9 @@ config:
 tasks: [ "prep", "train", "eval" ]
 prep:
   dataset: "kasteli" # options: kasteli, essays
+  split:
+    dev: 0.1
+    test: 0.1
   oversampling:
     # if you do not want oversampling just set it to false and remove the config of the models
     # if you want only some models just add only those models and remove the remaining
@@ -56,7 +59,7 @@ eval:
     password: "debateLabPassw0rd"
 seq_model:
   bert_kind:
-    adu: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb
+    adu: "xlm-roberta-base"
   hidden_size: 256
   rnn_layers: 2
   dropout: 0.5
@@ -73,9 +76,9 @@ seq_model:
   shuffle: False
 class_model:
   bert_kind:
-    rel: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb, base-multi
-    stance: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb, base-multi
-    sim: "nlpaueb/bert-base-greek-uncased-v1" # base, nli, aueb, base-multi, multi-nli
+    rel: "xlm-roberta-base"
+    stance: "clm-roberta-base"
+    sim: "nlpaueb/bert-base-greek-uncased-v1"
   hidden_size: 256
   layers: 2
   use_crf: False
@@ -91,8 +94,8 @@ class_model:
   shuffle: False
 clustering:
   n_clusters: 10
-  algorithm: "agglomerative" # options: kmeans, agglomerative, hdbscan
-  bert_kind: "nlpaueb/bert-base-greek-uncased-v1" # options: aueb, base-multi, fasttext, tfidf
+  algorithm: "agglomerative" # options: agglomerative, hdbscan
+  bert_kind: "xlm-roberta-base"
 alignment:
   teacher_model: bert-base-uncased
   student_model: bert-base-multilingual-uncased

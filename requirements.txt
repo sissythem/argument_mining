@@ -16,7 +16,9 @@ tensorboard==2.4.1
 matplotlib==3.4.1
 seaborn==0.11.1
 genson==1.2.2
-flair==0.7
+flair==0.8
 imbalanced-learn==0.8.0
 umap-learn==0.5.1
 hdbscan==0.8.26
+ipython==7.25.0
+fast-ml==3.68

@@ -6,7 +6,7 @@ import pandas as pd
 
 from src.pipeline.debatelab import DebateLab
 from src.training.models import SequentialModel, ClassificationModel
-from src.training.preprocessing import ClarinLoader, EssayLoader, CsvCreator
+from src.training.preprocessing import DataPreprocessor
 from src.utils.config import AppConfig, Notification
 
 
@@ -42,30 +42,6 @@ def error_analysis(path_to_resources):
         f.writelines(error_sentences)
 
 
-def preprocess(app_config):
-    """
-    Preprocess the data into CONLL format
-
-    Args
-        app_config (AppConfig): the application configuration
-    """
-    logger = app_config.app_logger
-    dataset = app_config.properties["prep"]["dataset"]
-    if dataset == "kasteli":
-        clarin_loader = ClarinLoader(app_config=app_config)
-        clarin_loader.load()
-    elif dataset == "essays":
-        essays_loader = EssayLoader(app_config=app_config)
-        essays_loader.load()
-    csv_loader = CsvCreator(app_config=app_config)
-    logger.info("Creating CSV file in CONLL format for ADUs classification")
-    csv_loader.load_adus(folder=dataset)
-    logger.info("Creating CSV file in CONLL format for relations/stance classification")
-    csv_loader.load_relations_and_stance(folder=dataset)
-    logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
-    # csv_loader.load_similarities()
-
-
 def train(app_config):
     """
     Train the selected models. In the application properties, the models to be trained are indicated.
@@ -97,17 +73,6 @@ def train(app_config):
         logger.info("Finished training similarity model")
 
 
-def evaluate(app_config):
-    """
-    Execute the DebateLab pipeline
-
-    Args
-        app_config (AppConfig): the application configuration
-    """
-    arg_mining = DebateLab(app_config=app_config)
-    arg_mining.run_pipeline()
-
-
 def main():
     """
     The main function of the program. Initializes the AppConfig class to load the application properties and
@@ -120,11 +85,13 @@ def main():
         properties = app_config.properties
         tasks = properties["tasks"]
         if "prep" in tasks:
-            preprocess(app_config=app_config)
+            data_preprocessor = DataPreprocessor(app_config=app_config)
+            data_preprocessor.preprocess()
         if "train" in tasks:
             train(app_config=app_config)
         if "eval" in properties["tasks"]:
-            evaluate(app_config=app_config)
+            arg_mining = DebateLab(app_config=app_config)
+            arg_mining.run_pipeline()
         if "error" in properties["tasks"]:
             error_analysis(path_to_resources=app_config.resources_path)
         notification.send_email(body="Argument mining pipeline finished successfully",
