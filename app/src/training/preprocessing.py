@@ -777,7 +777,7 @@ class DatasetSplitter:
 
     def _find_sentence_indices(self, df, start_idx):
         temp_df = df.loc[start_idx:]
-        indices = [start_idx]
+        indices = []
         for idx, row in temp_df.iterrows():
             indices.append(idx)
             if df.iloc[idx].isnull().values.all():
