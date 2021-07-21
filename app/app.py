@@ -50,9 +50,14 @@ async def startup_event():
 def hello_world():
     return 'Hello World!'
 
-
 @app.post('/predict')
 def predict(pipeline_request: PipelineRequest):
+    with open(join(config.resources_path, "example.json"), "r") as f:
+        return json.loads(f.read())
+
+
+@app.post('/pipeline')
+def pipeline(pipeline_request: PipelineRequest):
     links = pipeline_request.links
     if not links:
         raise HTTPException(status_code=500, detail="Missing URLs in request body for downloading")
