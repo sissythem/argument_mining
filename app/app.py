@@ -17,7 +17,7 @@ from src.pipeline.validation import JsonValidator
 app = FastAPI()
 config = AppConfig()
 logger = config.app_logger
-crawler_url = "http://localhost:8000/donwload/"
+crawler_url = config.properties["eval"]["crawler_endpoint"]
 
 
 class PipelineRequest(BaseModel):
@@ -59,12 +59,17 @@ def predict(pipeline_request: PipelineRequest):
     if type(links) == str or type(links) == bytes:
         links = [links]
     links = [link.decode('utf8') if type(link) == bytes else link for link in links]
+    link = links[0]
+    data = {
+        "spider_name": "article", "request": {
+            "url": link}
+    }
     try:
-        response = requests.post(url=crawler_url, json={"links": links})
+        response = requests.post(url=crawler_url, json=data)
         if response.status_code != 200:
-            return demo()
-    except(BaseException, Exception):
-        return demo()
+            raise HTTPException(status_code=500, detail=f"Could not retrieve article: {response.text}")
+    except(BaseException, Exception) as e:
+        raise HTTPException(status_code=500, detail=f"Could not retrieve article: {e}")
     document = json.loads(response.text)
     debatelab = DebateLab(app_config=config)
     validator = JsonValidator(app_config=config)
@@ -77,14 +82,6 @@ def predict(pipeline_request: PipelineRequest):
     else:
         raise ValidationException(message="ADU & relation predictions did not pass validation", document=document,
                                   validation_errors=validation_errors)
-
-
-def demo():
-    app_path = getcwd()
-    if app_path.endswith("mining"):
-        app_path = join(app_path, "app")
-    with open(join(app_path, "resources", "example.json"), "r") as f:
-        return json.loads(f.read())
 
 
 if __name__ == "__main__":
