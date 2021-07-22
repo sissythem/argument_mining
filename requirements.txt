@@ -22,3 +22,4 @@ umap-learn==0.5.1
 hdbscan==0.8.26
 ipython==7.25.0
 fast-ml==3.68
+sentence-transformers
