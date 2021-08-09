@@ -1,6 +1,4 @@
 import json
-from os import getcwd
-from os.path import join
 from typing import AnyStr, Dict, List, Union
 
 import requests
@@ -10,14 +8,15 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.utils.config import AppConfig
 from src.pipeline.debatelab import DebateLab
 from src.pipeline.validation import JsonValidator
+from src.utils.config import AppConfig
 
 app = FastAPI()
 config = AppConfig()
 logger = config.app_logger
 crawler_url = config.properties["eval"]["crawler_endpoint"]
+debatelab = DebateLab(app_config=config)
 
 
 class PipelineRequest(BaseModel):
@@ -42,7 +41,6 @@ async def validation_exception_handler(request: Request, exc: ValidationExceptio
 
 @app.on_event("startup")
 async def startup_event():
-    # TODO train
     pass
 
 
@@ -50,14 +48,9 @@ async def startup_event():
 def hello_world():
     return 'Hello World!'
 
+
 @app.post('/predict')
 def predict(pipeline_request: PipelineRequest):
-    with open(join(config.resources_path, "example.json"), "r") as f:
-        return json.loads(f.read())
-
-
-@app.post('/pipeline')
-def pipeline(pipeline_request: PipelineRequest):
     links = pipeline_request.links
     if not links:
         raise HTTPException(status_code=500, detail="Missing URLs in request body for downloading")
@@ -76,7 +69,6 @@ def pipeline(pipeline_request: PipelineRequest):
     except(BaseException, Exception) as e:
         raise HTTPException(status_code=500, detail=f"Could not retrieve article: {e}")
     document = json.loads(response.text)
-    debatelab = DebateLab(app_config=config)
     validator = JsonValidator(app_config=config)
     document, segment_counter, rel_counter, stance_counter = debatelab.predict(document=document)
     counters = {"adu": segment_counter, "rel": rel_counter, "stance": stance_counter}

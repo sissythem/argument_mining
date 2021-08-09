@@ -31,6 +31,7 @@ from sentence_transformers.datasets import ParallelSentencesDataset
 from torch.utils.data import DataLoader
 from src.utils.config import AppConfig
 from src.utils import utils
+from itertools import combinations
 
 
 class Model:
@@ -124,7 +125,7 @@ class SupervisedModel(Model):
     def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:
         raise NotImplementedError
 
-    def load(self):
+    def load(self, model_path=None):
         """
         Define the way to load the trained model
         """
@@ -204,11 +205,12 @@ class SequentialModel(SupervisedModel):
                                                 rnn_layers=self.rnn_layers)
         return tagger
 
-    def load(self):
+    def load(self, model_path=None):
         """
         Define the way to load the trained model
         """
-        model_path = join(self.base_path, self.model_file)
+        if not model_path:
+            model_path = join(self.base_path, self.model_file)
         self.app_logger.info(f"Loading model from path: {model_path}")
         self.model = SequenceTagger.load(model_path)
 
@@ -242,11 +244,12 @@ class ClassificationModel(SupervisedModel):
                                     multi_label=dictionary.multi_label)
         return classifier
 
-    def load(self):
+    def load(self, model_path=None):
         """
         Define the way to load the trained model
         """
-        model_path = join(self.base_path, self.model_file)
+        if not model_path:
+            model_path = join(self.base_path, self.model_file)
         self.app_logger.info(f"Loading model from path: {model_path}")
         self.model = TextClassifier.load(model_path)
 
@@ -267,6 +270,7 @@ class Clustering(UnsupervisedModel):
         super(Clustering, self).__init__(app_config=app_config, model_name=model_name)
         self.n_clusters = self.model_properties["n_clusters"]
         self.document_embeddings = TransformerDocumentEmbeddings(self.transformer_name)
+        self.document_embeddings.tokenizer.model_max_length = 512
 
     def get_embeddings(self, sentences):
         sentence_embeddings = []
@@ -333,27 +337,37 @@ class CustomAgglomerative(Clustering):
         self.app_logger.info(f"Finished clustering with {len(data_pairs)} of pairs")
         return data_pairs
 
-    def _agglomerative_clustering(self, sentences, embeddings, docs_ids, sentences_ids):
+    def _agglomerative_clustering(self, sentences: List[AnyStr], embeddings, docs_ids: List[AnyStr],
+                                  sentences_ids: List[AnyStr]):
         sims = cosine_similarity(embeddings)
+        mask = np.zeros(sims.shape, dtype=bool)
         # purge diagonal
         for k in range(len(sims)):
-            sims[k, k] = -1
+            mask[k, k] = True
         pairs = []
         simils = []
-        m = np.zeros(sims.shape, dtype=bool)
-        while False in m:
+
+        # disable pairs from the same doc
+        for doc in set(docs_ids):
+            idx = [i for i in range(len(docs_ids)) if docs_ids[i] == doc]
+            for i, j in combinations(idx, 2):
+                mask[i, j] = mask[j, i] = True
+
+        while False in mask:
             # get max sim
-            a = np.ma.array(sims, mask=m)
+            a = np.ma.array(sims, mask=mask)
             idx = np.argmax(a)
             idxs = np.unravel_index(idx, sims.shape)
             row = idxs[0]
             if len(idxs) > 1:
                 col = idxs[1]
+                if docs_ids[row] == docs_ids[col]:
+                    raise ValueError("Found matching pairs with same docids!")
                 pairs.append((row, col))
                 simils.append(sims[row, col])
                 for x in (row, col):
-                    m[:, x] = True
-                    m[x, :] = True
+                    mask[:, x] = True
+                    mask[x, :] = True
 
         self.app_logger.info(f"Number of pairs: {len(pairs)}")
         self.app_logger.info(list(zip(pairs, simils)))

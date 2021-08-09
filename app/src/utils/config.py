@@ -168,23 +168,23 @@ class AppConfig:
             str: the path to the directory of the model
         """
         # Create a base path:
-        if base_name == "adu":
-            properties = self.properties["seq_model"]
-        else:
-            properties = self.properties["class_model"]
-        bert_kind = properties["bert_kind"][base_name].replace("/", "-")
-        embedding_names = f"bert-{bert_kind}"
-        layers = properties["rnn_layers"] if base_name == "adu" else properties["layers"]
-        base_path = f"{base_name}-" + '-'.join([
-            str(embedding_names),
-            'hs=' + str(properties["hidden_size"]),
-            'hl=' + str(layers),
-            'crf=' + str(properties["use_crf"]),
-            "optmizer=" + properties["optimizer"],
-            'lr=' + str(properties["learning_rate"]),
-            'bs=' + str(properties["mini_batch_size"])
-        ])
-        base_path = join(self.model_path, base_path)
+        # if base_name == "adu":
+        #     properties = self.properties["seq_model"]
+        # else:
+        #     properties = self.properties["class_model"]
+        # bert_kind = properties["bert_kind"][base_name].replace("/", "-")
+        # embedding_names = f"bert-{bert_kind}"
+        # layers = properties["rnn_layers"] if base_name == "adu" else properties["layers"]
+        # base_path = f"{base_name}-" + '-'.join([
+        #     str(embedding_names),
+        #     'hs=' + str(properties["hidden_size"]),
+        #     'hl=' + str(layers),
+        #     'crf=' + str(properties["use_crf"]),
+        #     "optmizer=" + properties["optimizer"],
+        #     'lr=' + str(properties["learning_rate"]),
+        #     'bs=' + str(properties["mini_batch_size"])
+        # ])
+        base_path = join(self.model_path, base_name)
         try:
             os.makedirs(base_path)
         except (OSError, Exception):
@@ -420,11 +420,11 @@ class ElasticSearchConfig:
             [t.close() for t in threading.enumerate() if t.__class__.__name__ == "Transport"]
             self.tunnel.stop()
 
-    def truncate_elasticsearch(self):
+    def truncate_elasticsearch(self, index):
         """
         Delete all entries in the elasticsearch
         """
-        Search(using=self.elasticsearch_client, index="httpresponses").query("match_all").delete()
+        Search(using=self.elasticsearch_client, index=index).query("match_all").delete()
 
     def retrieve_documents(self, previous_date=None, retrieve_kind="file"):
         if retrieve_kind == "file":

@@ -1,13 +1,8 @@
 # ----------- DO NOT MODIFY THIS FILE! Copy it and name it properties.yaml ---------------------------
 config:
-  email:
-    # if you do not want to configure your email you can just set email: False
-    sender: "example@gmail.com"
-    receiver: "example@gmail.com"
-    password: "password"
   elastic_save:
     username: "debatelab"
-    password: "password"
+    password: "SRr4TqV9rPjfzxUmYcjR4R92"
     host: "143.233.226.60"
     port: 9200
     connect: "key" # options: key, password
@@ -18,15 +13,15 @@ config:
       key_path: "/path/to/key"
   elastic_retrieve:
     username: "elastic"
-    password: "password"
+    password: "fafOwgabdow."
     host: "socialwebobservatory.iit.demokritos.gr"
     port: 9200
-    connect: "password" # options: password, key
+    connect: "password"
     ssh:
       port: 222
       username: "debatelab"
-      password: "password"
-      key_path: "/path/to/key"
+      password: "SciatnodricacyedweasdabTipeanmye43*@"
+      key_path: "/home/sthemeli/.ssh/id_rsa"
 tasks: [ "prep", "train", "eval" ]
 prep:
   dataset: "kasteli" # options: kasteli, essays
@@ -46,7 +41,7 @@ prep:
     rel: 8705
     stance: 289
 train:
-  models: [ "adu", "rel", "stance", "sim" ]
+  models: [ "adu", "rel", "stance" ]
 eval:
   model: "best" # options: best, final
   retrieve: "file" # options: file, date
