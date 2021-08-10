@@ -269,11 +269,11 @@ class ClarinLoader(DatasetLoader):
 
 class EssayLoader(DatasetLoader):
 
-    def __init__(self, app_config: AppConfig, pickle_file="documents.pkl"):
+    def __init__(self, app_config: AppConfig, pickle_file="documents.pkl", languages=("english", "greek")):
         super(EssayLoader, self).__init__(app_config=app_config)
         self.dataset_path = join(self.app_config.dataset_folder, "initial", "essays")
-        self.eng_data_path = join(self.dataset_path, "english")
-        self.gr_data_path = join(self.dataset_path, "greek")
+        self.language_paths = [join(self.dataset_path, language) for language in languages]
+        self.languages = languages
         self.pickle_file = pickle_file
 
     def load(self) -> List[Document]:
@@ -281,9 +281,10 @@ class EssayLoader(DatasetLoader):
         if exists(path_to_pickle):
             with open(path_to_pickle, "rb") as f:
                 return pickle.load(f)
-        eng_data = self.get_json(path=self.eng_data_path)
-        gr_data = self.get_json(path=self.gr_data_path)
-        documents = {**eng_data, **gr_data}
+        documents = {}
+        for language_path in self.language_paths:
+            data = self.get_json(path=language_path)
+            documents = {**documents, **data}
         docs = []
         for key, doc in documents.items():
             document = self.create_document(doc=doc, name=key)
@@ -812,10 +813,13 @@ class DataPreprocessor:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.prep_properties = app_config.properties["prep"]
+        self.languages = self.prep_properties.get("languages", ["english", "greek"])
         self.data_loader = ClarinLoader(app_config=app_config) if self.prep_properties["dataset"] == "kasteli" else \
-            EssayLoader(app_config=app_config)
+            EssayLoader(app_config=app_config, languages=self.languages)
         self.csv_creator = CsvCreator(app_config=app_config)
-        self.dataset_splitter = DatasetSplitter(app_config=app_config)
+        self.split_properties = self.prep_properties["split"]
+        if self.split_properties:
+            self.dataset_splitter = DatasetSplitter(app_config=app_config)
 
     def preprocess(self):
         dataset = self.prep_properties["dataset"]
@@ -828,4 +832,5 @@ class DataPreprocessor:
         # self.app_logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
         # csv_loader.load_similarities()
         self.app_logger.info("Splitting datasets into dev, train and test")
-        self.dataset_splitter.split()
+        if self.split_properties:
+            self.dataset_splitter.split()

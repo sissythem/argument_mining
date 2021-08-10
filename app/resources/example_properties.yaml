@@ -25,6 +25,7 @@ config:
 tasks: [ "prep", "train", "eval" ]
 prep:
   dataset: "kasteli" # options: kasteli, essays
+  languages: ["english", "greek"]
   split:
     dev: 0.1
     test: 0.1
