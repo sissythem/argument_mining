@@ -1,13 +1,11 @@
 import traceback
-from os.path import join
-
-import numpy as np
-import pandas as pd
 
 from src.pipeline.debatelab import DebateLab
 from src.training.models import SequentialModel, ClassificationModel
 from src.training.preprocessing import DataPreprocessor
-from src.utils.config import AppConfig, Notification
+from src.training_hf.hf_datasets import *
+from src.training_hf.models import *
+from src.utils.config import Notification
 
 
 def error_analysis(path_to_resources):
@@ -109,6 +107,14 @@ def main():
             app_config.app_logger.error("Could not close ssh tunnels")
             exit(-1)
 
+
+def main_huggingface():
+    app_config = AppConfig()
+    arg_mining_dataset = ArgMiningDataset(app_config=app_config)
+    arg_mining_model = TransformerModel(app_config=app_config)
+    tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id="xlm-roberta-base", seqlen=512)
+    arg_mining_model.train(model_id="xlm-roberta-base", tokenizer=tok, num_labels=num_labels, train_dset=train_dset,
+                           eval_dset=eval_dset, seqlen=512, batch_size=8, eval_step_period=10, lr=0.001)
 
 if __name__ == '__main__':
     main()
