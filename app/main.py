@@ -116,5 +116,7 @@ def main_huggingface():
     arg_mining_model.train(model_id="xlm-roberta-base", tokenizer=tok, num_labels=num_labels, train_dset=train_dset,
                            eval_dset=eval_dset, seqlen=512, batch_size=8, eval_step_period=10, lr=0.001)
 
+
 if __name__ == '__main__':
-    main()
+    # main()
+    main_huggingface()
