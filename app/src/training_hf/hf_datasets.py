@@ -7,6 +7,7 @@ from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer
 from src.utils.config import AppConfig
+from collections import Counter
 
 
 class MyDataset(Dataset):
@@ -47,10 +48,16 @@ class ArgMiningDataset:
             tokens, labels = v[0].values.tolist(), v[1].values
             nans = [i for i, x in enumerate(tokens) if x is np.nan]
             # add first and last indexes
-            nans = [0] + nans + [-1]
-            sentences = [tokens[nans[i] + 1:nans[i + 1]] for i in range(len(nans) - 1)]
-            labels = [labels[nans[i] + 1:nans[i + 1]] for i in range(len(nans) - 1)]
+            nans = [-1] + nans + [-1]
+            sentences = [tokens[nans[i]+1: nans[i + 1]] for i in range(len(nans) - 1)]
+            labels = [labels[nans[i]+1: nans[i + 1]] for i in range(len(nans) - 1)]
             data[k] = (sentences, labels)
+        if any(x is np.nan for l in labels for x in l):
+            print("NaN found in labels")
+            exit(1)
+        if any(x is np.nan for l in sentences for x in l):
+            print("NaN found in sentences")
+            exit(1)
         return data["train"], data["test"]
 
     @staticmethod
@@ -69,11 +76,16 @@ class ArgMiningDataset:
         return [tok(dat, is_split_into_words=True, return_tensors='pt', add_special_tokens=True, padding="max_length",
                     max_length=seqlen, truncation=True) for dat in data]
 
-    def load_data(self, model_id, seqlen):
+    def load_data(self, model_id, seqlen, limit_data=None):
         data_folder = join(self.app_config.dataset_folder, "adu")
         train, test = self.read_data(data_folder)
-        # train = train[0][:100], train[1][:100]
-        # test = test[0][:100], test[1][:100]
+        if limit_data is not None:
+            train = train[0][:limit_data], train[1][:limit_data]
+            test = test[0][:limit_data], test[1][:limit_data]
+        self.logger.info("Train label distribution")
+        self.logger.info(Counter(np.concatenate(train[1])).most_common())
+        self.logger.info("Train label distribution")
+        self.logger.info(Counter(np.concatenate(test[1])).most_common())
 
         # tokenization
         self.logger.info(f"Tokenizing with {model_id}")

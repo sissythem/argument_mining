@@ -27,7 +27,7 @@ class TransformerModel:
         return res
 
     def train(self, model_id, tokenizer, num_labels, train_dset, eval_dset, seqlen, batch_size,
-              eval_step_period, lr):
+              eval_step_period, lr, epochs):
         cfg = AutoConfig.from_pretrained(model_id, num_labels=num_labels)
         model = AutoModelForTokenClassification.from_pretrained(model_id, config=cfg)
         dc = DataCollatorForTokenClassification(tokenizer=tokenizer, padding=True, max_length=seqlen)
@@ -38,7 +38,7 @@ class TransformerModel:
                                           load_best_model_at_end=True, report_to=["tensorboard"],
                                           logging_dir=self.app_config.logs_path,
                                           greater_is_better=True, save_strategy="steps", save_total_limit=5,
-                                          num_train_epochs=20, logging_strategy="steps", logging_steps=100)
+                                          num_train_epochs=epochs, logging_strategy="steps", logging_steps=100)
         trainer = Trainer(
             model=model,
             data_collator=dc,

@@ -6,6 +6,10 @@ from src.training.preprocessing import DataPreprocessor
 from src.training_hf.hf_datasets import *
 from src.training_hf.models import *
 from src.utils.config import Notification
+from baseline import run_baseline
+
+from sklearn.dummy import DummyClassifier
+import numpy as np
 
 
 def error_analysis(path_to_resources):
@@ -112,11 +116,32 @@ def main_huggingface():
     app_config = AppConfig()
     arg_mining_dataset = ArgMiningDataset(app_config=app_config)
     arg_mining_model = TransformerModel(app_config=app_config)
-    tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id="xlm-roberta-base", seqlen=512)
-    arg_mining_model.train(model_id="xlm-roberta-base", tokenizer=tok, num_labels=num_labels, train_dset=train_dset,
-                           eval_dset=eval_dset, seqlen=512, batch_size=8, eval_step_period=10, lr=0.001)
+    model_id = "bert-base-uncased"
+    seqlen=16
+    # tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id="xlm-roberta-base", seqlen=512, limit_data=100)
+    tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id=model_id, seqlen=seqlen, limit_data=100)
+    # arg_mining_model.train(model_id=model_id, tokenizer=tok, num_labels=num_labels, train_dset=train_dset, eval_dset=eval_dset, seqlen=seqlen, batch_size=8, eval_step_period=100, lr=0.01, epochs=1000)
+    
+   
+    # baseline code
+    ################################3
+    
+    train_dat = torch.stack([t['input_ids'] for t in train_dset])
+    train_dat = [tok.convert_ids_to_tokens(t) for t in  train_dat]
+    train_lab = np.stack([np.asarray(t['labels']) for t in train_dset])
+    train_lab[train_lab == -100] = 7
 
+    eval_dat = torch.stack([t['input_ids'] for t in eval_dset])
+    eval_dat = [tok.convert_ids_to_tokens(t) for t in  eval_dat]
+    eval_lab = np.stack([np.asarray(t['labels']) for t in eval_dset])
+    eval_lab[eval_lab == -100] = 7
+
+    print("Training with baseline")
+    model, w2i, t2i = run_baseline(train_dat, train_lab)
+    print("Evaluating with baseline")
+    run_baseline(eval_dat, eval_lab, model=(model, w2i, t2i))
 
 if __name__ == '__main__':
     # main()
     main_huggingface()
+    print("Done!")
