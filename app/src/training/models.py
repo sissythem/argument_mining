@@ -95,10 +95,13 @@ class SupervisedModel(Model):
 
         # 3. initialize embeddings
         embeddings = self.get_embeddings()
+        if embeddings.max_subtokens_sequence_length is None or embeddings.max_subtokens_sequence_length > 512:
+            embeddings.tokenizer.model_max_length = 512
+            embeddings.max_subtokens_sequence_length = 512
+            embeddings.stride = 512 // 2  # or 0
 
         # 4. get flair model: SequenceTagger or TextClassifier
         flair_model = self.get_flair_model(dictionary=dictionary, embeddings=embeddings)
-
         # 5. initialize the ModelTrainer
         trainer: ModelTrainer = self.get_model_trainer(corpus=corpus, flair_model=flair_model)
 
