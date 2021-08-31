@@ -90,7 +90,7 @@ class AppConfig:
         """
         timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
         self.log_filename = f"logs_{timestamp}.log"
-        log_formatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+        log_formatter = logging.Formatter('%(asctime)s,%(msecs)d %(levelname)-1s [%(filename)s:%(lineno)d] %(message)s')
         program_logger = logging.getLogger("flair")
 
         program_logger.setLevel(logging.DEBUG)

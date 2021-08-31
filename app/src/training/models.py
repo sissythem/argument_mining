@@ -105,8 +105,10 @@ class SupervisedModel(Model):
         # 5. initialize the ModelTrainer
         trainer: ModelTrainer = self.get_model_trainer(corpus=corpus, flair_model=flair_model)
 
-        trainer.train(self.base_path, learning_rate=self.model_properties["learning_rate"],
-                      patience=self.model_properties["patience"], max_epochs=self.model_properties["max_epochs"],
+        trainer.train(self.base_path, main_evaluation_metric=("marco avg", 'f1-score'),
+                      learning_rate=self.model_properties["learning_rate"],
+                      patience=self.model_properties["patience"],
+                      max_epochs=self.model_properties["max_epochs"],
                       mini_batch_size=self.model_properties["mini_batch_size"], monitor_test=True,
                       train_with_dev=self.model_properties["train_with_dev"],
                       save_final_model=self.model_properties["save_final_model"],
