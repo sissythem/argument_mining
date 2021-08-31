@@ -22,13 +22,9 @@ from sklearn.feature_extraction.text import CountVectorizer
 from torch.optim import SGD, Adam, Optimizer
 
 import logging
-import os
 from os.path import join
 
 import numpy as np
-from sentence_transformers import SentenceTransformer, models, evaluation, losses
-from sentence_transformers.datasets import ParallelSentencesDataset
-from torch.utils.data import DataLoader
 from src.utils.config import AppConfig
 from src.utils import utils
 from itertools import combinations
@@ -405,7 +401,7 @@ class CustomAgglomerative(Clustering):
             self.app_logger.info(f"Sentence1: {sentence1}")
             self.app_logger.info(f"Sentence2: {sentence2}")
             self.app_logger.info(
-                "===========================================================================================================")
+                "=====================================================================================================")
             count += 1
         return data_pairs
 
@@ -494,99 +490,100 @@ class TopicModel(Hdbscan):
         return topic_sizes
 
 
-class EmbeddingAlignment(Model):
-
-    def __init__(self, app_config, model_name="alignment"):
-        super(EmbeddingAlignment, self).__init__(app_config=app_config, model_name=model_name)
-        self.data_folder: AnyStr = join(self.app_config.dataset_folder, model_name)
-        self.teacher_model_name = self.model_properties["teacher_model"]
-        self.student_model_name = self.model_properties["student_model"]
-        self.train_file = join(self.data_folder, "train.tsv")
-        self.dev_file = join(self.data_folder, "dev.tsv")
-        self.test_file = join(self.data_folder, "test.tsv")
-        self.data_limit = np.Inf
-        self.teacher_model = None
-        self.student_model = None
-
-    def train(self):
-        self.teacher_model = self.get_teacher_model()
-        self.student_model = self.get_student_model()
-        train_dataloader, train_loss = self.get_train_dataloader_and_loss()
-        dev_src, dev_trg = self.read_tsv(self.dev_file)
-        test_src, test_trg = self.read_tsv(self.test_file)
-        evaluators = self.get_evaluators(dev_src=dev_src, dev_trg=dev_trg, test_src=test_src, test_trg=test_trg)
-        self.student_model.fit(train_objectives=[(train_dataloader, train_loss)],
-                               evaluator=evaluation.SequentialEvaluator(evaluators,
-                                                                        main_score_function=lambda scores: np.mean(
-                                                                            scores)),
-                               epochs=self.model_properties["num_epochs"],
-                               warmup_steps=self.model_properties["num_warmup_steps"],
-                               evaluation_steps=self.model_properties["num_evaluation_steps"],
-                               output_path=self.app_config.student_path,
-                               save_best_model=True,
-                               optimizer_params={'lr': 2e-5, 'eps': 1e-6, 'correct_bias': False}
-                               )
-
-    def read_tsv(self, path):
-        src, trg = [], []
-        self.app_logger.info(f"Reading data from {path}.")
-        with open(path, 'r', encoding='utf8') as f_in:
-            for line in f_in:
-                splits = line.strip().split('\t')
-                if splits[0] != "" and splits[1] != "":
-                    src.append(splits[0])
-                    trg.append(splits[1])
-                if len(src) >= self.data_limit:
-                    break
-        self.app_logger.info(f"Got {len(src)} data.")
-        return src, trg
-
-    def get_teacher_model(self):
-        self.app_logger.info("Load teacher model")
-        return SentenceTransformer(self.teacher_model_name)
-
-    def get_student_model(self):
-        self.app_logger.info("Create student model from scratch")
-        word_embedding_model = models.Transformer(self.student_model_name,
-                                                  max_seq_length=self.model_properties["max_seq_length"])
-        pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension())
-        return SentenceTransformer(modules=[word_embedding_model, pooling_model], device="cpu")
-
-    def get_train_dataloader_and_loss(self):
-        train_data = ParallelSentencesDataset(student_model=self.student_model, teacher_model=self.teacher_model,
-                                              batch_size=self.model_properties["inference_batch_size"],
-                                              use_embedding_cache=True)
-        train_data.load_data(self.train_file,
-                             max_sentences=min(self.model_properties["max_sentences_per_language"], self.data_limit),
-                             max_sentence_length=self.model_properties["train_max_sentence_len"])
-
-        train_dataloader = DataLoader(train_data, shuffle=True, batch_size=self.model_properties["train_batch_size"])
-        train_loss = losses.MSELoss(model=self.student_model)
-        return train_dataloader, train_loss
-
-    def get_evaluators(self, dev_src, dev_trg, test_src, test_trg):
-        evaluators = []
-
-        # dev evaluators
-        dev_mse = evaluation.MSEEvaluator(dev_src, dev_trg, name=os.path.basename(self.dev_file),
-                                          teacher_model=self.teacher_model,
-                                          batch_size=self.model_properties["inference_batch_size"])
-        # TranslationEvaluator computes the embeddings for all parallel sentences.
-        # It then check if the embedding of source[i] is the closest to target[i] out of all available target sentences
-        dev_trans_acc = evaluation.TranslationEvaluator(dev_src, dev_trg, name=os.path.basename(self.dev_file),
-                                                        batch_size=self.model_properties["inference_batch_size"])
-        evaluators.extend([dev_mse, dev_trans_acc])
-
-        # test evaluators
-
-        test_mse = evaluation.MSEEvaluator(
-            test_src, test_trg, name="test_mse.csv", teacher_model=self.teacher_model,
-            batch_size=self.model_properties["inference_batch_size"])
-        test_trans_acc = evaluation.TranslationEvaluator(
-            test_src, test_trg, name="test_transl.csv", batch_size=self.model_properties["inference_batch_size"])
-
-        # test_evaluator = evaluation.EmbeddingSimilarityEvaluator(test_src, test_trg, data['scores'],
-        #                                                             batch_size=inference_batch_size, name="test",
-        #                                                             show_progress_bar=False)
-        evaluators.extend([test_mse, test_trans_acc])
-        return evaluators
+# class EmbeddingAlignment(Model):
+#
+#     def __init__(self, app_config, model_name="alignment"):
+#         super(EmbeddingAlignment, self).__init__(app_config=app_config, model_name=model_name)
+#         self.data_folder: AnyStr = join(self.app_config.dataset_folder, model_name)
+#         self.teacher_model_name = self.model_properties["teacher_model"]
+#         self.student_model_name = self.model_properties["student_model"]
+#         self.train_file = join(self.data_folder, "train.tsv")
+#         self.dev_file = join(self.data_folder, "dev.tsv")
+#         self.test_file = join(self.data_folder, "test.tsv")
+#         self.data_limit = np.Inf
+#         self.teacher_model = None
+#         self.student_model = None
+#
+#     def train(self):
+#         self.teacher_model = self.get_teacher_model()
+#         self.student_model = self.get_student_model()
+#         train_dataloader, train_loss = self.get_train_dataloader_and_loss()
+#         dev_src, dev_trg = self.read_tsv(self.dev_file)
+#         test_src, test_trg = self.read_tsv(self.test_file)
+#         evaluators = self.get_evaluators(dev_src=dev_src, dev_trg=dev_trg, test_src=test_src, test_trg=test_trg)
+#         self.student_model.fit(train_objectives=[(train_dataloader, train_loss)],
+#                                evaluator=evaluation.SequentialEvaluator(evaluators,
+#                                                                         main_score_function=lambda scores: np.mean(
+#                                                                             scores)),
+#                                epochs=self.model_properties["num_epochs"],
+#                                warmup_steps=self.model_properties["num_warmup_steps"],
+#                                evaluation_steps=self.model_properties["num_evaluation_steps"],
+#                                output_path=self.app_config.student_path,
+#                                save_best_model=True,
+#                                optimizer_params={'lr': 2e-5, 'eps': 1e-6, 'correct_bias': False}
+#                                )
+#
+#     def read_tsv(self, path):
+#         src, trg = [], []
+#         self.app_logger.info(f"Reading data from {path}.")
+#         with open(path, 'r', encoding='utf8') as f_in:
+#             for line in f_in:
+#                 splits = line.strip().split('\t')
+#                 if splits[0] != "" and splits[1] != "":
+#                     src.append(splits[0])
+#                     trg.append(splits[1])
+#                 if len(src) >= self.data_limit:
+#                     break
+#         self.app_logger.info(f"Got {len(src)} data.")
+#         return src, trg
+#
+#     def get_teacher_model(self):
+#         self.app_logger.info("Load teacher model")
+#         return SentenceTransformer(self.teacher_model_name)
+#
+#     def get_student_model(self):
+#         self.app_logger.info("Create student model from scratch")
+#         word_embedding_model = models.Transformer(self.student_model_name,
+#                                                   max_seq_length=self.model_properties["max_seq_length"])
+#         pooling_model = models.Pooling(word_embedding_model.get_word_embedding_dimension())
+#         return SentenceTransformer(modules=[word_embedding_model, pooling_model], device="cpu")
+#
+#     def get_train_dataloader_and_loss(self):
+#         train_data = ParallelSentencesDataset(student_model=self.student_model, teacher_model=self.teacher_model,
+#                                               batch_size=self.model_properties["inference_batch_size"],
+#                                               use_embedding_cache=True)
+#         train_data.load_data(self.train_file,
+#                              max_sentences=min(self.model_properties["max_sentences_per_language"], self.data_limit),
+#                              max_sentence_length=self.model_properties["train_max_sentence_len"])
+#
+#         train_dataloader = DataLoader(train_data, shuffle=True, batch_size=self.model_properties["train_batch_size"])
+#         train_loss = losses.MSELoss(model=self.student_model)
+#         return train_dataloader, train_loss
+#
+#     def get_evaluators(self, dev_src, dev_trg, test_src, test_trg):
+#         evaluators = []
+#
+#         # dev evaluators
+#         dev_mse = evaluation.MSEEvaluator(dev_src, dev_trg, name=os.path.basename(self.dev_file),
+#                                           teacher_model=self.teacher_model,
+#                                           batch_size=self.model_properties["inference_batch_size"])
+#         # TranslationEvaluator computes the embeddings for all parallel sentences.
+#         # It then check if the embedding of source[i] is the closest to target[i] out of all available target
+#         sentences
+#         dev_trans_acc = evaluation.TranslationEvaluator(dev_src, dev_trg, name=os.path.basename(self.dev_file),
+#                                                         batch_size=self.model_properties["inference_batch_size"])
+#         evaluators.extend([dev_mse, dev_trans_acc])
+#
+#         # test evaluators
+#
+#         test_mse = evaluation.MSEEvaluator(
+#             test_src, test_trg, name="test_mse.csv", teacher_model=self.teacher_model,
+#             batch_size=self.model_properties["inference_batch_size"])
+#         test_trans_acc = evaluation.TranslationEvaluator(
+#             test_src, test_trg, name="test_transl.csv", batch_size=self.model_properties["inference_batch_size"])
+#
+#         # test_evaluator = evaluation.EmbeddingSimilarityEvaluator(test_src, test_trg, data['scores'],
+#         #                                                             batch_size=inference_batch_size, name="test",
+#         #                                                             show_progress_bar=False)
+#         evaluators.extend([test_mse, test_trans_acc])
+#         return evaluators

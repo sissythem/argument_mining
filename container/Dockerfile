@@ -1,4 +1,4 @@
-FROM tiangolo/uvicorn-gunicorn-fastapi
+FROM tiangolo/uvicorn-gunicorn-fastapi:python3.8
 
 RUN apt-get update && apt-get install -y build-essential unzip vim git curl wget \
                                         subversion tcl8.6 tcllib  tcl-tls  tcl-trf \
