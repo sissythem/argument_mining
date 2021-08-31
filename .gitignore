@@ -4,12 +4,17 @@ venv/
 app/src/__pycache__/
 app/resources/
 app/output/
+app/__pycache__/
 app/src/utils/__pycache__/
 app/src/training/__pycache__/
+app/src/training_hf/__pycache__/
 app/src/pipeline/__pycache__/
 public/
 docs/build/
+test_trainer/
 !app/resources/example_properties.yaml
 !app/resources/kasteli_34_urls.txt
 !app/resources/data/initial/kasteli/kasteli.json
 !app/resources/example.json
+
+*.swp
