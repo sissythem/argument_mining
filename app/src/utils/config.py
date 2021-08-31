@@ -127,6 +127,7 @@ class AppConfig:
         self.resources_path: AnyStr = join(self.app_path, "resources")
         self.output_path: AnyStr = join(self.app_path, "output")
         self.logs_path: AnyStr = join(self.output_path, "logs")
+        self.tensorboard_path: AnyStr = join(self.logs_path, self.run)
         self.model_path: AnyStr = join(self.output_path, "models")
         self.student_path: AnyStr = join(self.model_path, "student")
         self.output_files: AnyStr = join(self.output_path, "output_files")
@@ -142,6 +143,8 @@ class AppConfig:
             mkdir(self.output_path)
         if not exists(self.logs_path):
             mkdir(self.logs_path)
+        if not exists(self.tensorboard_path):
+            mkdir(self.tensorboard_path)
         if not exists(self.model_path):
             mkdir(self.model_path)
         if not exists(self.student_path):

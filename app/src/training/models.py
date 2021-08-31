@@ -133,7 +133,7 @@ class SupervisedModel(Model):
     def get_model_trainer(self, corpus: Corpus, flair_model: flair.nn.Model) -> ModelTrainer:
         # 5. initialize the ModelTrainer
         trainer: ModelTrainer = ModelTrainer(flair_model, corpus, use_tensorboard=self.use_tensorboard,
-                                             tensorboard_log_dir=self.app_config.logs_path,
+                                             tensorboard_log_dir=self.app_config.tensorboard_path,
                                              optimizer=self.optimizer)
         self.app_logger.info("Starting training with ModelTrainer")
         self.app_logger.info(f"Model configuration properties: {self.model_properties}")
