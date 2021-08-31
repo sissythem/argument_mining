@@ -10,13 +10,13 @@ elasticsearch==7.10.1
 elasticsearch-dsl==7.3.0
 requests==2.25.1
 pandas==1.2.3
-numpy==1.19.5
+numpy==1.21.2
 scipy==1.6.2
 tensorboard==2.4.1
 matplotlib==3.4.1
 seaborn==0.11.1
 genson==1.2.2
-flair==0.7
+flair==0.9
 imbalanced-learn==0.8.0
 umap-learn==0.5.1
 hdbscan==0.8.26

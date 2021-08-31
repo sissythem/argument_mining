@@ -142,6 +142,6 @@ def main_huggingface():
     run_baseline(eval_dat, eval_lab, model=(model, w2i, t2i))
 
 if __name__ == '__main__':
-    # main()
-    main_huggingface()
+    main()
+    # main_huggingface()
     print("Done!")

@@ -130,6 +130,7 @@ class SupervisedModel(Model):
     def get_model_trainer(self, corpus: Corpus, flair_model: flair.nn.Model) -> ModelTrainer:
         # 5. initialize the ModelTrainer
         trainer: ModelTrainer = ModelTrainer(flair_model, corpus, use_tensorboard=self.use_tensorboard,
+                                             tensorboard_log_dir=self.app_config.logs_path,
                                              optimizer=self.optimizer)
         self.app_logger.info("Starting training with ModelTrainer")
         self.app_logger.info(f"Model configuration properties: {self.model_properties}")
@@ -187,8 +188,15 @@ class SequentialModel(SupervisedModel):
         return tag_dictionary
 
     def get_embeddings(self):
-        embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(self.transformer_name)]
-        embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
+        embeddings = TransformerWordEmbeddings(
+            model=self.transformer_name,
+            layers="-1",
+            subtoken_pooling="first",
+            fine_tune=True,
+            use_context=True,
+        )
+        # embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(self.transformer_name)]
+        # embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
         return embeddings
 
     def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:
@@ -218,16 +226,16 @@ class ClassificationModel(SupervisedModel):
 
     def get_corpus(self) -> Corpus:
         # define columns
-        column_name_map = {0: "text", 1: "label_topic"}
+        column_name_map = {0: "text", 1: "labels"}
         # create Corpus
         corpus: Corpus = CSVClassificationCorpus(data_folder=self.data_folder, column_name_map=column_name_map,
                                                  skip_header=True, delimiter="\t", train_file="train.csv",
-                                                 test_file="test.csv", dev_file="dev.csv")
+                                                 test_file="test.csv", dev_file="dev.csv", label_type="relation")
         return corpus
 
     def get_dictionary(self, corpus: Corpus) -> Dictionary:
         # make label dictionary
-        return corpus.make_label_dictionary()
+        return corpus.make_label_dictionary(label_type="relation")
 
     def get_embeddings(self):
         # initialize the document embeddings
@@ -237,7 +245,7 @@ class ClassificationModel(SupervisedModel):
     def get_flair_model(self, dictionary: Dictionary, embeddings) -> flair.nn.Model:
         # create the TextClassifier
         classifier = TextClassifier(document_embeddings=embeddings, label_dictionary=dictionary,
-                                    multi_label=dictionary.multi_label)
+                                    multi_label=True, label_type="relation")
         return classifier
 
     def load(self, model_path=None):
