@@ -15,9 +15,12 @@ HIDDEN_DIM = 64
 UNKNOWN_TOKEN = "UNK"
 
 
-def prepare_sequence(seq, to_ix):
-    idxs = [to_ix[w] if w in to_ix else to_ix[UNKNWON_TOKEN] for w in seq]
-    return torch.tensor(idxs, dtype=torch.long)
+def prepare_sequence(seqs, to_ix):
+    all_idxs = []
+    for seq in seqs:
+        idxs = [to_ix[w] if w in to_ix else to_ix[UNKNOWN_TOKEN] for w in seq]
+        all_idxs.append(idxs)
+    return torch.tensor(all_idxs, dtype=torch.long)
 
 def map_unks(data, to_ix):
     for i in range(len(data)):
@@ -52,15 +55,18 @@ class LSTMTagger(nn.Module):
 
         # The LSTM takes word embeddings as inputs, and outputs hidden states
         # with dimensionality hidden_dim.
-        self.lstm = nn.LSTM(embedding_dim, hidden_dim)
+        self.lstm = nn.LSTM(embedding_dim, hidden_dim, batch_first=True)
 
         # The linear layer that maps from hidden state space to tag space
         self.hidden2tag = nn.Linear(hidden_dim, tagset_size)
+        self.num_classes = tagset_size
 
     def forward(self, sentence):
         embeds = self.word_embeddings(sentence)
-        lstm_out, _ = self.lstm(embeds.view(len(sentence), 1, -1))
-        tag_space = self.hidden2tag(lstm_out.view(len(sentence), -1))
+        # lstm_out, _ = self.lstm(embeds.view(len(sentence), 1, -1))
+        lstm_out, _ = self.lstm(embeds)
+        # tag_space = self.hidden2tag(lstm_out.view(len(sentence), -1))
+        tag_space = self.hidden2tag(lstm_out)
         tag_scores = F.log_softmax(tag_space, dim=1)
         return tag_scores
 
@@ -81,9 +87,9 @@ def predict(model, data, tags, w2i):
     gt = []
     with torch.no_grad():
         for dd, tt in zip(data, tags):
-            inputs = prepare_sequence(dd, w2i)
+            inputs = prepare_sequence([dd], w2i)
             pred = model(inputs)
-            pred = pred.argmax(axis=1)
+            pred = pred.squeeze().argmax(axis=1)
             # exclude padding
             pad_idx = torch.where(pred == -100)[0]
 
@@ -98,7 +104,7 @@ def predict(model, data, tags, w2i):
     print(r)
     return preds
 
-def train(model, data, tags, word_to_ix, tag_to_ix, num_epochs=50, lr=0.01):
+def train(model, data, tags, word_to_ix, tag_to_ix, num_epochs=100, lr=0.01, batch_size=64):
     loss_function = nn.NLLLoss()
     optimizer = optim.SGD(model.parameters(), lr=lr)
     # See what the scores are before training
@@ -109,18 +115,27 @@ def train(model, data, tags, word_to_ix, tag_to_ix, num_epochs=50, lr=0.01):
     for epoch in range(num_epochs):
         print("Performance at epoch", epoch)
         predict(model, data, tags, word_to_ix)
-        for batch_idx, (sentence, tg) in enumerate(zip(data, tags)):
+        # for batch_idx, (sentence, tg) in enumerate(zip(data, tags)):
+        for batch_idx, idx in enumerate(range(0, len(data), batch_size)):
+
+            last_idx = min(idx + batch_size, len(data))
+            sentences = data[idx: last_idx]
+            tg = tags[idx: last_idx]
             # Step 1. Remember that Pytorch accumulates gradients.
             # We need to clear them out before each instance
             model.zero_grad()
 
             # Step 2. Get our inputs ready for the network, that is, turn them into
             # Tensors of word indices.
-            sentence_in = prepare_sequence(sentence, word_to_ix)
+            sentence_in = prepare_sequence(sentences, word_to_ix)
             targets = prepare_sequence(tg, tag_to_ix)
 
             # Step 3. Run our forward pass.
             tag_scores = model(sentence_in)
+        
+            # todo verify flatttening / reshaping order is OK
+            targets = torch.flatten(targets)
+            tag_scores = tag_scores.reshape(-1, model.num_classes)
 
             # Step 4. Compute the loss, gradients, and update the parameters by
             #  calling optimizer.step()

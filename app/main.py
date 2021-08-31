@@ -119,7 +119,7 @@ def main_huggingface():
     model_id = "bert-base-uncased"
     seqlen=16
     # tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id="xlm-roberta-base", seqlen=512, limit_data=100)
-    tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id=model_id, seqlen=seqlen, limit_data=100)
+    tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id=model_id, seqlen=seqlen)
     # arg_mining_model.train(model_id=model_id, tokenizer=tok, num_labels=num_labels, train_dset=train_dset, eval_dset=eval_dset, seqlen=seqlen, batch_size=8, eval_step_period=100, lr=0.01, epochs=1000)
     
    
