@@ -29,15 +29,18 @@ class DebateLab:
         self.app_logger = app_config.app_logger
 
         # load ADU model
-        self.adu_model = SequentialModel(app_config=self.app_config, model_name="adu")
+        self.adu_model = SequentialModel(
+            app_config=self.app_config, model_name="adu")
         self.adu_model.load()
 
         # load Relations model
-        self.rel_model = ClassificationModel(app_config=self.app_config, model_name="rel")
+        self.rel_model = ClassificationModel(
+            app_config=self.app_config, model_name="rel")
         self.rel_model.load()
 
         # load Stance model
-        self.stance_model = ClassificationModel(app_config=self.app_config, model_name="stance")
+        self.stance_model = ClassificationModel(
+            app_config=self.app_config, model_name="stance")
         self.stance_model.load()
 
         # initialize TopicModel
@@ -46,7 +49,7 @@ class DebateLab:
         # initialize Clustering model
         self.clustering = CustomAgglomerative(app_config=app_config)
 
-    def run_pipeline(self, notify=False):
+    def run_pipeline(self, documents=None, notify=False):
         """
         Function to execute the DebateLab pipeline.
 
@@ -57,17 +60,22 @@ class DebateLab:
             | 4. Notifies ICS
         """
         # TODO retrieve previous day's articles, save now to properties --> retrieve_kind="date"
-        # retrive new documents
-        documents = self.app_config.elastic_retrieve.retrieve_documents()
+        if documents is None:
+            # retrive new documents
+            documents, _ = self.app_config.elastic_retrieve.retrieve_documents(
+                retrieve_kind=self.app_config.properties["eval"]["retrieve"])
         # run Argument Mining pipeline
-        documents, document_ids = self.run_argument_mining(documents=documents)
+        documents, document_ids = self.run_argument_mining(
+            documents=documents, save=False)
         self.app_logger.info(f"Valid document ids: {document_ids}")
         if notify:
             self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
-        relations, relation_ids = self.run_manual_clustering(documents=documents, document_ids=document_ids)
+        relations, relation_ids = self.run_manual_clustering(
+            documents=documents, document_ids=document_ids, save=False)
         if notify:
-            self.notification.notify_ics(ids_list=relation_ids, kind="clustering")
+            self.notification.notify_ics(
+                ids_list=relation_ids, kind="clustering")
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************
@@ -87,27 +95,35 @@ class DebateLab:
         Returns
             tuple: the list of documents and the list of document ids of the **valid** json objects
         """
-        document_ids = []
+        valid_document_ids = []
         invalid_document_ids = []
         corrected_ids = []
         validator = JsonValidator(app_config=self.app_config)
         for idx, document in enumerate(documents):
-            document, segment_counter, rel_counter, stance_counter = self.predict(document=document)
-            counters = {"adu": segment_counter, "rel": rel_counter, "stance": stance_counter}
-            validation_errors, invalid_adus, corrected = validator.run_validation(document=document, counters=counters)
+            self.app_logger.info(
+                f"Extracting topics for document {idx+1}/{len(documents)}: {document['title']}")
+            document, segment_counter, rel_counter, stance_counter = self.predict(
+                document=document)
+            counters = {"adu": segment_counter,
+                        "rel": rel_counter, "stance": stance_counter}
+            validation_errors, invalid_adus, corrected = validator.run_validation(
+                document=document, counters=counters)
             if corrected:
-                corrected_ids.append(document_ids)
-            if not validation_errors and save:
-                self.app_config.elastic_save.save_document(document=document)
-                document_ids.append(document["id"])
+                corrected_ids.append(valid_document_ids)
+            if not validation_errors:
+                if save:
+                    self.app_config.elastic_save.save_document(
+                        document=document)
+                valid_document_ids.append(document["id"])
             else:
                 invalid_document_ids.append(document["id"])
                 validator.save_invalid_json(document=document, validation_errors=validation_errors,
                                             invalid_adus=invalid_adus)
-        validator.print_validation_results(document_ids, corrected_ids, invalid_document_ids)
+        validator.print_validation_results(
+            valid_document_ids, corrected_ids, invalid_document_ids)
         if export_schema:
-            validator.export_json_schema(document_ids=document_ids)
-        return documents, document_ids
+            validator.export_json_schema(document_ids=valid_document_ids)
+        return documents, valid_document_ids
 
     def predict(self, document):
         """
@@ -124,25 +140,29 @@ class DebateLab:
         Returns
             tuple: the generated document and the counters for the produced ids of ADUs, relations and stance
         """
-        self.app_logger.info(f"Extracting topics for document with title: {document['title']}")
-        document["topics"] = self.topic_model.get_topics(content=document["content"])
-        self.app_logger.info("Extracting named entities")
-        entities = self._get_named_entities(doc_id=document["id"], content=document["content"])
-        self.app_logger.info("Predicting ADUs from document")
+        document["topics"] = self.topic_model.get_topics(
+            content=document["content"])
+        self.app_logger.debug("Extracting named entities")
+        entities = self._get_named_entities(
+            doc_id=document["id"], content=document["content"])
+        self.app_logger.debug("Predicting ADUs from document")
         segments, segment_counter = self._predict_adus(document=document)
         # assumes major_claim label should appear once -- concatenation due to sentence splitting
         major_claims, claims, premises = utils.get_adus(segments)
-        self.app_logger.info(
+        self.app_logger.debug(
             f"Found {len(major_claims)} major claims, {len(claims)} claims and {len(premises)} premises")
-        self.app_logger.info("Predicting relations between ADUs")
-        relations, rel_counter = self._predict_relations(major_claims=major_claims, claims=claims, premises=premises)
+        self.app_logger.debug("Predicting relations between ADUs")
+        relations, rel_counter = self._predict_relations(
+            major_claims=major_claims, claims=claims, premises=premises)
         document["annotations"] = {
             "ADUs": segments,
             "Relations": relations,
             "entities": entities
         }
-        self.app_logger.info("Predicting stance between major claim and claims")
-        document, stance_counter = self._predict_stance(major_claims=major_claims, claims=claims, json_obj=document)
+        self.app_logger.debug(
+            "Predicting stance between major claim and claims")
+        document, stance_counter = self._predict_stance(
+            major_claims=major_claims, claims=claims, json_obj=document)
         return document, segment_counter, rel_counter, stance_counter
 
     def _get_named_entities(self, doc_id, content):
@@ -164,7 +184,8 @@ class DebateLab:
             entities = json.loads(response.text)
         else:
             self.app_logger.error("Could not retrieve named entities")
-            self.app_logger.error(f"Status code: {response.status_code}, reason: {response.text}")
+            self.app_logger.error(
+                f"Status code: {response.status_code}, reason: {response.text}")
         return entities
 
     def _predict_adus(self, document):
@@ -181,18 +202,22 @@ class DebateLab:
         """
         # init document id & annotations
         adus = []
-        self.app_logger.debug(f"Processing document with id: {document['id']} and name: {document}")
+        self.app_logger.debug(
+            f"Processing document with id: {document['id']} and name: {document}")
         segment_counter = 0
         sentences = utils.tokenize_with_spans(text=document["content"])
         found_mc = False
-        for sentence in sentences:
-            self.app_logger.debug(f"Predicting labels for sentence: {sentence}")
+        for idx, sentence in enumerate(sentences):
+            self.app_logger.debug(
+                f"Predicting adu for sentence: {idx+1}/{len(sentences)}: {sentence}")
             sentence = CustomSentence(sentence)
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
             segments = utils.get_args_from_sentence(sentence)
             if segments:
-                for segment in segments:
+                for s_idx, segment in enumerate(segments):
+                    self.app_logger.debug(
+                        f"Predicting for segment: {s_idx+1}/{len(segments)} of sentence {idx+1}/{len(sentences)}")
                     if len(segment["text"]) == 1:
                         continue
                     if segment["text"] and segment["label"]:
@@ -201,10 +226,13 @@ class DebateLab:
                             continue
                         if segment["label"] == "major_claim":
                             found_mc = True
-                        self.app_logger.debug(f"Segment text: {segment['text']}")
-                        self.app_logger.debug(f"Segment type: {segment['label']}")
+                        self.app_logger.debug(
+                            f"Segment text: {segment['text']}")
+                        self.app_logger.debug(
+                            f"Segment type: {segment['label']}")
                         segment_counter += 1
-                        start_idx, end_idx = utils.find_segment_in_text(segment=segment, sentence=sentence)
+                        start_idx, end_idx = utils.find_segment_in_text(
+                            segment=segment, sentence=sentence)
                         if start_idx == -1 and end_idx == -1:
                             continue
                         seg = {
@@ -244,7 +272,8 @@ class DebateLab:
             major_claim["ends"] = mc["ends"]
             major_claim["segment"] += " " + mc["segment"]
         major_claim["confidence"] = np.mean(confs)
-        major_claim["segment"] = utils.replace_multiple_spaces_with_single_space(text=major_claim["segment"])
+        major_claim["segment"] = utils.replace_multiple_spaces_with_single_space(
+            text=major_claim["segment"])
         return self._insert_major_claim(adus=adus, seg=major_claim)
 
     def _handle_missing_major_claim(self, adus, title):
@@ -281,7 +310,8 @@ class DebateLab:
         rel_counter = 0
         relations = []
         if major_claims and claims:
-            relations, rel_counter = self._get_relations(source=claims, target=major_claims, counter=rel_counter)
+            relations, rel_counter = self._get_relations(
+                source=claims, target=major_claims, counter=rel_counter)
         if claims and premises:
             rel, rel_counter = self._get_relations(source=premises, target=claims, counter=rel_counter,
                                                    modify_source_list=True)
@@ -306,12 +336,14 @@ class DebateLab:
         already_predicted = []
         for adu2 in target:
             if modify_source_list:
-                source = self._modify_source_adus(adu2, already_predicted, initial_source)
+                source = self._modify_source_adus(
+                    adu2, already_predicted, initial_source)
                 if not source:
                     break
             for adu1 in source:
                 sentence_pair = f"[CLS] {adu1['segment']} [SEP] {adu2['segment']}"
-                self.app_logger.debug(f"Predicting relation for sentence pair: {sentence_pair}")
+                self.app_logger.debug(
+                    f"Predicting relation for sentence pair: {sentence_pair}")
                 sentence = Sentence(sentence_pair)
                 self.rel_model.model.predict(sentence)
                 labels = sentence.get_labels()
@@ -332,10 +364,12 @@ class DebateLab:
     def _modify_source_adus(self, adu2, already_predicted, source):
         adu2_start = adu2["starts"]
         adu2_end = adu2["ends"]
-        source = self._remove_already_predicted(source=source, already_predicted=already_predicted)
+        source = self._remove_already_predicted(
+            source=source, already_predicted=already_predicted)
         if not source:
             return source
-        source = self._keep_k_closest(source=source, target_start=adu2_start, target_end=adu2_end)
+        source = self._keep_k_closest(
+            source=source, target_start=adu2_start, target_end=adu2_end)
         return source
 
     @staticmethod
@@ -355,14 +389,17 @@ class DebateLab:
 
     @staticmethod
     def _keep_k_closest(source, target_start, target_end, k=5):
-        source = sorted(source, key=lambda key: int(key['starts']), reverse=False)
+        source = sorted(source, key=lambda key: int(
+            key['starts']), reverse=False)
         for s in source:
             s["distance_from_start"] = abs(int(target_start) - int(s["ends"]))
             s["distance_from_end"] = abs(int(target_end) - int(s["starts"]))
-        source_from_start = sorted(source, key=lambda key: key['distance_from_start'], reverse=False)
+        source_from_start = sorted(
+            source, key=lambda key: key['distance_from_start'], reverse=False)
         if source_from_start:
             source_from_start = source_from_start[:k]
-        source_from_end = sorted(source, key=lambda key: key['distance_from_end'], reverse=False)
+        source_from_end = sorted(
+            source, key=lambda key: key['distance_from_end'], reverse=False)
         if source_from_end:
             source_from_end = source_from_end[:k]
         if source_from_start and source_from_end:
@@ -400,10 +437,13 @@ class DebateLab:
         """
         stance_counter = 0
         if major_claims and claims:
-            for major_claim in major_claims:
+            for m, major_claim in enumerate(major_claims):
+                self.app_logger.debug(f"Major claim {m+1}/{len(major_claims)}")
                 for claim in claims:
-                    sentence_pair = "[CLS] " + claim["segment"] + " [SEP] " + major_claim["segment"]
-                    self.app_logger.debug(f"Predicting stance for sentence pair: {sentence_pair}")
+                    sentence_pair = "[CLS] " + claim["segment"] + \
+                        " [SEP] " + major_claim["segment"]
+                    self.app_logger.debug(
+                        f"Predicting stance for sentence pair: {sentence_pair}")
                     sentence = Sentence(sentence_pair)
                     self.stance_model.model.predict(sentence)
                     labels = sentence.get_labels()
@@ -423,13 +463,16 @@ class DebateLab:
     # ************************************* Cross-document relations **********************************
     def run_manual_clustering(self, documents, document_ids, save=True):
         self.app_logger.info("Running manual clustering -- agglomerative")
-        adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
+        adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(
+            documents=documents, document_ids=document_ids)
         self.app_logger.info("Collected claims for clustering")
-        data_pairs = self.clustering.get_clusters(sentences=adus, doc_ids=doc_ids, sentences_ids=adu_ids)
+        data_pairs = self.clustering.get_clusters(
+            sentences=adus, doc_ids=doc_ids, sentences_ids=adu_ids)
         relations, relation_ids = [], []
         for pair in data_pairs:
             relation_id = f"{pair['doc_id1']};{pair['doc_id2']};{pair['sentence1_id']};{pair['sentence2_id']}"
-            self.app_logger.debug(f"Saving cross document relation with id:{relation_id}")
+            self.app_logger.debug(
+                f"Saving cross document relation with id:{relation_id}")
             relation = {
                 "id": relation_id,
                 "cluster": pair['cluster'],
@@ -457,9 +500,11 @@ class DebateLab:
             the Argument Mining pipeline
             | document_ids (list): list of the ids of the valid documents
         """
-        adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(documents=documents, document_ids=document_ids)
+        adus, doc_ids, adu_ids = utils.collect_adu_for_clustering(
+            documents=documents, document_ids=document_ids)
         n_clusters = self.app_config.properties["clustering"]["n_clusters"]
-        clusters = self.clustering.get_clusters(n_clusters=n_clusters, sentences=adus)
+        clusters = self.clustering.get_clusters(
+            n_clusters=n_clusters, sentences=adus)
         relations = self.get_cross_document_relations(clusters=clusters, sentences=adus, adu_ids=adu_ids,
                                                       doc_ids=doc_ids)
         relations_ids = []
@@ -506,6 +551,7 @@ class DebateLab:
             for idx, cluster_list in clusters_dict.items():
                 self.app_logger.debug(f"Content of Cluster {idx}")
                 for pair in cluster_list:
-                    self.app_logger.debug(f"Sentence {pair[0]} in document with id {pair[1]}")
+                    self.app_logger.debug(
+                        f"Sentence {pair[0]} in document with id {pair[1]}")
                     self.app_logger.debug(f"Sentence content: {pair[2]}")
         return clusters_dict

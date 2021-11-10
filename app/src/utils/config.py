@@ -7,6 +7,7 @@ import smtplib
 import ssl
 import threading
 import uuid
+import datetime as datetime_base
 from datetime import datetime
 from email import encoders
 from email.mime.base import MIMEBase
@@ -22,7 +23,7 @@ import requests
 import torch
 import yaml
 from elasticsearch import Elasticsearch
-from elasticsearch_dsl import Search
+from elasticsearch_dsl import Search, Q
 from sshtunnel import SSHTunnelForwarder
 
 
@@ -90,11 +91,13 @@ class AppConfig:
         """
         timestamp = datetime.now().strftime('%Y%m%d-%H%M%S')
         self.log_filename = f"logs_{timestamp}.log"
-        log_formatter = logging.Formatter('%(asctime)s,%(msecs)d %(levelname)-1s [%(filename)s:%(lineno)d] %(message)s')
+        log_formatter = logging.Formatter(
+            '%(asctime)s,%(msecs)d %(levelname)-1s [%(filename)s:%(lineno)d] %(message)s')
         program_logger = logging.getLogger("flair")
 
         program_logger.setLevel(logging.DEBUG)
-        file_handler = logging.FileHandler(f"{self.logs_path}/{self.log_filename}")
+        file_handler = logging.FileHandler(
+            f"{self.logs_path}/{self.log_filename}")
         file_handler.setFormatter(log_formatter)
         program_logger.addHandler(file_handler)
 
@@ -113,8 +116,10 @@ class AppConfig:
         self.properties_file = "properties.yaml"
         self.example_properties = "example_properties.yaml"
         path_to_properties = join(self.resources_path, self.properties_file)
-        path_to_example_properties = join(self.resources_path, self.example_properties)
-        final_path = path_to_properties if exists(path_to_properties) else path_to_example_properties
+        path_to_example_properties = join(
+            self.resources_path, self.example_properties)
+        final_path = path_to_properties if exists(
+            path_to_properties) else path_to_example_properties
         with open(final_path, "r") as f:
             properties = yaml.safe_load(f.read())
         return properties
@@ -237,7 +242,8 @@ class Notification:
                     server.login(self.sender_email, self.password)
                 self.do_send_email = True
             except (BaseException, Exception):
-                self.app_logger.error("Connecting to email account failed! Check your credentials!")
+                self.app_logger.error(
+                    "Connecting to email account failed! Check your credentials!")
                 self.do_send_email = False
 
     def notify_ics(self, ids_list: List[AnyStr], kind: AnyStr = "arg_mining"):
@@ -262,7 +268,8 @@ class Notification:
         creds_bytes = creds.encode("ascii")
         base64_bytes = base64.b64encode(creds_bytes)
         base64_msg = base64_bytes.decode("ascii")
-        headers = {"Content-Type": "application/json", "Authorization": f"Basic {base64_msg}"}
+        headers = {"Content-Type": "application/json",
+                   "Authorization": f"Basic {base64_msg}"}
         try:
             response = requests.post(url, json=data, headers=headers)
             if response.status_code == 200:
@@ -357,16 +364,21 @@ class ElasticSearchConfig:
             self._init_ssh_tunnel()
             self._init_elasticsearch_client()
             self.connected = True
-            self.logger.info(f"Connected to ssh client to {elasticsearch} documents")
+            self.logger.info(
+                f"Connected to ssh client to {elasticsearch} documents")
         except (BaseException, Exception) as e:
-            self.logger.error(f"An error occurred while trying to connect via ssh: {e}")
+            self.logger.error(
+                f"An error occurred while trying to connect via ssh: {e}")
             try:
-                self.logger.warning("Could not connect via ssh. Trying via http...")
+                self.logger.warning(
+                    "Could not connect via ssh. Trying via http...")
                 self._init_elastic_search_client_http()
                 self.connected = True
-                self.logger.info(f"Connected to elasticsearch via http to {elasticsearch} documents")
+                self.logger.info(
+                    f"Connected to elasticsearch via http to {elasticsearch} documents")
             except(BaseException, Exception) as e:
-                self.logger.warning("Could not connect to ElasticSearch with ssh or http")
+                self.logger.warning(
+                    "Could not connect to ElasticSearch with ssh or http")
                 self.logger.error(e)
                 self.connected = False
 
@@ -420,34 +432,65 @@ class ElasticSearchConfig:
         """
         if self.connected:
             del self.elasticsearch_client
-            [t.close() for t in threading.enumerate() if t.__class__.__name__ == "Transport"]
+            [t.close() for t in threading.enumerate()
+             if t.__class__.__name__ == "Transport"]
             self.tunnel.stop()
 
     def truncate_elasticsearch(self, index):
         """
         Delete all entries in the elasticsearch
         """
-        Search(using=self.elasticsearch_client, index=index).query("match_all").delete()
+        Search(using=self.elasticsearch_client,
+               index=index).query("match_all").delete()
 
     def retrieve_documents(self, previous_date=None, retrieve_kind="file"):
         if retrieve_kind == "file":
-            file_path = join(self.resources_folder, "kasteli_34_urls.txt")
+            file_path = join(self.resources_folder,
+                             self.properties["eval"]["file_path"])
             # read the list of urls from the file:
             with open(file_path, "r") as f:
                 urls = [line.rstrip() for line in f]
-            search_articles = Search(using=self.elasticsearch_client, index='articles').filter('terms', link=urls)
+            search_articles = Search(
+                using=self.elasticsearch_client, index='articles').filter('terms', link=urls)
         else:
-            date_range = {'gt': previous_date, 'lte': datetime.now()}
-            search_articles = Search(using=self.elasticsearch_client, index='articles').filter('range', date=date_range)
+            delta = self.properties["eval"]["delta_days"]
+            today_date = datetime_base.date.today()
+            previous_date = today_date - datetime_base.timedelta(days=delta)
+            search_term = self.properties["eval"]["search_term"]
+            date_range = {'gt': previous_date, 'lte': today_date}
+            search_id = f"{str(today_date)}_range_{','.join([k + '_' + str(v) for (k,v) in date_range.items()])}"
+
+            date_range = {'gt': str(previous_date), 'lte': str(today_date)}
+            if search_term:
+                if type(search_term) is not list:
+                    search_term = [search_term]
+                queries = []
+                for st in search_term:
+                    queries.append(Q('match', title=st))
+                # if len(queries) == 1:
+                #     queries = queries[0]
+                query = Q('bool', must=queries, filter=[
+                          {"range": {"date": date_range}}])
+                search_articles = Search(
+                    using=self.elasticsearch_client, index='articles')
+                search_articles.query = query
+                search_id += "_terms_" + ",".join(search_term)
+            else:
+                search_articles = Search(using=self.elasticsearch_client, index='articles').filter(
+                    'range', date=date_range)
         documents = []
         for hit in search_articles.scan():
             document = hit.to_dict()
             document["id"] = hit.meta["id"]
             if not document["content"].startswith(document["title"]):
-                document["content"] = document["title"] + "\r\n\r\n" + document["content"]
+                document["content"] = document["title"] + \
+                    "\r\n\r\n" + document["content"]
+            self.logger.debug(
+                f"Appending doc from {document['date']} titled: {document['title']}")
             documents.append(document)
-        self.update_last_retrieve_date()
-        return documents
+        # self.update_last_retrieve_date()
+        self.logger.debug(f"Got {len(documents)} docs")
+        return documents, search_id
 
     def update_last_retrieve_date(self):
         path_to_properties = join(self.resources_folder, self.properties_file)

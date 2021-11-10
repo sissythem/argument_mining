@@ -9,10 +9,7 @@ from string import punctuation
 from elasticsearch import Elasticsearch
 
 # from elasticsearch_dsl import Search, Q
-try:
-    from ellogon import tokeniser
-except(BaseException, Exception):
-    pass
+from ellogon import tokeniser
 from genson import SchemaBuilder
 from sshtunnel import SSHTunnelForwarder
 

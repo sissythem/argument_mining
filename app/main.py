@@ -8,6 +8,7 @@ from src.training_hf.models import *
 from src.utils.config import Notification
 from baseline import run_baseline
 
+import json
 from sklearn.dummy import DummyClassifier
 import numpy as np
 
@@ -20,7 +21,8 @@ def error_analysis(path_to_resources):
         path_to_resources (str): the full path to the resources folder
     """
     path_to_results = join(path_to_resources, "resources/results", "test.tsv")
-    results = pd.read_csv(path_to_results, sep=" ", index_col=None, header=None, skip_blank_lines=False)
+    results = pd.read_csv(path_to_results, sep=" ",
+                          index_col=None, header=None, skip_blank_lines=False)
     df_list = np.split(results, results[results.isnull().all(1)].index)
     sentences = []
     for df in df_list:
@@ -28,7 +30,8 @@ def error_analysis(path_to_resources):
         df[3] = np.where(df[1] == df[2], 0, 1)
         sentences.append(df)
     sentences_df = pd.concat(sentences)
-    sentences_df.to_csv(join(path_to_resources, "resources/results/results.tsv"), sep="\t", index=False, header=False)
+    sentences_df.to_csv(join(
+        path_to_resources, "resources/results/results.tsv"), sep="\t", index=False, header=False)
     error_sentences = []
     for sentence_df in sentences:
         if 1 in sentence_df[3].values:
@@ -38,7 +41,8 @@ def error_analysis(path_to_resources):
                 total_text += f"{text} <{true_lbl}> " if diff == 0 else \
                     f"{text} <{true_lbl}> <{pred_lbl}> "
             print(total_text.strip())
-            print("==============================================================================")
+            print(
+                "==============================================================================")
             error_sentences.append(total_text + "\n\n")
     with open(join(path_to_resources, "errors.txt"), "w") as f:
         f.writelines(error_sentences)
@@ -60,17 +64,20 @@ def train(app_config):
         logger.info("ADU Training is finished!")
     if "rel" in models_to_train:
         logger.info("Training relations model")
-        rel_model = ClassificationModel(app_config=app_config, model_name="rel")
+        rel_model = ClassificationModel(
+            app_config=app_config, model_name="rel")
         rel_model.train()
         logger.info("Relations training finished!")
     if "stance" in models_to_train:
         logger.info("Training stance model")
-        stance_model = ClassificationModel(app_config=app_config, model_name="stance")
+        stance_model = ClassificationModel(
+            app_config=app_config, model_name="stance")
         stance_model.train()
         logger.info("Stance training finished!")
     if "sim" in models_to_train:
         logger.info("Training argument similarity model")
-        sim_model = ClassificationModel(app_config=app_config, model_name="sim")
+        sim_model = ClassificationModel(
+            app_config=app_config, model_name="sim")
         sim_model.train()
         logger.info("Finished training similarity model")
 
@@ -85,7 +92,13 @@ def main():
     notification: Notification = Notification(app_config=app_config)
     try:
         properties = app_config.properties
+
         tasks = properties["tasks"]
+        if "retrieve" in tasks:
+            documents, search_id = app_config.elastic_retrieve.retrieve_documents(
+                retrieve_kind=app_config.properties["eval"]["retrieve"])
+            with open(join(app_config.output_path, f"retrieved_documents_{search_id}.json"), "w") as f:
+                json.dump(documents, f)
         if "prep" in tasks:
             data_preprocessor = DataPreprocessor(app_config=app_config)
             data_preprocessor.preprocess()
@@ -93,7 +106,7 @@ def main():
             train(app_config=app_config)
         if "eval" in properties["tasks"]:
             arg_mining = DebateLab(app_config=app_config)
-            arg_mining.run_pipeline()
+            arg_mining.run_pipeline(documents=documents)
         if "error" in properties["tasks"]:
             error_analysis(path_to_resources=app_config.resources_path)
         notification.send_email(body="Argument mining pipeline finished successfully",
@@ -105,6 +118,7 @@ def main():
             subject=f"Error in argument mining run: {app_config.run}")
     finally:
         try:
+
             app_config.elastic_save.stop()
             app_config.elastic_retrieve.stop()
         except(BaseException, Exception):
@@ -117,22 +131,22 @@ def main_huggingface():
     arg_mining_dataset = ArgMiningDataset(app_config=app_config)
     arg_mining_model = TransformerModel(app_config=app_config)
     model_id = "bert-base-uncased"
-    seqlen=16
+    seqlen = 16
     # tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id="xlm-roberta-base", seqlen=512, limit_data=100)
-    tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(model_id=model_id, seqlen=seqlen)
+    tok, num_labels, train_dset, eval_dset = arg_mining_dataset.load_data(
+        model_id=model_id, seqlen=seqlen)
     # arg_mining_model.train(model_id=model_id, tokenizer=tok, num_labels=num_labels, train_dset=train_dset, eval_dset=eval_dset, seqlen=seqlen, batch_size=8, eval_step_period=100, lr=0.01, epochs=1000)
-    
-   
+
     # baseline code
-    ################################3
-    
+    # 3
+
     train_dat = torch.stack([t['input_ids'] for t in train_dset])
-    train_dat = [tok.convert_ids_to_tokens(t) for t in  train_dat]
+    train_dat = [tok.convert_ids_to_tokens(t) for t in train_dat]
     train_lab = np.stack([np.asarray(t['labels']) for t in train_dset])
     train_lab[train_lab == -100] = 7
 
     eval_dat = torch.stack([t['input_ids'] for t in eval_dset])
-    eval_dat = [tok.convert_ids_to_tokens(t) for t in  eval_dat]
+    eval_dat = [tok.convert_ids_to_tokens(t) for t in eval_dat]
     eval_lab = np.stack([np.asarray(t['labels']) for t in eval_dset])
     eval_lab[eval_lab == -100] = 7
 
@@ -140,6 +154,7 @@ def main_huggingface():
     model, w2i, t2i = run_baseline(train_dat, train_lab)
     print("Evaluating with baseline")
     run_baseline(eval_dat, eval_lab, model=(model, w2i, t2i))
+
 
 if __name__ == '__main__':
     main()
