@@ -97,7 +97,7 @@ def main():
         if "retrieve" in tasks:
             documents, search_id = app_config.elastic_retrieve.retrieve_documents(
                 retrieve_kind=app_config.properties["eval"]["retrieve"])
-            with open(join(app_config.output_path, f"retrieved_documents_{search_id}.json"), "w") as f:
+            with open(join(app_config.output_path, "output_files", f"retrieved_documents_{len(documents)}_{search_id}.json"), "w") as f:
                 json.dump(documents, f)
         if "prep" in tasks:
             data_preprocessor = DataPreprocessor(app_config=app_config)

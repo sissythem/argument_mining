@@ -46,6 +46,8 @@ train:
 eval:
   model: "best" # options: best, final
   retrieve: "file" # options: file, date
+  file_path: "kasteli_1_urls.txt"
+  search_term: ["Κρήτη", "Σεισμός"]
   last_date: ""
   ner_endpoint: "http://petasis.dyndns.org:7100/predict-ner"
   crawler_endpoint: "http://socialwebobservatory.iit.demokritos.gr:8001/crawl.json"
