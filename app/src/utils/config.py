@@ -114,6 +114,7 @@ class AppConfig:
             dict: the application properties
         """
         self.properties_file = "properties.yaml"
+        print("Loading properties from", self.properties_file)
         self.example_properties = "example_properties.yaml"
         path_to_properties = join(self.resources_path, self.properties_file)
         path_to_example_properties = join(
@@ -444,12 +445,17 @@ class ElasticSearchConfig:
                index=index).query("match_all").delete()
 
     def retrieve_documents(self, previous_date=None, retrieve_kind="file"):
+        search_id = None
         if retrieve_kind == "file":
             file_path = join(self.resources_folder,
                              self.properties["eval"]["file_path"])
             # read the list of urls from the file:
             with open(file_path, "r") as f:
-                urls = [line.rstrip() for line in f]
+                try:
+                    data = json.load(f)
+                    urls = [dat["link"] for dat in data]
+                except json.JSONDecodeError:
+                    urls = [line.rstrip() for line in f]
             search_articles = Search(
                 using=self.elasticsearch_client, index='articles').filter('terms', link=urls)
         else:

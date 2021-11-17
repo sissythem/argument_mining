@@ -1,4 +1,5 @@
 import json
+from os.path import join
 from itertools import combinations
 
 import numpy as np
@@ -99,6 +100,7 @@ class DebateLab:
         invalid_document_ids = []
         corrected_ids = []
         validator = JsonValidator(app_config=self.app_config)
+
         for idx, document in enumerate(documents):
             self.app_logger.info(
                 f"Extracting topics for document {idx+1}/{len(documents)}: {document['title']}")
@@ -123,6 +125,13 @@ class DebateLab:
             valid_document_ids, corrected_ids, invalid_document_ids)
         if export_schema:
             validator.export_json_schema(document_ids=valid_document_ids)
+
+        # mark validity and save outputs
+        for doc in documents:
+            doc["valid"] = int(doc["id"] in valid_document_ids)
+        with open(join(self.app_config.output_files, "pipeline_results.json"), "w") as f:
+                self.app_logger.info(f"Writing pipeline outputs to {f.name}")
+                json.dump(documents, f)
         return documents, valid_document_ids
 
     def predict(self, document):

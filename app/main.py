@@ -92,8 +92,8 @@ def main():
     notification: Notification = Notification(app_config=app_config)
     try:
         properties = app_config.properties
-
         tasks = properties["tasks"]
+        documents = None
         if "retrieve" in tasks:
             documents, search_id = app_config.elastic_retrieve.retrieve_documents(
                 retrieve_kind=app_config.properties["eval"]["retrieve"])
