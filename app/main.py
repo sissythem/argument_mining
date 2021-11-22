@@ -104,7 +104,7 @@ def main():
             data_preprocessor.preprocess()
         if "train" in tasks:
             train(app_config=app_config)
-        if "eval" in properties["tasks"]:
+        if "eval" in tasks:
             arg_mining = DebateLab(app_config=app_config)
             arg_mining.run_pipeline(documents=documents)
         if "error" in properties["tasks"]:

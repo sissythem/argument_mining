@@ -446,16 +446,20 @@ class ElasticSearchConfig:
 
     def retrieve_documents(self, previous_date=None, retrieve_kind="file"):
         search_id = None
-        if retrieve_kind == "file":
+        if retrieve_kind in ["objects", "links"]:
             file_path = join(self.resources_folder,
                              self.properties["eval"]["file_path"])
             # read the list of urls from the file:
             with open(file_path, "r") as f:
-                try:
-                    data = json.load(f)
-                    urls = [dat["link"] for dat in data]
-                except json.JSONDecodeError:
+                if retrieve_kind == "links":
                     urls = [line.rstrip() for line in f]
+                elif retrieve_kind == "objects":
+                    data = json.load(f)
+                    self.logger.info(
+                        f"Loaded {len(data)} data object instances.")
+                    return data, search_id
+            self.logger.info(
+                f"Fetching documents from explicit list of {len(urls)} urls")
             search_articles = Search(
                 using=self.elasticsearch_client, index='articles').filter('terms', link=urls)
         else:
@@ -465,6 +469,7 @@ class ElasticSearchConfig:
             search_term = self.properties["eval"]["search_term"]
             date_range = {'gt': previous_date, 'lte': today_date}
             search_id = f"{str(today_date)}_range_{','.join([k + '_' + str(v) for (k,v) in date_range.items()])}"
+            self.logger.info(f"Fetching documents from search: {search_id}")
 
             date_range = {'gt': str(previous_date), 'lte': str(today_date)}
             if search_term:

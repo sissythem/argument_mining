@@ -1,20 +1,19 @@
-import json
-import re
-import threading
-from datetime import datetime
-from os import mkdir, getcwd
-from os.path import join, exists
-from string import punctuation
-
+from src.utils.config import AppConfig
+from src.pipeline.validation import JsonValidator
+from sshtunnel import SSHTunnelForwarder
+from genson import SchemaBuilder
+from ellogon import tokeniser
 from elasticsearch import Elasticsearch
+from string import punctuation
+from os.path import join, exists
+from os import mkdir, getcwd
+from datetime import datetime
+import threading
+import re
+import json
+
 
 # from elasticsearch_dsl import Search, Q
-from ellogon import tokeniser
-from genson import SchemaBuilder
-from sshtunnel import SSHTunnelForwarder
-
-from src.pipeline.validation import JsonValidator
-from src.utils.config import AppConfig
 
 
 def tokenize(text, punct=True):
@@ -47,7 +46,8 @@ def join_sentences(tokenized_sentences):
     sentences = []
     punc = get_punctuation_symbols()
     for sentence in tokenized_sentences:
-        sentence = "".join(w if set(w) <= punc else f" {w}" for w in sentence).lstrip()
+        sentence = "".join(
+            w if set(w) <= punc else f" {w}" for w in sentence).lstrip()
         sentence = sentence.replace("( ", " (")
         sentence = sentence.replace("« ", " «")
         sentence = sentence.replace(" »", "» ")
@@ -60,7 +60,8 @@ def join_sentences(tokenized_sentences):
 
 def stop(tunnel, elastic_server_client):
     del elastic_server_client
-    [t.close() for t in threading.enumerate() if t.__class__.__name__ == "Transport"]
+    [t.close() for t in threading.enumerate()
+     if t.__class__.__name__ == "Transport"]
     tunnel.stop()
 
 
@@ -115,7 +116,8 @@ def export_to_json_files(data, do_validation=False, with_sentences=False):
     for document in data:
         document = document["_source"]
         if with_sentences:
-            sentences = join_sentences(tokenized_sentences=tokenize(text=document["content"]))
+            sentences = join_sentences(
+                tokenized_sentences=tokenize(text=document["content"]))
             document["sentences"] = sentences
         if do_validation:
             validate(validator=validator, document=document)
@@ -132,7 +134,8 @@ def validate(validator, document):
         file_path = join(getcwd(), f"output/output_files/{filename}")
         txt_file_path = file_path.replace(".json", ".txt")
         with open(file_path, "w", encoding='utf8') as f:
-            f.write(json.dumps(document, indent=4, sort_keys=False, ensure_ascii=False))
+            f.write(json.dumps(document, indent=4,
+                    sort_keys=False, ensure_ascii=False))
         with open(txt_file_path, "w") as f:
             for validation_error in validation_errors:
                 f.write(validation_error.value + "\n")
@@ -161,7 +164,7 @@ def main(connection_type="http", export=("articles", "schema"), do_validation=Fa
                '5a6a4222c17b66a4f8ecd0750762d316f666db0a', '2a6a5690affc0a5733ef5fc4354a4d32aa91e230',
                'aed988e95568cf6e999ef4ec852d37c9482e7801', 'dca77f44643e63f2a49caf3455c94ad809e18ca0',
                'e6d74b3832e335b73961645fa42667c106508782']
-
+    swo_ids = ['da556dfd49831f9feb76bda7a0867dbf1f2e6990']
     if connection_type == "http":
         elastic_client = elastic_http()
         tunnel = None
@@ -169,7 +172,8 @@ def main(connection_type="http", export=("articles", "schema"), do_validation=Fa
         elastic_client, tunnel = elastic_ssh()
     articles = get_articles(elastic_client=elastic_client, ids=swo_ids)
     if "articles" in export:
-        export_to_json_files(data=articles, with_sentences=with_sentences, do_validation=do_validation)
+        export_to_json_files(
+            data=articles, with_sentences=with_sentences, do_validation=do_validation)
     if "schema" in export:
         export_schema(data=articles)
     if connection_type == "ssh":
@@ -177,4 +181,5 @@ def main(connection_type="http", export=("articles", "schema"), do_validation=Fa
 
 
 if __name__ == '__main__':
-    main(connection_type="http", export=("articles"), do_validation=False, with_sentences=True)
+    main(connection_type="http", export=("articles"),
+         do_validation=True, with_sentences=True)

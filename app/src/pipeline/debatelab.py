@@ -130,8 +130,8 @@ class DebateLab:
         for doc in documents:
             doc["valid"] = int(doc["id"] in valid_document_ids)
         with open(join(self.app_config.output_files, "pipeline_results.json"), "w") as f:
-                self.app_logger.info(f"Writing pipeline outputs to {f.name}")
-                json.dump(documents, f)
+            self.app_logger.info(f"Writing pipeline outputs to {f.name}")
+            json.dump(documents, f)
         return documents, valid_document_ids
 
     def predict(self, document):
