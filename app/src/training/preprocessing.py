@@ -161,8 +161,7 @@ class DatasetLoader:
 class ClarinLoader(DatasetLoader):
 
     def __init__(self, app_config: AppConfig, folder="kasteli", json_file="kasteli.json", pickle_file="documents.pkl"):
-        self.app_config: AppConfig = app_config
-        self.app_logger = self.app_config.app_logger
+        super(ClarinLoader, self).__init__(app_config=app_config)
         self.dataset_path = join(self.app_config.dataset_folder, "initial", folder)
         self.json_file = json_file
         self.pickle_file = pickle_file
