@@ -1,6 +1,7 @@
 import re
 from string import punctuation
 from typing import Union, List, Dict, Tuple, AnyStr, Set
+import difflib
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +10,7 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.manifold import TSNE
+from itertools import product
 
 try:
     from ellogon import tokeniser
@@ -26,8 +28,55 @@ def tokenize(text, punct=True):
     return list(tokeniser.tokenise_no_punc(text)) if not punct else list(tokeniser.tokenise(text))
 
 
+def inject_missing_gaps(token_idx_list, starting_idx=0, reference_text=None):
+    """Modify list of tokens so that all indices are consequtive
+
+    Args:
+        token_idx_list (list): List of tuples, each element is
+        starting_idx (int): Initial index
+    """
+
+    if reference_text is None:
+        reference_text = " " * token_idx_list[-1]
+
+    if type(token_idx_list[0][0]) is not str:
+        l = []
+        for part in token_idx_list:
+            if type(part) is not int:
+                # it's a tuple of tokens
+                part = inject_missing_gaps(
+                    part, starting_idx=starting_idx, reference_text=reference_text)
+            else:
+                pass
+            l.append(part)
+        # update starting index
+        l[1] = l[0][0][1]
+        return tuple(l)
+    else:
+        res = []
+        current = starting_idx
+        # we are at a lowest-level tuple
+        for part in token_idx_list:
+            txt, start, end = part
+            diff = start - current
+            if diff != 0:
+                whitespace_slice = reference_text[current:current+diff]
+                assert not whitespace_slice.strip(), "Non-empty whitespace in tokenization-injection!"
+                res.append((whitespace_slice, current, start))
+            res.append(part)
+            current = end
+        return tuple(res)
+
+
 def tokenize_with_spans(text):
-    return tokeniser.tokenise_spans(text)
+    toks_raw = tokeniser.tokenise_spans(text)
+    toks_fixed = []
+    curr_idx = 0
+    for t in toks_raw:
+        tk = inject_missing_gaps(t, starting_idx=curr_idx, reference_text=text)
+        toks_fixed.append(tk)
+        curr_idx = tk[-1]
+    return toks_fixed, toks_raw
 
 
 def get_punctuation_symbols() -> Set[AnyStr]:
@@ -62,7 +111,8 @@ def join_sentences(tokenized_sentences: List[Tuple[AnyStr]]) -> List[AnyStr]:
 
 def join_sentence(sentence: Union[List[AnyStr], Tuple[AnyStr]]) -> AnyStr:
     punc = get_punctuation_symbols()
-    sentence = "".join(w if set(w) <= punc else f" {w}" for w in sentence).lstrip()
+    sentence = "".join(
+        w if set(w) <= punc else f" {w}" for w in sentence).lstrip()
     sentence = sentence.replace("( ", " (")
     sentence = sentence.replace("« ", " «")
     sentence = sentence.replace(" »", "» ")
@@ -195,7 +245,8 @@ def locate_end(adu, content, end_idx):
     window_len = min(len(adu), 10)
     adu_slice = adu[-window_len:]
     jitter_length = 5
-    candidates = list(range(end_idx - jitter_length, end_idx + jitter_length + 1))
+    candidates = list(range(end_idx - jitter_length,
+                      end_idx + jitter_length + 1))
     variable_end_idx = end_idx
     while True:
         content_slice = content[variable_end_idx - window_len:variable_end_idx]
@@ -206,7 +257,9 @@ def locate_end(adu, content, end_idx):
         variable_end_idx = candidates.pop(0)
 
 
-def find_segment_in_text(segment, sentence):
+def find_segment_in_text(segment, tokenized_sentence):
+    if "Σχόλιο" in segment:
+        print()
     segment_tokens = segment["tokens"]
     start_idx, end_idx = -1, -1
     first_token = segment_tokens[0]
@@ -224,18 +277,57 @@ def find_segment_in_text(segment, sentence):
     return start_idx, end_idx
 
 
-def get_args_from_sentence(sentence):
+def get_args_from_sentence(sentence, orig_tokenized):
     if sentence.tokens:
         segments = []
         idx = None
         while True:
             segment, idx = get_next_segment(sentence.tokens, current_idx=idx)
             if segment:
+                # consolidate tokens to text
+                # locate edges to expanded seq
+                s, e = align_expanded_tokens(segment['text'], orig_tokenized)
+                # reconstruct
+                text = "".join(orig_tokenized[s:e+1])
+                segment['text'] = text
                 segment["mean_conf"] = np.mean(segment["confidences"])
                 segments.append(segment)
             if idx is None:
                 break
         return segments
+
+
+def align_expanded_tokens(tokens, expanded_tokens):
+    # align token sequence with the expanded token sequence, to have a
+    # perfect match for reconstructed text
+
+    # match the start and end
+    start = [i for i, tok in enumerate(expanded_tokens) if tok == tokens[0]]
+    end = [i for i, tok in enumerate(expanded_tokens) if tok == tokens[-1]]
+
+    # handle singletons
+
+    combos = product(start, end)
+
+    # start <= end
+    combos = [(s, e) for (s, e) in combos if s <= e]
+
+    # expaned seqlen >= original seqlen
+    if len(tokens) > 1:
+        combos = [(s, e) for (s, e) in combos if e-s+1 >= len(tokens)]
+
+    if len(combos) > 1:
+        # get closest match
+        candidates = [expanded_tokens[i:j+1] for (i, j) in combos]
+        match = difflib.get_close_matches(tokens, candidates, n=1)[0]
+        ix = candidates.index(match)
+        combos = [combos[ix]]
+
+    if len(combos) != 1:
+        raise ValueError(
+            "Ambiguous / missing token alignment to expanded collection!")
+    start, end = combos[0]
+    return start, end
 
 
 def get_next_segment(tokens, current_idx=None, current_label=None, segment=None):
@@ -257,7 +349,7 @@ def get_next_segment(tokens, current_idx=None, current_label=None, segment=None)
     if current_label is not None:
         if label_type == "I" and current_label == label:
             # append to the running collections
-            segment["text"] += " " + token.text
+            segment["text"].append(token.text)
             segment["confidences"].append(confidence)
             segment["tokens"].append(token)
             return get_next_segment(tokens, current_idx + 1, current_label, segment)
@@ -268,14 +360,16 @@ def get_next_segment(tokens, current_idx=None, current_label=None, segment=None)
     else:
         # only care about B-tags to start a segment
         if label_type == "B":
-            segment = {"text": token.text, "label": label, "tokens": [token], "confidences": [confidence]}
+            segment = {"text": [token.text], "label": label,
+                       "tokens": [token], "confidences": [confidence]}
             return get_next_segment(tokens, current_idx + 1, label, segment)
         else:
             return get_next_segment(tokens, current_idx + 1, None, segment)
 
 
 def get_adus(segments):
-    major_claims = [segment for segment in segments if segment["type"] == "major_claim"]
+    major_claims = [
+        segment for segment in segments if segment["type"] == "major_claim"]
     claims = [segment for segment in segments if segment["type"] == "claim"]
     premises = [segment for segment in segments if segment["type"] == "premise"]
     return major_claims, claims, premises
@@ -329,7 +423,8 @@ def visualize_topics(cluster, embeddings):
     outliers = result.loc[result.labels == -1, :]
     clustered = result.loc[result.labels != -1, :]
     plt.scatter(outliers.x, outliers.y, color='#BDBDBD', s=0.05)
-    plt.scatter(clustered.x, clustered.y, c=clustered.labels, s=0.05, cmap='hsv_r')
+    plt.scatter(clustered.x, clustered.y,
+                c=clustered.labels, s=0.05, cmap='hsv_r')
     plt.colorbar()
 
 

@@ -17,17 +17,20 @@ from src.utils.config import AppConfig
 
 class CustomSentence(Sentence):
 
-    def __init__(self, sentence_tuple):
+    def __init__(self, sentence_tuple, sentence_tuple_without_whitespace):
         tokens_tuple, start_idx, end_idx = sentence_tuple
         self.start_idx = start_idx
         self.end_idx = end_idx
         only_tokens = [token[0] for token in tokens_tuple]
         self.text = utils.join_sentence(sentence=only_tokens)
+        self.expanded_tokens = sentence_tuple
         self.tokens = []
         for token in tokens_tuple:
             tok = CustomToken(text=token[0], start=token[1], end=token[2])
             self.tokens.append(tok)
-        super(CustomSentence, self).__init__(self.text)
+        self.solid_tokens = [tt[0]
+                             for tt in sentence_tuple_without_whitespace[0]]
+        super(CustomSentence, self).__init__(self.solid_tokens)
 
 
 class CustomToken:
@@ -80,11 +83,14 @@ class Document:
             segments = self._get_segments(sentence=sentence)
             sentence_split = self.sentences[idx]
             if segments:
-                tokens_lbls = self._get_tokens_and_labels(sentence_tokens=sentence_split, segments=segments)
-                sentence_split, sentence_labels = utils.bio_tag_lbl_per_token(tokens_labels_tuple=tokens_lbls)
+                tokens_lbls = self._get_tokens_and_labels(
+                    sentence_tokens=sentence_split, segments=segments)
+                sentence_split, sentence_labels = utils.bio_tag_lbl_per_token(
+                    tokens_labels_tuple=tokens_lbls)
             else:
                 label = other_label
-                sentence_split = tuple([token for token in sentence_split if token is not None or token != ""])
+                sentence_split = tuple(
+                    [token for token in sentence_split if token is not None or token != ""])
                 sentence_labels = tuple([label for _ in sentence_split])
 
             self.sentences[idx] = sentence_split
@@ -162,7 +168,10 @@ class ClarinLoader(DatasetLoader):
 
     def __init__(self, app_config: AppConfig, folder="kasteli", json_file="kasteli.json", pickle_file="documents.pkl"):
         super(ClarinLoader, self).__init__(app_config=app_config)
+        self.app_config: AppConfig = app_config
+        self.app_logger = self.app_config.app_logger
         self.dataset_path = join(self.app_config.dataset_folder, "initial", folder)
+
         self.json_file = json_file
         self.pickle_file = pickle_file
 
@@ -202,7 +211,8 @@ class ClarinLoader(DatasetLoader):
         document = Document(logger=self.app_logger, document_id=doc["id"], name=doc["name"], content=doc["text"],
                             annotations=doc["annotations"])
         document.sentences = utils.tokenize(text=document.content)
-        self.app_logger.debug(f"Processing document with id {document.document_id}")
+        self.app_logger.debug(
+            f"Processing document with id {document.document_id}")
         for annotation in document.annotations:
             annotation_id = annotation["_id"]
             spans = annotation["spans"]
@@ -270,8 +280,10 @@ class EssayLoader(DatasetLoader):
 
     def __init__(self, app_config: AppConfig, pickle_file="documents.pkl", languages=("english", "greek")):
         super(EssayLoader, self).__init__(app_config=app_config)
-        self.dataset_path = join(self.app_config.dataset_folder, "initial", "essays")
-        self.language_paths = [join(self.dataset_path, language) for language in languages]
+        self.dataset_path = join(
+            self.app_config.dataset_folder, "initial", "essays")
+        self.language_paths = [join(self.dataset_path, language)
+                               for language in languages]
         self.languages = languages
         self.pickle_file = pickle_file
 
@@ -305,7 +317,8 @@ class EssayLoader(DatasetLoader):
         document = Document(logger=self.app_logger, document_id=doc["id"], name=name, content=doc["content"],
                             annotations=doc["annotations"])
         document.sentences = utils.tokenize(text=document.content)
-        self.app_logger.debug(f"Processing document with id {document.document_id}")
+        self.app_logger.debug(
+            f"Processing document with id {document.document_id}")
         adus = document.annotations["ADUs"]
         relations = document.annotations["Relations"]
         major_claim_id = -1
@@ -403,10 +416,12 @@ class EssayLoader(DatasetLoader):
                     if file.endswith(".txt"):
                         with open(join(path, file), "r") as f:
                             lines = f.readlines()
-                            lines = [line for line in lines if line and line != "\n"]
+                            lines = [
+                                line for line in lines if line and line != "\n"]
                         processed_files[filename]["content"] = " ".join(lines)
                     elif file.endswith(".ann"):
-                        df = pd.read_csv(join(path, file), index_col=None, header=None, sep="\t")
+                        df = pd.read_csv(join(path, file),
+                                         index_col=None, header=None, sep="\t")
                         data = self.process_df(df)
                         processed_files[filename]["annotations"] = data
                         processed_files[filename]["annotations"]["document_link"] = ""
@@ -418,7 +433,8 @@ class EssayLoader(DatasetLoader):
         for index, row in df.iterrows():
             if row[0].startswith("T"):
                 adu_type = row[1].split(" ")
-                adu = {"id": row[0], "type": adu_type[0], "starts": adu_type[1], "ends": adu_type[2], "segment": row[2]}
+                adu = {"id": row[0], "type": adu_type[0],
+                       "starts": adu_type[1], "ends": adu_type[2], "segment": row[2]}
                 data["ADUs"].append(adu)
             elif row[0].startswith("R"):
                 rel_type = row[1].split(" ")
@@ -431,7 +447,8 @@ class EssayLoader(DatasetLoader):
                         if adu["id"] == rel[1]:
                             if "stance" not in adu.keys():
                                 adu["stance"] = []
-                            adu["stance"].append({"id": row[0], "type": rel[2]})
+                            adu["stance"].append(
+                                {"id": row[0], "type": rel[2]})
         return data
 
 
@@ -460,10 +477,12 @@ class DataUpSampler:
             if not type(total_num) == dict:
                 self.app_logger.warning(
                     "For ADU oversampling total_num should be a dict with the labels & their final count")
-                self.app_logger.warning("Labels that have equal or greater number of instance will be kept the same")
+                self.app_logger.warning(
+                    "Labels that have equal or greater number of instance will be kept the same")
             df = self.oversample_adus(data=df, desired_lbl_count=total_num)
         else:
-            df = self.oversample_relations(df=df, rel=task_kind, total_num=total_num)
+            df = self.oversample_relations(
+                df=df, rel=task_kind, total_num=total_num)
         filename = filename.replace(".csv", "")
         new_file = f"{filename}.csv"
         output_filepath = join(data_path, new_file)
@@ -489,13 +508,15 @@ class DataUpSampler:
             while True:
                 if desired_count <= num_instances + len(append_idxs):
                     break
-                num_append = min(desired_count - num_instances + len(append_idxs), num_instances)
+                num_append = min(desired_count - num_instances +
+                                 len(append_idxs), num_instances)
                 append_idxs.extend(random.sample(ixs, num_append))
             dfs.extend([dfs[i] for i in append_idxs])
         new_df_list = []
         for _, df_list in labels_dict.items():
             for df in df_list:
-                empty_row = pd.DataFrame([[np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN]])
+                empty_row = pd.DataFrame(
+                    [[np.NaN, np.NaN, np.NaN, np.NaN, np.NaN, np.NaN]])
                 new_df_list.append(df)
                 new_df_list.append(empty_row)
         return pd.concat(new_df_list, axis=0)
@@ -557,18 +578,22 @@ class CsvCreator:
 
     def load_adus(self, folder="kasteli"):
         self.app_logger.debug("Running ADU preprocessing")
-        out_file_path = join(self.app_config.dataset_folder, "adu", "train.csv")
+        out_file_path = join(
+            self.app_config.dataset_folder, "adu", "train.csv")
         if not exists(out_file_path):
-            documents_path = join(self.app_config.dataset_folder, "initial", folder, self.pickle_file)
+            documents_path = join(
+                self.app_config.dataset_folder, "initial", folder, self.pickle_file)
             self.app_logger.debug("Loading documents from pickle file")
             with open(documents_path, "rb") as f:
                 documents = pickle.load(f)
             self.app_logger.debug("Documents are loaded")
-            df = pd.DataFrame(columns=["token", "label", "is_arg", "sp", "sentence", "document"])
+            df = pd.DataFrame(
+                columns=["token", "label", "is_arg", "sp", "sentence", "document"])
             row_counter = 0
             sentence_counter = 0
             for document in documents:
-                self.app_logger.debug(f"Processing document with id: {document.document_id}")
+                self.app_logger.debug(
+                    f"Processing document with id: {document.document_id}")
                 doc_sentence_counter = 0
                 for idx, sentence in enumerate(document.sentences):
                     self.app_logger.debug(f"Processing sentence: {sentence}")
@@ -578,7 +603,8 @@ class CsvCreator:
                         sp = f"SP: {doc_sentence_counter}"
                         sentence_counter_str = f"Sentence: {sentence_counter}"
                         document_str = f"Doc: {document.document_id}"
-                        df.loc[row_counter] = [token, label, is_arg, sp, sentence_counter_str, document_str]
+                        df.loc[row_counter] = [token, label, is_arg,
+                                               sp, sentence_counter_str, document_str]
                         row_counter += 1
                         doc_sentence_counter += 1
                     df.loc[row_counter] = ["", "", "", "", "", ""]
@@ -590,7 +616,8 @@ class CsvCreator:
         if self.oversampling_prop:
             adu_config = self.oversampling_prop.get("adu", None)
             if adu_config:
-                self.upsampling.oversample(task_kind="adu", file_kind="train", total_num=adu_config)
+                self.upsampling.oversample(
+                    task_kind="adu", file_kind="train", total_num=adu_config)
 
     def load_similarities(self, do_oversample=False):
         self.app_logger.debug("Reading UKP aspect corpus")
@@ -599,7 +626,8 @@ class CsvCreator:
         data_file_path = join(data_path, data_csv)
         output_filepath = join(data_path, "train.csv")
         if not exists(output_filepath):
-            df = pd.read_csv(data_file_path, sep="\t", header=0, index_col=None)
+            df = pd.read_csv(data_file_path, sep="\t",
+                             header=0, index_col=None)
             new_df = pd.DataFrame(columns=["sentence", "label", "topic"])
             row_counter = 0
             for index, row in df.iterrows():
@@ -616,26 +644,33 @@ class CsvCreator:
 
     def load_relations_and_stance(self, folder="kasteli"):
         relations, stances = self._get_relations(folder=folder)
-        self._save_rel_df(rel_list=relations, folder="rel", filename="train.csv")
-        self._save_rel_df(rel_list=stances, folder="stance", filename="train.csv")
+        self._save_rel_df(rel_list=relations, folder="rel",
+                          filename="train.csv")
+        self._save_rel_df(rel_list=stances, folder="stance",
+                          filename="train.csv")
         if self.oversampling_prop:
             rel_num = self.oversampling_prop.get("rel", None)
             stance_num = self.oversampling_prop.get("stance", None)
             if rel_num is not None and type(rel_num) == int:
-                self.upsampling.oversample(task_kind="rel", file_kind="train", total_num=rel_num)
+                self.upsampling.oversample(
+                    task_kind="rel", file_kind="train", total_num=rel_num)
             if stance_num is not None and type(stance_num) == int:
-                self.upsampling.oversample(task_kind="stance", file_kind="train", total_num=stance_num)
+                self.upsampling.oversample(
+                    task_kind="stance", file_kind="train", total_num=stance_num)
 
     def _get_relations(self, folder):
-        documents_path = join(self.app_config.dataset_folder, "initial", folder, self.pickle_file)
+        documents_path = join(self.app_config.dataset_folder,
+                              "initial", folder, self.pickle_file)
         self.app_logger.debug("Loading documents from pickle file")
         with open(documents_path, "rb") as f:
             documents = pickle.load(f)
         self.app_logger.debug("Documents are loaded")
         relations, stances = [], []
         for document in documents:
-            self.app_logger.debug(f"Processing relations for document: {document.document_id}")
-            major_claims, claims, premises, relation_pairs, stance_pairs = self._collect_segments(document)
+            self.app_logger.debug(
+                f"Processing relations for document: {document.document_id}")
+            major_claims, claims, premises, relation_pairs, stance_pairs = self._collect_segments(
+                document)
             relations += utils.collect_relation_pairs(parents=major_claims, children=claims,
                                                       relation_pairs=relation_pairs)
             relations += utils.collect_relation_pairs(parents=claims, children=premises,
@@ -679,12 +714,14 @@ class CsvCreator:
             if relation.arg1 is None or relation.arg2 is None:
                 self.app_logger.error(
                     f"None segment for relation: {relation.relation_id} and document {relation.document_id}")
-            relation_pairs[(relation.arg1.segment_id, relation.arg2.segment_id)] = relation.relation_type
+            relation_pairs[(relation.arg1.segment_id,
+                            relation.arg2.segment_id)] = relation.relation_type
         for stance in stances:
             if stance.arg1 is None or stance.arg2 is None:
                 self.app_logger.error(
                     f"None segment for relation: {stance.relation_id} and document {stance.document_id}")
-            stance_pairs[(stance.arg1.segment_id, stance.arg2.segment_id)] = stance.relation_type
+            stance_pairs[(stance.arg1.segment_id,
+                          stance.arg2.segment_id)] = stance.relation_type
         for segment in document.segments:
             if segment.arg_type == "major_claim":
                 major_claims[segment.segment_id] = segment.text
@@ -733,7 +770,8 @@ class DatasetSplitter:
                              encoding="utf-8")
         rel_df.columns = ["sentence", "label", "pair"]
         rel_df = rel_df.drop(columns=["pair"])
-        train_df, dev_df, test_df = self._split_single_line_instance_dataset(df=rel_df)
+        train_df, dev_df, test_df = self._split_single_line_instance_dataset(
+            df=rel_df)
         self.write_csv(df=train_df, task="rel", kind="train")
         self.write_csv(df=dev_df, task="rel", kind="dev")
         self.write_csv(df=test_df, task="rel", kind="test")
@@ -743,14 +781,16 @@ class DatasetSplitter:
                                 encoding="utf-8")
         stance_df.columns = ["sentence", "label", "pair"]
         stance_df = stance_df.drop(columns=["pair"])
-        train_df, dev_df, test_df = self._split_single_line_instance_dataset(df=stance_df)
+        train_df, dev_df, test_df = self._split_single_line_instance_dataset(
+            df=stance_df)
         self.write_csv(df=train_df, task="stance", kind="train")
         self.write_csv(df=dev_df, task="stance", kind="dev")
         self.write_csv(df=test_df, task="stance", kind="test")
 
     def _split_token_level_dataset(self, df):
         new_df = self._keep_only_sentence_start(df=df)
-        train_df, dev_df, test_df = self._split_single_line_instance_dataset(df=new_df)
+        train_df, dev_df, test_df = self._split_single_line_instance_dataset(
+            df=new_df)
         train_df = self._get_all_sentences_df(df=train_df, initial_df=df)
         dev_df = self._get_all_sentences_df(df=dev_df, initial_df=df)
         test_df = self._get_all_sentences_df(df=test_df, initial_df=df)
@@ -787,7 +827,8 @@ class DatasetSplitter:
         indices = []
         for i, row in df.iterrows():
             idx = row["idx"]
-            indices += self._find_sentence_indices(df=initial_df, start_idx=idx)
+            indices += self._find_sentence_indices(
+                df=initial_df, start_idx=idx)
         return initial_df.loc[indices]
 
     def _find_sentence_indices(self, df, start_idx):
@@ -803,7 +844,8 @@ class DatasetSplitter:
         path = join(self.app_config.dataset_folder, task)
         filename = f"{kind}.csv"
         filepath = join(path, filename)
-        df.to_csv(filepath, sep="\t", index=False, header=False, encoding="utf-8")
+        df.to_csv(filepath, sep="\t", index=False,
+                  header=False, encoding="utf-8")
 
 
 class DataPreprocessor:
@@ -812,7 +854,8 @@ class DataPreprocessor:
         self.app_config = app_config
         self.app_logger = app_config.app_logger
         self.prep_properties = app_config.properties["prep"]
-        self.languages = self.prep_properties.get("languages", ["english", "greek"])
+        self.languages = self.prep_properties.get(
+            "languages", ["english", "greek"])
         self.data_loader = ClarinLoader(app_config=app_config) if self.prep_properties["dataset"] == "kasteli" else \
             EssayLoader(app_config=app_config, languages=self.languages)
         self.csv_creator = CsvCreator(app_config=app_config)
@@ -824,9 +867,11 @@ class DataPreprocessor:
         dataset = self.prep_properties["dataset"]
         self.app_logger.info(f"Loading dataset with documents: {dataset}")
         self.data_loader.load()
-        self.app_logger.info("Creating CSV file in CONLL format for ADUs classification")
+        self.app_logger.info(
+            "Creating CSV file in CONLL format for ADUs classification")
         self.csv_creator.load_adus(folder=dataset)
-        self.app_logger.info("Creating CSV file in CONLL format for relations/stance classification")
+        self.app_logger.info(
+            "Creating CSV file in CONLL format for relations/stance classification")
         self.csv_creator.load_relations_and_stance(folder=dataset)
         # self.app_logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
         # csv_loader.load_similarities()

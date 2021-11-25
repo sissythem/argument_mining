@@ -90,40 +90,43 @@ def main():
     """
     app_config: AppConfig = AppConfig()
     notification: Notification = Notification(app_config=app_config)
-    try:
-        properties = app_config.properties
-        tasks = properties["tasks"]
-        documents = None
-        if "retrieve" in tasks:
-            documents, search_id = app_config.elastic_retrieve.retrieve_documents(
-                retrieve_kind=app_config.properties["eval"]["retrieve"])
-            with open(join(app_config.output_path, "output_files", f"retrieved_documents_{len(documents)}_{search_id}.json"), "w") as f:
-                json.dump(documents, f)
-        if "prep" in tasks:
-            data_preprocessor = DataPreprocessor(app_config=app_config)
-            data_preprocessor.preprocess()
-        if "train" in tasks:
-            train(app_config=app_config)
-        if "eval" in tasks:
-            arg_mining = DebateLab(app_config=app_config)
-            arg_mining.run_pipeline(documents=documents)
-        if "error" in properties["tasks"]:
-            error_analysis(path_to_resources=app_config.resources_path)
-        notification.send_email(body="Argument mining pipeline finished successfully",
-                                subject=f"Argument mining run: {app_config.run}")
-    except(BaseException, Exception):
-        app_config.app_logger.error(traceback.format_exc())
-        notification.send_email(
-            body=f"Argument mining pipeline finished with errors {traceback.format_exc(limit=100)}",
-            subject=f"Error in argument mining run: {app_config.run}")
-    finally:
-        try:
+    # try:
+    properties = app_config.properties
+    tasks = properties["tasks"]
+    documents = None
+    if "retrieve" in tasks:
+        documents, search_id = app_config.elastic_retrieve.retrieve_documents(
+            retrieve_kind=app_config.properties["eval"]["retrieve"])
+        with open(join(app_config.output_path, "output_files", f"retrieved_documents_{len(documents)}_{search_id}.json"), "w") as f:
+            json.dump(documents, f)
+    if "prep" in tasks:
+        data_preprocessor = DataPreprocessor(app_config=app_config)
+        data_preprocessor.preprocess()
+    if "train" in tasks:
+        train(app_config=app_config)
+    if "eval" in tasks:
+        arg_mining = DebateLab(app_config=app_config)
+        arg_mining.run_pipeline(documents=documents)
+    if "error" in properties["tasks"]:
+        error_analysis(path_to_resources=app_config.resources_path)
+    notification.send_email(body="Argument mining pipeline finished successfully",
+                            subject=f"Argument mining run: {app_config.run}")
+    # except(BaseException, Exception) as ex:
+    #     app_config.app_logger.error(traceback.format_exc())
+    #     notification.send_email(
+    #         body=f"Argument mining pipeline finished with errors {traceback.format_exc(limit=100)}",
+    #         subject=f"Error in argument mining run: {app_config.run}")
+    # finally:
+    #     try:
 
-            app_config.elastic_save.stop()
-            app_config.elastic_retrieve.stop()
-        except(BaseException, Exception):
-            app_config.app_logger.error("Could not close ssh tunnels")
-            exit(-1)
+    #         app_config.elastic_save.stop()
+    #         app_config.elastic_retrieve.stop()
+    #     except(BaseException, Exception):
+    #         app_config.app_logger.error("Could not close ssh tunnels")
+    #         exit(-1)
+
+    app_config.elastic_save.stop()
+    app_config.elastic_retrieve.stop()
 
 
 def main_huggingface():

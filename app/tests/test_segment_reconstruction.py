@@ -1,37 +1,5 @@
 from ellogon import tokeniser
-
-
-def inject_missing_gaps(token_idx_list, starting_idx=0):
-    """Modify list of tokens so that all indices are consequtive
-
-    Args:
-        token_idx_list (list): List of tuples, each element is
-        starting_idx (int): Initial index
-    """
-    if type(token_idx_list[0][0]) is not str:
-        l = []
-        for part in token_idx_list:
-            if type(part) is not int:
-                # it's a tuple of tokens
-                part = inject_missing_gaps(part, starting_idx=starting_idx)
-            else:
-                pass
-            l.append(part)
-        # update starting index
-        l[1] = l[0][0][1]
-        return tuple(l)
-    else:
-        res = []
-        current = starting_idx
-        # we are at a lowest-level tuple
-        for part in token_idx_list:
-            txt, start, end = part
-            diff = start - current
-            if diff != 0:
-                res.append((" "*diff, current, start))
-            res.append(part)
-            current = end
-        return res
+from app.src.utils import inject_missing_gaps
 
 
 def test_document_text_reconstruction():
@@ -39,7 +7,7 @@ def test_document_text_reconstruction():
         by tokenization
     """
     texts = [
-        " \"  Ένα δύο, τρία ! ΤΕΣΣΕΡΑ + πέντε/έξι - επτά  . One two three? Four! and"
+        " \"  Ένα δύο, τρία ! ΤΕΣΣΕΡΑ + πέντε/έξι - επτά, έτσι:   One two three? Four! and"
     ]
 
     for te in texts:
@@ -58,3 +26,18 @@ def test_document_text_reconstruction():
 
         joined = "".join([y[0] for x in processed_parts for y in x[0]])
         assert joined == te, "Mismatch in stiched tokens and entire original text!"
+
+        # join tokens
+        reconc_sentences = []
+        for pp in processed_parts:
+            tok_tuples = pp[0]
+            toks = [x[0] for x in tok_tuples]
+            sentence = "".join(toks)
+            reconc_sentences.append(sentence)
+        reconc_text = "".join(reconc_sentences)
+        assert reconc_text == te, "Reconstrution error!"
+        print()
+
+
+if __name__ == "__main__":
+    test_document_text_reconstruction()

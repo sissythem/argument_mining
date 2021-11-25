@@ -72,8 +72,12 @@ class DebateLab:
         if notify:
             self.notification.notify_ics(ids_list=document_ids)
         # run cross-document clustering
-        relations, relation_ids = self.run_manual_clustering(
-            documents=documents, document_ids=document_ids, save=False)
+        if len(documents) > 1:
+            relations, relation_ids = self.run_manual_clustering(
+                documents=documents, document_ids=document_ids, save=False)
+        else:
+            self.app_logger.info(
+                "Skipping document clustering for {len(documents)} documents")
         if notify:
             self.notification.notify_ics(
                 ids_list=relation_ids, kind="clustering")
@@ -96,9 +100,7 @@ class DebateLab:
         Returns
             tuple: the list of documents and the list of document ids of the **valid** json objects
         """
-        valid_document_ids = []
-        invalid_document_ids = []
-        corrected_ids = []
+        valid_document_ids, invalid_document_ids, corrected_ids = [], [], []
         validator = JsonValidator(app_config=self.app_config)
 
         for idx, document in enumerate(documents):
@@ -108,6 +110,7 @@ class DebateLab:
                 document=document)
             counters = {"adu": segment_counter,
                         "rel": rel_counter, "stance": stance_counter}
+
             validation_errors, invalid_adus, corrected = validator.run_validation(
                 document=document, counters=counters)
             if corrected:
@@ -129,7 +132,21 @@ class DebateLab:
         # mark validity and save outputs
         for doc in documents:
             doc["valid"] = int(doc["id"] in valid_document_ids)
-        with open(join(self.app_config.output_files, "pipeline_results.json"), "w") as f:
+            for adu in doc['annotations']['ADUs']:
+                majcount = 0
+                s, e = int(adu["starts"]), int(adu["ends"])
+                if doc['content'][s:e] != adu["segment"]:
+                    self.app_logger.error(
+                        f"ERROR: Mismatch between offsets and segment {doc['id']}")
+                    self.app_logger.error("DOC:", doc['content'][s:e])
+                    self.app_logger.error("ADU:", adu['segment'])
+                if adu['type'] == 'major_claim':
+                    majcount += 1
+            if majcount > 1:
+                self.app_logger.error(
+                    f"ERROR: got {majcount} major claims for document {doc['id']}")
+
+        with open(join(self.app_config.output_files, "pipeline_results.json"), "w", encoding="utf-8") as f:
             self.app_logger.info(f"Writing pipeline outputs to {f.name}")
             json.dump(documents, f)
         return documents, valid_document_ids
@@ -154,6 +171,12 @@ class DebateLab:
         self.app_logger.debug("Extracting named entities")
         entities = self._get_named_entities(
             doc_id=document["id"], content=document["content"])
+
+        for ent in entities:
+            s, e = int(ent["starts"]), int(ent["ends"])
+            if document['content'][s:e] != ent["segment"]:
+                print()
+
         self.app_logger.debug("Predicting ADUs from document")
         segments, segment_counter = self._predict_adus(document=document)
         # assumes major_claim label should appear once -- concatenation due to sentence splitting
@@ -214,15 +237,18 @@ class DebateLab:
         self.app_logger.debug(
             f"Processing document with id: {document['id']} and name: {document}")
         segment_counter = 0
-        sentences = utils.tokenize_with_spans(text=document["content"])
+        sentences, sentences_without_whitespace = utils.tokenize_with_spans(
+            text=document["content"])
         found_mc = False
-        for idx, sentence in enumerate(sentences):
+        for idx, tokenized_sentence in enumerate(sentences):
             self.app_logger.debug(
-                f"Predicting adu for sentence: {idx+1}/{len(sentences)}: {sentence}")
-            sentence = CustomSentence(sentence)
+                f"Predicting adu for sentence: {idx+1}/{len(sentences)}: {tokenized_sentence}")
+            sentence = CustomSentence(
+                tokenized_sentence, sentences_without_whitespace[idx])
             self.adu_model.model.predict(sentence, all_tag_prob=True)
             self.app_logger.debug(f"Output: {sentence.to_tagged_string()}")
-            segments = utils.get_args_from_sentence(sentence)
+            segments = utils.get_args_from_sentence(
+                sentence, [x[0] for x in tokenized_sentence[0]])
             if segments:
                 for s_idx, segment in enumerate(segments):
                     self.app_logger.debug(
@@ -230,18 +256,24 @@ class DebateLab:
                     if len(segment["text"]) == 1:
                         continue
                     if segment["text"] and segment["label"]:
-                        tokens = segment["text"].split()
+                        # tokens = segment["text"].split()
+                        tokens = [t.text for t in segment["tokens"]]
                         if len(tokens) <= 2:
                             continue
                         if segment["label"] == "major_claim":
                             found_mc = True
                         self.app_logger.debug(
-                            f"Segment text: {segment['text']}")
-                        self.app_logger.debug(
-                            f"Segment type: {segment['label']}")
+                            f"Segment type: {segment['label']}, text: {segment['text']}")
+
                         segment_counter += 1
-                        start_idx, end_idx = utils.find_segment_in_text(
-                            segment=segment, sentence=sentence)
+                        expanded_tokens = [e[0] for e in tokenized_sentence[0]]
+
+                        s, e = utils.align_expanded_tokens(
+                            [x.text for x in segment['tokens']],
+                            expanded_tokens)
+                        start_idx = tokenized_sentence[0][s][1]
+                        end_idx = tokenized_sentence[0][e][2]
+
                         if start_idx == -1 and end_idx == -1:
                             continue
                         seg = {
@@ -253,6 +285,9 @@ class DebateLab:
                             "confidence": segment["mean_conf"]
                         }
                         adus.append(seg)
+                        assert document['content'][start_idx:
+                                                   end_idx] == seg['segment'], "Oi bruv"
+
         return self._check_major_claim(adus=adus, title=document["title"], mc_exists=found_mc,
                                        segment_counter=segment_counter)
 
@@ -269,23 +304,51 @@ class DebateLab:
             return self._handle_multiple_major_claims(major_claims=major_claims, adus=adus)
 
     def _handle_multiple_major_claims(self, major_claims, adus):
-        major_claim = {"id": "T1", "type": "major_claim", "segment": ""}
-        confs = []
-        for idx, mc in enumerate(major_claims):
-            if idx == 0:
-                major_claim["starts"] = mc["starts"]
+        slist = list(sorted(major_claims, key=lambda x: int(x["starts"])))
+
+        # first merge any contiguous mcs
+        i = 0
+        while i < len(slist)-1:
+            a = major_claims[i]
+            b = major_claims[i+1]
+            if a['starts'] == b['ends']:
+                # merge
+                merged = {"id": f"{a['id']}_{b['id']}", "type": "major_claim",
+                          "segment": a['segment'] + b['segment'],
+                          "starts": min(a['starts']),
+                          "confidence": np.mean([a['confidence'], b['confidence']])}
+                slist = [slist[:i] + [merged] + slist[i+2:]]
             else:
-                if int(mc["starts"]) > int(major_claim["ends"]) + 5:
-                    break
-            confs.append(mc["confidence"])
-            major_claim["ends"] = mc["ends"]
-            major_claim["segment"] += " " + mc["segment"]
-        major_claim["confidence"] = np.mean(confs)
-        major_claim["segment"] = utils.replace_multiple_spaces_with_single_space(
-            text=major_claim["segment"])
-        return self._insert_major_claim(adus=adus, seg=major_claim)
+                i += 1
+
+        # after merging, keep only the mc that has the highest confidence
+        rng = list(range(len(major_claims)))
+        maxconf_idx = max(zip(rng, major_claims),
+                          key=lambda x: x[1]['confidence'])[0]
+        resolved_major_claim = major_claims[maxconf_idx]
+        # convert the rest to plain claims
+        claims = []
+        for i in rng:
+            if i != maxconf_idx:
+                cl = major_claims[i]
+                cl["type"] = "claim"
+                claims.append(cl)
+        adus.extend(claims)
+        return self._handle_adu_ids(adus, resolved_major_claim)
+
+    def _handle_adu_ids(self, adus, major_claim):
+        # insert the major claim
+        major_claim["id"] = "T1"
+        adus.insert(0, major_claim)
+        # set other adus to ids T2, T3, ...
+        segment_counter = 2
+        for adu in adus:
+            adu["id"] = f"T{segment_counter}"
+            segment_counter += 1
+        return adus, segment_counter
 
     def _handle_missing_major_claim(self, adus, title):
+        # set title as the major claim
         seg = {
             "id": "T1",
             "type": "major_claim",
@@ -294,15 +357,7 @@ class DebateLab:
             "segment": title,
             "confidence": 0.99
         }
-        return self._insert_major_claim(adus, seg)
-
-    def _insert_major_claim(self, adus, seg):
-        segment_counter = 2
-        for adu in adus:
-            adu["id"] = f"T{segment_counter}"
-            segment_counter += 1
-        adus.insert(0, seg)
-        return adus, segment_counter
+        return self._handle_adu_ids(adus, seg)
 
     def _predict_relations(self, major_claims, claims, premises):
         """
@@ -381,7 +436,7 @@ class DebateLab:
             source=source, target_start=adu2_start, target_end=adu2_end)
         return source
 
-    @staticmethod
+    @ staticmethod
     def _remove_already_predicted(source, already_predicted):
         if source and already_predicted:
             final_source = []
@@ -396,7 +451,7 @@ class DebateLab:
             return final_source
         return source
 
-    @staticmethod
+    @ staticmethod
     def _keep_k_closest(source, target_start, target_end, k=5):
         source = sorted(source, key=lambda key: int(
             key['starts']), reverse=False)

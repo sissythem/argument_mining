@@ -14,7 +14,7 @@ from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from os import environ
-from os import mkdir
+from os import makedirs
 from os.path import exists, join
 from pathlib import Path
 from typing import List, Dict, AnyStr
@@ -145,26 +145,17 @@ class AppConfig:
         """
         Create missing directories (e.g. logs, output etc)
         """
-        if not exists(self.output_path):
-            mkdir(self.output_path)
-        if not exists(self.logs_path):
-            mkdir(self.logs_path)
-        if not exists(self.tensorboard_path):
-            mkdir(self.tensorboard_path)
-        if not exists(self.model_path):
-            mkdir(self.model_path)
-        if not exists(self.student_path):
-            mkdir(self.student_path)
-        if not exists(self.output_files):
-            mkdir(self.output_files)
-        if not exists(join(self.dataset_folder)):
-            mkdir(self.dataset_folder)
-            mkdir(join(self.dataset_folder, "adu"))
-            mkdir(join(self.dataset_folder, "rel"))
-            mkdir(join(self.dataset_folder, "stance"))
-            # mkdir(join(self.dataset_folder, "sim"))
-        if not exists(self.results_folder):
-            mkdir(self.results_folder)
+        makedirs(self.output_path, exist_ok=True)
+        makedirs(self.logs_path, exist_ok=True)
+        makedirs(self.tensorboard_path, exist_ok=True)
+        makedirs(self.model_path, exist_ok=True)
+        makedirs(self.student_path, exist_ok=True)
+        makedirs(self.output_files, exist_ok=True)
+        makedirs(self.dataset_folder, exist_ok=True)
+        makedirs(join(self.dataset_folder, "adu"), exist_ok=True)
+        makedirs(join(self.dataset_folder, "rel"), exist_ok=True)
+        makedirs(join(self.dataset_folder, "stance"), exist_ok=True)
+        makedirs(self.results_folder, exist_ok=True)
 
     def _get_base_path(self, base_name: AnyStr) -> AnyStr:
         """
