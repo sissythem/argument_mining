@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import logging
 from sklearn.decomposition import PCA
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.manifold import TSNE
@@ -23,6 +24,9 @@ except (Exception, BaseException):
 def get_greek_stopwords():
     return tokeniser.stop_words()
 
+
+def normalize_newlines(text):
+    return "\n".join(text.splitlines())
 
 def tokenize(text, punct=True):
     return list(tokeniser.tokenise_no_punc(text)) if not punct else list(tokeniser.tokenise(text))
@@ -61,14 +65,20 @@ def inject_missing_gaps(token_idx_list, starting_idx=0, reference_text=None):
             diff = start - current
             if diff != 0:
                 whitespace_slice = reference_text[current:current+diff]
-                assert not whitespace_slice.strip(), "Non-empty whitespace in tokenization-injection!"
+                if len(whitespace_slice.strip()) > 0:
+                    logging.error("Non-empty whitespace in tokenization-injection!")
                 res.append((whitespace_slice, current, start))
             res.append(part)
             current = end
         return tuple(res)
 
 
+def preprocess_text(text):
+    text = text.replace("\u200b", " ")
+    return text
+
 def tokenize_with_spans(text):
+    text = preprocess_text(text)
     toks_raw = tokeniser.tokenise_spans(text)
     toks_fixed = []
     curr_idx = 0

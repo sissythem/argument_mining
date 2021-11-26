@@ -26,6 +26,7 @@ from elasticsearch import Elasticsearch
 from elasticsearch_dsl import Search, Q
 from sshtunnel import SSHTunnelForwarder
 
+from src.utils.utils import normalize_newlines
 
 class AppConfig:
     """
@@ -492,6 +493,14 @@ class ElasticSearchConfig:
             documents.append(document)
         # self.update_last_retrieve_date()
         self.logger.debug(f"Got {len(documents)} docs")
+
+        try:
+            if self.properties["prep"]["newline_norm"] is True:
+                self.logger.debug(f"Normalizing newlines")
+                for doc in documents:
+                    doc['content'] = normalize_newlines(doc['content'])
+        except KeyError:
+                pass
         return documents, search_id
 
     def update_last_retrieve_date(self):

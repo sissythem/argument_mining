@@ -288,20 +288,27 @@ class DebateLab:
                         assert document['content'][start_idx:
                                                    end_idx] == seg['segment'], "Oi bruv"
 
-        return self._check_major_claim(adus=adus, title=document["title"], mc_exists=found_mc,
+        adus, segment_counter = self._check_major_claim(adus=adus, title=document["title"], mc_exists=found_mc,
                                        segment_counter=segment_counter)
+        id_list = [x['id'] for x in adus]
+        assert len(id_list) == len(set(id_list)), f"Duplicate segment id(s) after MC checks: {id_list}"
+        return adus, segment_counter 
 
     def _check_major_claim(self, adus, title, mc_exists, segment_counter):
         if not mc_exists:
             return self._handle_missing_major_claim(adus, title)
         else:
             major_claims = []
+            other_adus = []
             for adu in adus:
                 if adu["type"] == "major_claim":
                     major_claims.append(adu)
+                else:
+                    other_adus.append(adu)
             if len(major_claims) == 1:
+                # all good -- return originals
                 return adus, segment_counter
-            return self._handle_multiple_major_claims(major_claims=major_claims, adus=adus)
+            return self._handle_multiple_major_claims(major_claims=major_claims, adus=other_adus)
 
     def _handle_multiple_major_claims(self, major_claims, adus):
         slist = list(sorted(major_claims, key=lambda x: int(x["starts"])))
@@ -535,8 +542,7 @@ class DebateLab:
         relations, relation_ids = [], []
         for pair in data_pairs:
             relation_id = f"{pair['doc_id1']};{pair['doc_id2']};{pair['sentence1_id']};{pair['sentence2_id']}"
-            self.app_logger.debug(
-                f"Saving cross document relation with id:{relation_id}")
+            # self.app_logger.debug(f"Saving cross document relation with id:{relation_id}")
             relation = {
                 "id": relation_id,
                 "cluster": pair['cluster'],
