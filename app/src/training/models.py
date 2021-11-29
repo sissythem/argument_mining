@@ -378,8 +378,8 @@ class CustomAgglomerative(Clustering):
                     mask[:, x] = True
                     mask[x, :] = True
 
-        self.app_logger.info(f"Number of pairs: {len(pairs)}")
-        self.app_logger.info(list(zip(pairs, simils)))
+        self.app_logger.debug(f"Number of pairs: {len(pairs)}")
+        self.app_logger.debug(list(zip(pairs, simils)))
         count = 1
         data_pairs = []
         for pair, sim in zip(pairs, simils):
@@ -410,10 +410,10 @@ class CustomAgglomerative(Clustering):
             data["type"] = "similar"
             data["score"] = sim
             data_pairs.append(data)
-            self.app_logger.info(f"Similar pair no {count} with similarity {sim}")
-            self.app_logger.info(f"Sentence1: {sentence1}")
-            self.app_logger.info(f"Sentence2: {sentence2}")
-            self.app_logger.info(
+            self.app_logger.debug(f"Similar pair no {count} with similarity {sim}")
+            self.app_logger.debug(f"Sentence1: {sentence1}")
+            self.app_logger.debug(f"Sentence2: {sentence2}")
+            self.app_logger.debug(
                 "=====================================================================================================")
             count += 1
         return data_pairs

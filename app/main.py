@@ -127,6 +127,7 @@ def main():
 
     app_config.elastic_save.stop()
     app_config.elastic_retrieve.stop()
+    app_config.app_logger.info(f"Run complete, logfile is at: {app_config.log_filename}")
 
 
 def main_huggingface():
@@ -162,4 +163,3 @@ def main_huggingface():
 if __name__ == '__main__':
     main()
     # main_huggingface()
-    print("Done!")

@@ -96,7 +96,7 @@ class AppConfig:
             '%(asctime)s,%(msecs)d %(levelname)-1s [%(filename)s:%(lineno)d] %(message)s')
         program_logger = logging.getLogger("flair")
 
-        program_logger.setLevel(logging.DEBUG)
+        program_logger.setLevel(logging.INFO)
         file_handler = logging.FileHandler(
             f"{self.logs_path}/{self.log_filename}")
         file_handler.setFormatter(log_formatter)

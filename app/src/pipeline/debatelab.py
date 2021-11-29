@@ -75,6 +75,16 @@ class DebateLab:
         if len(documents) > 1:
             relations, relation_ids = self.run_manual_clustering(
                 documents=documents, document_ids=document_ids, save=False)
+
+            # ensure no intra-doc relations exist
+            for rel in relations:
+                assert rel['source_doc'] != rel['target_doc'], "Found reflective (intra) cross-document relation!"
+            # save relations
+            with open(join(self.app_config.output_files, "cross-document-relations.json"), "w", encoding="utf-8") as f:
+                self.app_logger.info(f"Writing cross-doc relations to {f.name}")
+                for rel in relations:
+                    rel['score'] = str(rel['score'])
+                json.dump(relations, f, ensure_ascii=False)
         else:
             self.app_logger.info(
                 "Skipping document clustering for {len(documents)} documents")
@@ -104,6 +114,7 @@ class DebateLab:
         validator = JsonValidator(app_config=self.app_config)
 
         for idx, document in enumerate(documents):
+            doc_id = document['id']
             self.app_logger.info(
                 f"Extracting topics for document {idx+1}/{len(documents)}: {document['title']}")
             document, segment_counter, rel_counter, stance_counter = self.predict(
@@ -111,17 +122,16 @@ class DebateLab:
             counters = {"adu": segment_counter,
                         "rel": rel_counter, "stance": stance_counter}
 
-            validation_errors, invalid_adus, corrected = validator.run_validation(
-                document=document, counters=counters)
+            validation_errors, invalid_adus, corrected = validator.run_validation( document=document, counters=counters)
             if corrected:
                 corrected_ids.append(valid_document_ids)
             if not validation_errors:
                 if save:
                     self.app_config.elastic_save.save_document(
                         document=document)
-                valid_document_ids.append(document["id"])
+                valid_document_ids.append(doc_id)
             else:
-                invalid_document_ids.append(document["id"])
+                invalid_document_ids.append(doc_id)
                 validator.save_invalid_json(document=document, validation_errors=validation_errors,
                                             invalid_adus=invalid_adus)
         validator.print_validation_results(
@@ -148,7 +158,7 @@ class DebateLab:
 
         with open(join(self.app_config.output_files, "pipeline_results.json"), "w", encoding="utf-8") as f:
             self.app_logger.info(f"Writing pipeline outputs to {f.name}")
-            json.dump(documents, f)
+            json.dump(documents, f, ensure_ascii=False)
         return documents, valid_document_ids
 
     def predict(self, document):
