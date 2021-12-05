@@ -52,6 +52,9 @@ class Segment:
         self.sentences: List = []
         self.sentences_labels: List = []
 
+    def __repr__(self):
+        return f"{self.char_start}-{self.char_end} | {self.sentences[0][:20]}"
+
 
 class Relation:
     def __init__(self, relation_id, document_id, arg1, arg2, kind, relation_type):
@@ -78,7 +81,38 @@ class Document:
         self.sentences_labels: List = []
 
     def update_segments(self, other_label="O"):
-        sentences = utils.join_sentences(tokenized_sentences=self.sentences)
+        """
+        Complete tagging for the document, adding <other_label> to sentence tokens not in already annotated segments
+        """
+        sentence_labels = [[other_label for _ in s[0]] for s in self.sentences]
+        # align each segment to its sentence
+        for seg in self.segments:
+            seg_s, seg_e = seg.char_start, seg.char_end
+            candidate_sentences = []
+            # locate corresponding sentence
+            for sent_idx, sent in enumerate(self.sentences):
+                s, e = sent[-2:]
+                # relevant sentences: segment's start/end is within
+                if (s <= seg_s <= e) or (s <= seg_e <= e):
+                    candidate_sentences.append((sent, sent_idx))
+            if len(candidate_sentences) > 1:
+                breakpoint()
+            sentence, sent_idx = candidate_sentences[0]
+            # only one sentence per segment allowed
+            assert len(seg.sentences) == 1, "Multi-sentence segment!"
+            segment_tokens = seg.sentences[0]
+            segment_labels = seg.sentences_labels[0]
+            # get relative position of segment in the sentence
+            sentence_tokens = utils.get_sentence_raw_tokens(sentence)
+            s, e = utils.align_expanded_tokens(segment_tokens, sentence_tokens)
+            assert segment_tokens == sentence_tokens[s: e +
+                                                     1], "Failed to match segment to sentence!"
+            sentence_labels[sent_idx][s:e+1] = segment_labels
+        self.sentence_labels = sentence_labels
+
+    def update_segments_old(self, other_label="O"):
+        sentences = utils.join_sentences(
+            tokenized_sentences=self.sentences_expanded)
         for idx, sentence in enumerate(sentences):
             segments = self._get_segments(sentence=sentence)
             sentence_split = self.sentences[idx]
@@ -166,14 +200,41 @@ class DatasetLoader:
 
 class ClarinLoader(DatasetLoader):
 
-    def __init__(self, app_config: AppConfig, folder="kasteli", json_file="kasteli.json", pickle_file="documents.pkl"):
+    def __init__(self, app_config: AppConfig, annotations_folder="annotations"):
         super(ClarinLoader, self).__init__(app_config=app_config)
         self.app_config: AppConfig = app_config
         self.app_logger = self.app_config.app_logger
-        self.dataset_path = join(self.app_config.dataset_folder, "initial", folder)
 
-        self.json_file = json_file
-        self.pickle_file = pickle_file
+    def check_and_filter_loaded_data(self, documents):
+        res = []
+        idx_mismatches = set()
+        # check validity of input spans
+        for dd, doc in enumerate(documents):
+            ndocs = len(documents)
+            document['text'] = text = utils.normalize_newlines(doc['text'])
+            # text = doc['text']
+            # doc['text'] = text = "".join(text.splitlines())
+            # text = text.replace("\n", "")
+            for annot in doc['annotations']:
+                if "annotator_id" not in annot:
+                    continue
+                for span in annot['spans']:
+                    seg = span['segment']
+                    s, e = int(span['start']), int(span['end'])
+                    # self.app_logger.info(f"Segment [{seg}], {s}, {e}")
+                    if text[s: e] != seg:
+                        self.app_logger.error(
+                            f"{doc['id']}, {dd+1}/{ndocs} Segm gives [{seg}]")
+                        self.app_logger.error(
+                            f"{doc['id']}, {dd+1}/{ndocs} Span gives [{text[s: e]}]")
+                        idx_mismatches.add(dd)
+                        # raise ValueError("Annotation input error.")
+            res.append(doc)
+        if idx_mismatches:
+            ids = [documents[i]['id'] for i in idx_mismatches]
+            raise ValueError(
+                f"Got span index mismatch for {len(idx_mismatches)}/{len(documents)} documents: {ids}.")
+        return res
 
     def load(self) -> List[Document]:
         """
@@ -182,19 +243,26 @@ class ClarinLoader(DatasetLoader):
         Returns
             | list: the loaded documents
         """
-        path_to_pickle = join(self.dataset_path, self.pickle_file)
-        if exists(path_to_pickle):
-            with open(path_to_pickle, "rb") as f:
-                return pickle.load(f)
-        path_to_data = join(self.dataset_path, self.json_file)
-        with open(path_to_data, "r") as f:
-            content = json.loads(f.read())
+        # if exists(path_to_pickle) and False:
+        #     with open(path_to_pickle, "rb") as f:
+        #         return pickle.load(f)
+        annot_filename = self.app_config.properties["prep"]["annotation_file"]
+        annot_path = join(self.app_config.annotations_folder, annot_filename)
+        with open(annot_path, "r") as f:
+            self.app_logger.info(f"Reading annotated documents from {f.name}")
+            content = json.load(f)
         documents = content["data"]["documents"]
+        documents = self.check_and_filter_loaded_data(documents)
+
         docs = []
         for doc in documents:
+            if doc['id'] != 182:
+                continue
             document = self.create_document(doc=doc)
             docs.append(document)
-        with open(join(self.dataset_path, self.pickle_file), "wb") as f:
+        # serialize
+        path_to_pickle = join(self.dataset_path, annot_filename + ".pkl")
+        with open(path_to_pickle, "wb") as f:
             pickle.dump(docs, f)
         return docs
 
@@ -210,7 +278,10 @@ class ClarinLoader(DatasetLoader):
         """
         document = Document(logger=self.app_logger, document_id=doc["id"], name=doc["name"], content=doc["text"],
                             annotations=doc["annotations"])
-        document.sentences = utils.tokenize(text=document.content)
+        tokens_expanded, tokens_raw = utils.tokenize_with_spans(
+            text=document.content)
+        document.sentences = list(tokens_raw)
+        document.sentences_expanded = list(tokens_expanded)
         self.app_logger.debug(
             f"Processing document with id {document.document_id}")
         for annotation in document.annotations:
@@ -220,6 +291,8 @@ class ClarinLoader(DatasetLoader):
             attributes = annotation["attributes"]
             if utils.is_old_annotation(attributes):
                 continue
+            if spans and any("Επισήμως" in sp['segment'] for sp in spans):
+                print()
             if segment_type == "argument":
                 span = spans[0]
                 segment = self.create_segment(span=span, document_id=document.document_id,
@@ -238,17 +311,19 @@ class ClarinLoader(DatasetLoader):
         document.segments.sort(key=lambda x: x.char_start)
         return document
 
-    @staticmethod
+    @ staticmethod
     def create_segment(span, document_id, annotation_id, attributes):
         segment_text = span["segment"]
         segment = Segment(segment_id=annotation_id, document_id=document_id, text=segment_text,
                           char_start=span["start"], char_end=span["end"], arg_type=attributes[0]["value"])
-        segment.sentences = utils.tokenize(text=segment.text)
-        segment.sentences, segment.sentences_labels = utils.bio_tagging(sentences=segment.sentences,
+        _, segment.sentences = utils.tokenize_with_spans(text=segment.text)
+        raw_sentences_tokens = [
+            utils.get_sentence_raw_tokens(x) for x in segment.sentences]
+        segment.sentences, segment.sentences_labels = utils.bio_tagging(sentences=raw_sentences_tokens,
                                                                         label=segment.arg_type)
         return segment
 
-    @staticmethod
+    @ staticmethod
     def create_relation(segments, attributes, annotation_id, document_id):
         relation_type, kind, arg1_id, arg2_id = "", "", "", ""
         arg1, arg2 = None, None
@@ -373,7 +448,7 @@ class EssayLoader(DatasetLoader):
         document.segments.sort(key=lambda x: x.char_start)
         return document
 
-    @staticmethod
+    @ staticmethod
     def create_segment(document_id, segment_id, segment_type, starts, ends, text):
         if not text or text == "nan" or type(text) == float:
             return None
@@ -384,7 +459,7 @@ class EssayLoader(DatasetLoader):
                                                                         label=segment.arg_type)
         return segment
 
-    @staticmethod
+    @ staticmethod
     def create_relation(segments, relation_id, rel_type, kind, document_id, arg1_id, arg2_id):
         arg1, arg2 = None, None
         for seg in segments:
@@ -427,7 +502,7 @@ class EssayLoader(DatasetLoader):
                         processed_files[filename]["annotations"]["document_link"] = ""
         return processed_files
 
-    @staticmethod
+    @ staticmethod
     def process_df(df):
         data = {"ADUs": [], "Relations": []}
         for index, row in df.iterrows():
@@ -489,7 +564,7 @@ class DataUpSampler:
         if not exists(output_filepath):
             df.to_csv(output_filepath, sep='\t', index=False, header=True)
 
-    @staticmethod
+    @ staticmethod
     def oversample_adus(data: pd.DataFrame, desired_lbl_count: Dict):
         df_list = np.split(data, data[data.isnull().all(1)].index)
         df_list = [df.dropna() for df in df_list]
@@ -521,7 +596,7 @@ class DataUpSampler:
                 new_df_list.append(empty_row)
         return pd.concat(new_df_list, axis=0)
 
-    @staticmethod
+    @ staticmethod
     def oversample_relations(df: pd.DataFrame, rel: AnyStr, total_num: int):
         texts = list(df[0])
         indices = [texts.index(x) for x in texts]
@@ -576,27 +651,30 @@ class CsvCreator:
         if self.oversampling_prop is not None and self.oversampling_prop and type(self.oversampling_prop) == dict:
             self.upsampling = DataUpSampler(app_config=app_config)
 
-    def load_adus(self, folder="kasteli"):
-        self.app_logger.debug("Running ADU preprocessing")
+    def load_adus(self, folder="annotations"):
+        self.app_logger.info("Running ADU preprocessing")
         out_file_path = join(
             self.app_config.dataset_folder, "adu", "train.csv")
         if not exists(out_file_path):
-            documents_path = join(
+            cached_path = join(
                 self.app_config.dataset_folder, "initial", folder, self.pickle_file)
-            self.app_logger.debug("Loading documents from pickle file")
-            with open(documents_path, "rb") as f:
+            self.app_logger.info(
+                f"Loading cached documents from {cached_path}")
+            with open(cached_path, "rb") as f:
                 documents = pickle.load(f)
-            self.app_logger.debug("Documents are loaded")
+
             df = pd.DataFrame(
                 columns=["token", "label", "is_arg", "sp", "sentence", "document"])
-            row_counter = 0
-            sentence_counter = 0
+            row_counter, sentence_counter = 0, 0
+
             for document in documents:
                 self.app_logger.debug(
                     f"Processing document with id: {document.document_id}")
                 doc_sentence_counter = 0
                 for idx, sentence in enumerate(document.sentences):
                     self.app_logger.debug(f"Processing sentence: {sentence}")
+                    # get raw sentence tokens
+                    tokens = utils.get_sentence_raw_tokens(sentence)
                     labels = document.sentences_labels[idx]
                     for token, label in zip(sentence, labels):
                         is_arg = "Y" if label != "O" else "N"
@@ -610,9 +688,9 @@ class CsvCreator:
                     df.loc[row_counter] = ["", "", "", "", "", ""]
                     sentence_counter += 1
                     row_counter += 1
-            self.app_logger.debug("Finished building dataframe. Saving...")
+            self.app_logger.debug(
+                f"Finished building CONLL-format ADU data, saving to {out_file_path}")
             df.to_csv(out_file_path, sep='\t', index=False, header=False)
-            self.app_logger.debug("Dataframe saved!")
         if self.oversampling_prop:
             adu_config = self.oversampling_prop.get("adu", None)
             if adu_config:
@@ -856,7 +934,7 @@ class DataPreprocessor:
         self.prep_properties = app_config.properties["prep"]
         self.languages = self.prep_properties.get(
             "languages", ["english", "greek"])
-        self.data_loader = ClarinLoader(app_config=app_config) if self.prep_properties["dataset"] == "kasteli" else \
+        self.data_loader = ClarinLoader(app_config=app_config) if self.prep_properties["dataset_type"] == "clarin" else \
             EssayLoader(app_config=app_config, languages=self.languages)
         self.csv_creator = CsvCreator(app_config=app_config)
         self.split_properties = self.prep_properties["split"]
@@ -864,15 +942,16 @@ class DataPreprocessor:
             self.dataset_splitter = DatasetSplitter(app_config=app_config)
 
     def preprocess(self):
-        dataset = self.prep_properties["dataset"]
-        self.app_logger.info(f"Loading dataset with documents: {dataset}")
+        annot_file = self.prep_properties["annotation_file"]
+        self.app_logger.info(
+            f"Loading annotation with documents from: {annot_file}")
         self.data_loader.load()
         self.app_logger.info(
             "Creating CSV file in CONLL format for ADUs classification")
-        self.csv_creator.load_adus(folder=dataset)
+        self.csv_creator.load_adus(folder=annot_file)
         self.app_logger.info(
             "Creating CSV file in CONLL format for relations/stance classification")
-        self.csv_creator.load_relations_and_stance(folder=dataset)
+        self.csv_creator.load_relations_and_stance(folder=annot_file)
         # self.app_logger.info("Creating CSV file in CONLL format for cross-document similarities classification")
         # csv_loader.load_similarities()
         self.app_logger.info("Splitting datasets into dev, train and test")

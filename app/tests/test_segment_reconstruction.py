@@ -20,19 +20,20 @@ def test_document_text_reconstruction():
             # update starting index
             current_idx = x[-1]
 
-            joined = "".join([y[0] for x in processed_parts for y in x[0]])
+            joined = utils.expanded_tokens_to_text(processed_parts)
             assert joined == te[:
                                 current_idx], f"Mismatch in stiched tokens and original text, after consuming sentence # {i+1}/{len(parts)}!"
 
-        joined = "".join([y[0] for x in processed_parts for y in x[0]])
+        joined = utils.expanded_tokens_to_text(processed_parts)
         assert joined == te, "Mismatch in stiched tokens and entire original text!"
 
         # join tokens
         reconc_sentences = []
         for pp in processed_parts:
-            tok_tuples = pp[0]
-            toks = [x[0] for x in tok_tuples]
-            sentence = "".join(toks)
+            sentence = utils.expanded_tokens_to_text(pp)
+            # tok_tuples = pp[0]
+            # toks = [x[0] for x in tok_tuples]
+            # sentence = "".join(toks)
             reconc_sentences.append(sentence)
         reconc_text = "".join(reconc_sentences)
         assert reconc_text == te, "Reconstrution error!"

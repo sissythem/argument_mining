@@ -28,6 +28,7 @@ def get_greek_stopwords():
 def normalize_newlines(text):
     return "\n".join(text.splitlines())
 
+
 def tokenize(text, punct=True):
     return list(tokeniser.tokenise_no_punc(text)) if not punct else list(tokeniser.tokenise(text))
 
@@ -66,7 +67,8 @@ def inject_missing_gaps(token_idx_list, starting_idx=0, reference_text=None):
             if diff != 0:
                 whitespace_slice = reference_text[current:current+diff]
                 if len(whitespace_slice.strip()) > 0:
-                    logging.error("Non-empty whitespace in tokenization-injection!")
+                    logging.error(
+                        "Non-empty whitespace in tokenization-injection!")
                 res.append((whitespace_slice, current, start))
             res.append(part)
             current = end
@@ -76,6 +78,7 @@ def inject_missing_gaps(token_idx_list, starting_idx=0, reference_text=None):
 def preprocess_text(text):
     text = text.replace("\u200b", " ")
     return text
+
 
 def tokenize_with_spans(text):
     text = preprocess_text(text)
@@ -102,6 +105,18 @@ def get_punctuation_symbols() -> Set[AnyStr]:
     return punc
 
 
+def get_sentence_raw_tokens(expanded_tokens):
+    tokens_tuples, _, _ = expanded_tokens
+    tokens_text = [x[0] for x in tokens_tuples]
+    return tokens_text
+
+
+def expanded_tokens_to_text(expanded_tokens):
+    tokens_text = get_sentence_raw_tokens(expanded_tokens)
+    txt = "".join(tokens_text)
+    return txt
+
+
 def join_sentences(tokenized_sentences: List[Tuple[AnyStr]]) -> List[AnyStr]:
     """
     Function to create a correct string (punctuation in the correct position - correct spaces)
@@ -114,7 +129,8 @@ def join_sentences(tokenized_sentences: List[Tuple[AnyStr]]) -> List[AnyStr]:
     """
     sentences = []
     for sentence in tokenized_sentences:
-        sentence = join_sentence(sentence=sentence)
+        sentence = expanded_tokens_to_text(sentence)
+        # sentence = join_sentence(sentence=sentence)
         sentences.append(sentence)
     return sentences
 
@@ -203,13 +219,13 @@ def bio_tagging(sentences, label, other_label="O"):
     for sentence in sentences:
         sentence_labels = []
         tokens = []
-        for token in sentence:
+        for token_idx, token in enumerate(sentence):
             if token:
                 tokens.append(token)
                 if label == other_label:
                     sentence_labels.append(other_label)
                 else:
-                    if sentence.index(token) == 0:
+                    if token_idx == 0:
                         sentence_labels.append(f"B-{label}")
                     else:
                         sentence_labels.append(f"I-{label}")
@@ -308,8 +324,15 @@ def get_args_from_sentence(sentence, orig_tokenized):
 
 
 def align_expanded_tokens(tokens, expanded_tokens):
-    # align token sequence with the expanded token sequence, to have a
-    # perfect match for reconstructed text
+    """ align token sequence with the expanded token sequence, to have a perfect match for reconstructed text
+
+    Args:
+        tokens (list of strings): Smaller sequence to match
+        expanded_tokens (list of strings): Reference sequence to match onto. Has to be >= than the tokens. 
+
+    Returns:
+        [type]: Tuple of start and end index (inclusive), so that tokens == expanded_tokens[start: end+1]
+    """
 
     # match the start and end
     start = [i for i, tok in enumerate(expanded_tokens) if tok == tokens[0]]

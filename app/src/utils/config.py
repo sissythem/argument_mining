@@ -28,6 +28,7 @@ from sshtunnel import SSHTunnelForwarder
 
 from src.utils.utils import normalize_newlines
 
+
 class AppConfig:
     """
     Class to initialize the application properties
@@ -100,6 +101,7 @@ class AppConfig:
         file_handler = logging.FileHandler(
             f"{self.logs_path}/{self.log_filename}")
         file_handler.setFormatter(log_formatter)
+        [program_logger.removeHandler(h) for h in program_logger.handlers]
         program_logger.addHandler(file_handler)
 
         console_handler = logging.StreamHandler()
@@ -139,6 +141,8 @@ class AppConfig:
         self.student_path: AnyStr = join(self.model_path, "student")
         self.output_files: AnyStr = join(self.output_path, "output_files")
         self.dataset_folder: AnyStr = join(self.resources_path, "data")
+        self.annotations_folder: AnyStr = join(
+            self.resources_path, "annotations")
         self.results_folder: AnyStr = join(self.resources_path, "results")
         self._create_output_dirs()
 
@@ -500,7 +504,7 @@ class ElasticSearchConfig:
                 for doc in documents:
                     doc['content'] = normalize_newlines(doc['content'])
         except KeyError:
-                pass
+            pass
         return documents, search_id
 
     def update_last_retrieve_date(self):
