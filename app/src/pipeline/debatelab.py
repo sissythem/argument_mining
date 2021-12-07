@@ -63,8 +63,8 @@ class DebateLab:
         # TODO retrieve previous day's articles, save now to properties --> retrieve_kind="date"
         if documents is None:
             # retrive new documents
-            documents, _ = self.app_config.elastic_retrieve.retrieve_documents(
-                retrieve_kind=self.app_config.properties["eval"]["retrieve"])
+            documents = self.app_config.elastic_retrieve.retrieve_documents(
+                retrieve_kind=self.app_config.properties["eval"]["retrieve"], output_folder=self.app_config.retrieved_documents_folder)
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(
             documents=documents, save=False)
@@ -78,10 +78,12 @@ class DebateLab:
 
             # ensure no intra-doc relations exist
             for rel in relations:
-                assert rel['source_doc'] != rel['target_doc'], "Found reflective (intra) cross-document relation!"
+                assert rel['source_doc'] != rel[
+                    'target_doc'], "Found reflective (intra) cross-document relation!"
             # save relations
             with open(join(self.app_config.output_files, "cross-document-relations.json"), "w", encoding="utf-8") as f:
-                self.app_logger.info(f"Writing cross-doc relations to {f.name}")
+                self.app_logger.info(
+                    f"Writing cross-doc relations to {f.name}")
                 for rel in relations:
                     rel['score'] = str(rel['score'])
                 json.dump(relations, f, ensure_ascii=False)
@@ -122,7 +124,8 @@ class DebateLab:
             counters = {"adu": segment_counter,
                         "rel": rel_counter, "stance": stance_counter}
 
-            validation_errors, invalid_adus, corrected = validator.run_validation( document=document, counters=counters)
+            validation_errors, invalid_adus, corrected = validator.run_validation(
+                document=document, counters=counters)
             if corrected:
                 corrected_ids.append(valid_document_ids)
             if not validation_errors:
@@ -144,16 +147,20 @@ class DebateLab:
             doc["valid"] = int(doc["id"] in valid_document_ids)
             for adu in doc['annotations']['ADUs']:
                 majcount = 0
+                if self.app_config.properties['prep']['newline_norm']:
+                    assert doc['content'] == "\n".join(
+                        doc['content'].splitlines())
                 s, e = int(adu["starts"]), int(adu["ends"])
                 if doc['content'][s:e] != adu["segment"]:
                     self.app_logger.error(
                         f"ERROR: Mismatch between offsets and segment {doc['id']}")
                     self.app_logger.error("DOC:", doc['content'][s:e])
                     self.app_logger.error("ADU:", adu['segment'])
+                    raise ValueError("Segment-content mismatch!")
                 if adu['type'] == 'major_claim':
                     majcount += 1
             if majcount > 1:
-                self.app_logger.error(
+                raise ValueError(
                     f"ERROR: got {majcount} major claims for document {doc['id']}")
 
         with open(join(self.app_config.output_files, "pipeline_results.json"), "w", encoding="utf-8") as f:
@@ -296,13 +303,14 @@ class DebateLab:
                         }
                         adus.append(seg)
                         assert document['content'][start_idx:
-                                                   end_idx] == seg['segment'], "Oi bruv"
+                                                   end_idx] == seg['segment'], "Misaligned segment!"
 
         adus, segment_counter = self._check_major_claim(adus=adus, title=document["title"], mc_exists=found_mc,
-                                       segment_counter=segment_counter)
+                                                        segment_counter=segment_counter)
         id_list = [x['id'] for x in adus]
-        assert len(id_list) == len(set(id_list)), f"Duplicate segment id(s) after MC checks: {id_list}"
-        return adus, segment_counter 
+        assert len(id_list) == len(
+            set(id_list)), f"Duplicate segment id(s) after MC checks: {id_list}"
+        return adus, segment_counter
 
     def _check_major_claim(self, adus, title, mc_exists, segment_counter):
         if not mc_exists:
@@ -374,6 +382,8 @@ class DebateLab:
             "segment": title,
             "confidence": 0.99
         }
+        self.app_logger.info(
+            f"Injecting document title: {title} as the fallback major claim.")
         return self._handle_adu_ids(adus, seg)
 
     def _predict_relations(self, major_claims, claims, premises):

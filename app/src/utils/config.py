@@ -140,6 +140,8 @@ class AppConfig:
         self.model_path: AnyStr = join(self.output_path, "models")
         self.student_path: AnyStr = join(self.model_path, "student")
         self.output_files: AnyStr = join(self.output_path, "output_files")
+        self.retrieved_documents_folder: AnyStr = join(
+            self.output_path, "retrieved_documents")
         self.dataset_folder: AnyStr = join(self.resources_path, "data")
         self.annotations_folder: AnyStr = join(
             self.resources_path, "annotations")
@@ -161,6 +163,7 @@ class AppConfig:
         makedirs(join(self.dataset_folder, "rel"), exist_ok=True)
         makedirs(join(self.dataset_folder, "stance"), exist_ok=True)
         makedirs(self.results_folder, exist_ok=True)
+        makedirs(self.retrieved_documents_folder, exist_ok=True)
 
     def _get_base_path(self, base_name: AnyStr) -> AnyStr:
         """
@@ -440,24 +443,24 @@ class ElasticSearchConfig:
         Search(using=self.elasticsearch_client,
                index=index).query("match_all").delete()
 
-    def retrieve_documents(self, previous_date=None, retrieve_kind="file"):
+    def retrieve_documents(self, previous_date=None, retrieve_kind="file", output_folder="app/resources/retrieved_documents"):
         search_id = None
-        if retrieve_kind in ["objects", "links"]:
+        expected_num_results = None
+        if retrieve_kind == "explicit":
+            field = self.properties["eval"]["explicit_field"]
             file_path = join(self.resources_folder,
                              self.properties["eval"]["file_path"])
             # read the list of urls from the file:
             with open(file_path, "r") as f:
-                if retrieve_kind == "links":
-                    urls = [line.rstrip() for line in f]
-                elif retrieve_kind == "objects":
-                    data = json.load(f)
-                    self.logger.info(
-                        f"Loaded {len(data)} data object instances.")
-                    return data, search_id
+                if field in ("links", "_id"):
+                    value_list = [line.rstrip() for line in f]
             self.logger.info(
-                f"Fetching documents from explicit list of {len(urls)} urls")
+                f"Fetching documents from explicit list of {len(value_list)} {field} items")
+            match_arg = {field: value_list}
             search_articles = Search(
-                using=self.elasticsearch_client, index='articles').filter('terms', link=urls)
+                using=self.elasticsearch_client, index='articles').filter('terms', **match_arg)
+            expected_num_results = len(value_list)
+            search_id = f"{retrieve_kind}_{field}_{len(value_list)}"
         else:
             delta = self.properties["eval"]["delta_days"]
             today_date = datetime_base.date.today()
@@ -469,15 +472,20 @@ class ElasticSearchConfig:
 
             date_range = {'gt': str(previous_date), 'lte': str(today_date)}
             if search_term:
+                try:
+                    against = self.properties["eval"]["search_against"]
+                except KeyError:
+                    against = "title"
                 if type(search_term) is not list:
                     search_term = [search_term]
                 queries = []
                 for st in search_term:
-                    queries.append(Q('match', title=st))
+                    mtch = {against: st}
+                    queries.append(Q('match', **mtch))
                 # if len(queries) == 1:
                 #     queries = queries[0]
                 query = Q('bool', must=queries, filter=[
-                          {"range": {"date": date_range}}])
+                    {"range": {"date": date_range}}])
                 search_articles = Search(
                     using=self.elasticsearch_client, index='articles')
                 search_articles.query = query
@@ -505,7 +513,16 @@ class ElasticSearchConfig:
                     doc['content'] = normalize_newlines(doc['content'])
         except KeyError:
             pass
-        return documents, search_id
+        if expected_num_results is not None:
+            if len(documents) != expected_num_results:
+                raise ValueError(
+                    f"Expected {expected_num_results} docs but got {len(documents)}")
+
+        # save docs
+        with open(join(output_folder, f"retrieved_documents_{len(documents)}_{search_id}.json"), "w") as f:
+            self.logger.info(f"Saving obtained docs to {f.name}")
+            json.dump(documents, f)
+        return documents
 
     def update_last_retrieve_date(self):
         path_to_properties = join(self.resources_folder, self.properties_file)

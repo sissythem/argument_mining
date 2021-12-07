@@ -95,10 +95,8 @@ def main():
     tasks = properties["tasks"]
     documents = None
     if "retrieve" in tasks:
-        documents, search_id = app_config.elastic_retrieve.retrieve_documents(
+        documents = app_config.elastic_retrieve.retrieve_documents(
             retrieve_kind=app_config.properties["eval"]["retrieve"])
-        with open(join(app_config.output_path, "output_files", f"retrieved_documents_{len(documents)}_{search_id}.json"), "w") as f:
-            json.dump(documents, f)
     if "prep" in tasks:
         data_preprocessor = DataPreprocessor(app_config=app_config)
         data_preprocessor.preprocess()
@@ -127,7 +125,8 @@ def main():
 
     app_config.elastic_save.stop()
     app_config.elastic_retrieve.stop()
-    app_config.app_logger.info(f"Run complete, logfile is at: {app_config.log_filename}")
+    app_config.app_logger.info(
+        f"Run complete, logfile is at: {app_config.log_filename}")
 
 
 def main_huggingface():

@@ -83,6 +83,7 @@ def preprocess_text(text):
 def tokenize_with_spans(text):
     text = preprocess_text(text)
     toks_raw = tokeniser.tokenise_spans(text)
+
     toks_fixed = []
     curr_idx = 0
     for t in toks_raw:
@@ -90,6 +91,28 @@ def tokenize_with_spans(text):
         toks_fixed.append(tk)
         curr_idx = tk[-1]
     return toks_fixed, toks_raw
+
+
+def correct_tokenization(tokenization):
+    """Apply manual corrections to the tokenization"""
+    tokenization = list(tokenization)
+    res = []
+    for sent_idx, sent in enumerate(tokenization):
+        toks = []
+        for token in sent[0]:
+            tok, s, e = token
+            # split dot at the end of the token
+            if len(tok) > 1 and tok.endswith("."):
+                s1, e1 = s, e-1
+                s2, e2 = e-1, e
+                t1, dot = tok[:-1], tok[-1]
+                # split the tokens
+                toks.append((t1, s1, e1))
+                toks.append((dot, s2, e2))
+            else:
+                toks.append(token)
+        res.append((tuple(toks), *sent[1:]))
+    return tuple(res)
 
 
 def get_punctuation_symbols() -> Set[AnyStr]:
@@ -215,23 +238,23 @@ def collect_relation_pairs(parents, children, relation_pairs):
 
 
 def bio_tagging(sentences, label, other_label="O"):
-    new_sentences, sentences_labels = [], []
+    new_sentences, sentence_labels = [], []
     for sentence in sentences:
-        sentence_labels = []
+        labels = []
         tokens = []
         for token_idx, token in enumerate(sentence):
             if token:
                 tokens.append(token)
                 if label == other_label:
-                    sentence_labels.append(other_label)
+                    labels.append(other_label)
                 else:
                     if token_idx == 0:
-                        sentence_labels.append(f"B-{label}")
+                        labels.append(f"B-{label}")
                     else:
-                        sentence_labels.append(f"I-{label}")
+                        labels.append(f"I-{label}")
         new_sentences.append(tokens)
-        sentences_labels.append(sentence_labels)
-    return new_sentences, sentences_labels
+        sentence_labels.append(labels)
+    return new_sentences, sentence_labels
 
 
 def bio_tag_lbl_per_token(tokens_labels_tuple, other_label="O"):
@@ -323,7 +346,7 @@ def get_args_from_sentence(sentence, orig_tokenized):
         return segments
 
 
-def align_expanded_tokens(tokens, expanded_tokens):
+def align_expanded_tokens(tokens, expanded_tokens, best_effort=False):
     """ align token sequence with the expanded token sequence, to have a perfect match for reconstructed text
 
     Args:
@@ -340,10 +363,10 @@ def align_expanded_tokens(tokens, expanded_tokens):
 
     # handle singletons
 
-    combos = product(start, end)
+    orig_combos = list(product(start, end))
 
     # start <= end
-    combos = [(s, e) for (s, e) in combos if s <= e]
+    combos = [(s, e) for (s, e) in orig_combos if s <= e]
 
     # expaned seqlen >= original seqlen
     if len(tokens) > 1:
