@@ -50,7 +50,7 @@ class DebateLab:
         # initialize Clustering model
         self.clustering = CustomAgglomerative(app_config=app_config)
 
-    def run_pipeline(self, documents=None, notify=False):
+    def run_pipeline(self, es_save, es_retrieve, documents=None, notify=False):
         """
         Function to execute the DebateLab pipeline.
 
@@ -61,13 +61,14 @@ class DebateLab:
             | 4. Notifies ICS
         """
         # TODO retrieve previous day's articles, save now to properties --> retrieve_kind="date"
+
         if documents is None:
             # retrive new documents
-            documents = self.app_config.elastic_retrieve.retrieve_documents(
+            documents = es_retrieve.retrieve_documents(
                 retrieve_kind=self.app_config.properties["eval"]["retrieve"], output_folder=self.app_config.retrieved_documents_folder)
         # run Argument Mining pipeline
         documents, document_ids = self.run_argument_mining(
-            documents=documents, save=False)
+            documents=documents, es_save=es_save, save=False)
         self.app_logger.info(f"Valid document ids: {document_ids}")
         if notify:
             self.notification.notify_ics(ids_list=document_ids)
@@ -96,7 +97,7 @@ class DebateLab:
         self.app_logger.info("Evaluation is finished!")
 
     # ************************** Classification ********************************************************
-    def run_argument_mining(self, documents, export_schema=False, save=True):
+    def run_argument_mining(self, documents, export_schema=False, es_save=None, save=True):
         """
         Argument Mining pipeline:
         | 1. Predict ADUs for each document
@@ -130,8 +131,7 @@ class DebateLab:
                 corrected_ids.append(valid_document_ids)
             if not validation_errors:
                 if save:
-                    self.app_config.elastic_save.save_document(
-                        document=document)
+                    es_save.save_document(document=document)
                 valid_document_ids.append(doc_id)
             else:
                 invalid_document_ids.append(doc_id)
@@ -147,9 +147,10 @@ class DebateLab:
             doc["valid"] = int(doc["id"] in valid_document_ids)
             for adu in doc['annotations']['ADUs']:
                 majcount = 0
-                if self.app_config.properties['prep']['newline_norm']:
-                    assert doc['content'] == "\n".join(
-                        doc['content'].splitlines())
+                # this does not hold -- calling normalize newlines twice can change the result both times
+                # if self.app_config.properties['prep']['newline_norm']:
+                #     assert doc['content'] == "\n".join(
+                #         doc['content'].splitlines())
                 s, e = int(adu["starts"]), int(adu["ends"])
                 if doc['content'][s:e] != adu["segment"]:
                     self.app_logger.error(

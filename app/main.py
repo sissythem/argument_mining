@@ -8,6 +8,7 @@ from src.training_hf.models import *
 from src.utils.config import Notification
 from baseline import run_baseline
 
+from src.search.search import ElasticSearchConfig
 import json
 from sklearn.dummy import DummyClassifier
 import numpy as np
@@ -94,9 +95,19 @@ def main():
     properties = app_config.properties
     tasks = properties["tasks"]
     documents = None
-    if "retrieve" in tasks:
-        documents = app_config.elastic_retrieve.retrieve_documents(
-            retrieve_kind=app_config.properties["eval"]["retrieve"])
+    es_retrieve, es_save = None, None
+    if any(k in properties["tasks"] for k in ("retrieve", "eval")):
+        es_retrieve: ElasticSearchConfig = ElasticSearchConfig(properties=properties,
+                                                               properties_file=app_config.properties_file,
+                                                               resources_folder=app_config.resources_path,
+                                                               elasticsearch="retrieve",
+                                                               logger=app_config.app_logger)
+        documents = es_retrieve.retrieve_documents()
+    if any(k in properties["tasks"] for k in ("eval")):
+        es_save: ElasticSearchConfig = ElasticSearchConfig(properties=properties,
+                                                           properties_file=app_config.properties_file,
+                                                           resources_folder=app_config.resources_path,
+                                                           elasticsearch="save", logger=app_config.app_logger)
     if "prep" in tasks:
         data_preprocessor = DataPreprocessor(app_config=app_config)
         data_preprocessor.preprocess()
@@ -104,7 +115,7 @@ def main():
         train(app_config=app_config)
     if "eval" in tasks:
         arg_mining = DebateLab(app_config=app_config)
-        arg_mining.run_pipeline(documents=documents)
+        arg_mining.run_pipeline(documents=documents, es_save=es_save, es_retrieve=es_retrieve)
     if "error" in properties["tasks"]:
         error_analysis(path_to_resources=app_config.resources_path)
     notification.send_email(body="Argument mining pipeline finished successfully",
@@ -123,8 +134,10 @@ def main():
     #         app_config.app_logger.error("Could not close ssh tunnels")
     #         exit(-1)
 
-    app_config.elastic_save.stop()
-    app_config.elastic_retrieve.stop()
+    if es_retrieve is not None:
+        es_retrieve.stop()
+    if es_save is not None:
+        es_save.stop()
     app_config.app_logger.info(
         f"Run complete, logfile is at: {app_config.log_filename}")
 
