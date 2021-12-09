@@ -234,7 +234,7 @@ class ElasticSearchConfig:
                     doc['content'] = normalize_newlines(doc['content'])
         except KeyError:
             pass
-        if expected_num_results is not None:
+        if expected_num_results is not None and self.properties["eval"]["error_on_missing"]:
             if len(documents) != expected_num_results:
                 raise ValueError(
                     f"Expected {expected_num_results} docs but got {len(documents)}")

@@ -45,9 +45,13 @@ train:
   models: [ "adu", "rel", "stance" ]
 eval:
   model: "best" # options: best, final
+  error_on_missing: True
+  explicit_field: "link"
+  interactive: False
   retrieve: "file" # options: file, date
   file_path: "kasteli_1_urls.txt"
   search_term: ["Κρήτη", "Σεισμός"]
+  search_against: "title"
   last_date: ""
   ner_endpoint: "http://petasis.dyndns.org:7100/predict-ner"
   crawler_endpoint: "http://socialwebobservatory.iit.demokritos.gr:8001/crawl.json"
