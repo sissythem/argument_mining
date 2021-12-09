@@ -326,7 +326,7 @@ class DebateLab:
                     other_adus.append(adu)
             if len(major_claims) == 1:
                 # all good -- return originals
-                return adus, segment_counter
+                return self._handle_adu_ids(other_adus, major_claims[0])
             return self._handle_multiple_major_claims(major_claims=major_claims, adus=other_adus)
 
     def _handle_multiple_major_claims(self, major_claims, adus):
@@ -365,12 +365,12 @@ class DebateLab:
     def _handle_adu_ids(self, adus, major_claim):
         # insert the major claim
         major_claim["id"] = "T1"
-        adus.insert(0, major_claim)
         # set other adus to ids T2, T3, ...
         segment_counter = 2
         for adu in adus:
             adu["id"] = f"T{segment_counter}"
             segment_counter += 1
+        adus = [major_claim] + adus
         return adus, segment_counter
 
     def _handle_missing_major_claim(self, adus, title):
@@ -385,6 +385,8 @@ class DebateLab:
         }
         self.app_logger.info(
             f"Injecting document title: {title} as the fallback major claim.")
+        # remove any adu with the same segment content
+        adus = [a for a in adus if a['segment'] != title]
         return self._handle_adu_ids(adus, seg)
 
     def _predict_relations(self, major_claims, claims, premises):
