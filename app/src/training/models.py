@@ -105,7 +105,8 @@ class SupervisedModel(Model):
         # 5. initialize the ModelTrainer
         trainer: ModelTrainer = self.get_model_trainer(corpus=corpus, flair_model=flair_model)
 
-        trainer.train(self.base_path, main_evaluation_metric=("marco avg", 'f1-score'),
+        trainer.train(self.base_path,
+                      # main_evaluation_metric=("marco avg", 'f1-score'),
                       learning_rate=self.model_properties["learning_rate"],
                       patience=self.model_properties["patience"],
                       max_epochs=self.model_properties["max_epochs"],
@@ -135,7 +136,7 @@ class SupervisedModel(Model):
     def get_model_trainer(self, corpus: Corpus, flair_model: flair.nn.Model) -> ModelTrainer:
         # 5. initialize the ModelTrainer
         trainer: ModelTrainer = ModelTrainer(flair_model, corpus, use_tensorboard=self.use_tensorboard,
-                                             tensorboard_log_dir=self.app_config.tensorboard_path,
+                                             # tensorboard_log_dir=self.app_config.tensorboard_path,
                                              optimizer=self.optimizer)
         self.app_logger.info("Starting training with ModelTrainer")
         self.app_logger.info(f"Model configuration properties: {self.model_properties}")
@@ -195,10 +196,10 @@ class SequentialModel(SupervisedModel):
     def get_embeddings(self):
         embeddings = TransformerWordEmbeddings(
             model=self.transformer_name,
-            layers="-1",
-            subtoken_pooling="first",
             fine_tune=True,
-            use_context=True,
+            layers="-1"
+            # subtoken_pooling="first",
+            # use_context=True,
         )
         # embedding_types: List[TokenEmbeddings] = [TransformerWordEmbeddings(self.transformer_name)]
         # embeddings: StackedEmbeddings = StackedEmbeddings(embedding_types)
