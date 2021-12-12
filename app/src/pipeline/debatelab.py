@@ -378,15 +378,20 @@ class DebateLab:
         seg = {
             "id": "T1",
             "type": "major_claim",
-            "starts": 0,
-            "ends": len(title),
+            "starts": '0',
+            "ends": str(len(title)),
             "segment": title,
             "confidence": 0.99
         }
         self.app_logger.info(
             f"Injecting document title: {title} as the fallback major claim.")
-        # remove any adu with the same segment content
-        adus = [a for a in adus if a['segment'] != title]
+        # remove any adu with the same / overlapping segment content
+        overlaps = [a for a in adus if a['segment'] == title or int(a['starts']) < int(seg['ends'])]
+        if overlaps:
+            self.app_logger.debug("Discarding ADUs for overlapping with inserted title major claim:")
+            for o in overlaps:
+                self.app_logger.debug(f"{o['id']} : {o['starts'], o['ends']} - {o['segment']}")
+        adus = [a for a in adus if a not in overlaps]
         return self._handle_adu_ids(adus, seg)
 
     def _predict_relations(self, major_claims, claims, premises):
