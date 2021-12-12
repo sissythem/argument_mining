@@ -7,11 +7,12 @@ from app.src.utils import utils
 path = "/home/nik/work/debatelab/argument-mining/app/resources/21_docs.json"
 kasteli_32_name = "DebateLab 1 Kasteli"
 collection_name = kasteli_32_name
-collection_name = "Manual-22-docs-covid-crete-politics"
+# collection_name = "Manual-22-docs-covid-crete-politics"
 
-read_source = "file"
 read_source = "tool"
-do_newline_norm = False
+read_source = "file"
+newline_norm = False
+text_preproc = "newline_norm"
 omit = ["Ομιλία του Πρωθυπουργού Κυριάκου Μητσοτάκη στη Βουλή στη συζήτηση για τη διαχείριση των καταστροφικών πυρκαγιών και τα μέτρα αποκατάστασης"]
 
 #########################
@@ -56,6 +57,7 @@ if read_source == "file":
 elif read_source == "tool":
     documents = read_from_annotation_tool(collection_name)
 
+
 for i, doc in enumerate(documents):
     if omit:
         if doc.external_name in omit:
@@ -64,8 +66,10 @@ for i, doc in enumerate(documents):
     # Simulate how codemirror handles lines...
     # text_cm = "\n".join(doc.text.splitlines())
     text_cm = doc.text
-    if do_newline_norm:
+    if text_preproc == "newline_norm":
         text_cm = utils.normalize_newlines(text_cm)
+    if text_preproc == "squash":
+        text_cm = "".join(text_cm.splitlines())
 
     annotations = dict()
     dangling_relations = defaultdict(list)
@@ -73,13 +77,14 @@ for i, doc in enumerate(documents):
     sp = 0
     # Collect ADU annotations...
     for ann in doc.annotationsByType('argument'):
-        if collection_name == kasteli_32_name:
-            if ann.annotator_id != 'Button_Annotator_neutral_argument_type_Generic':
-                continue
         first_span = ann.spans[0]
         s, e = int(first_span.start), int(first_span.end)
         segment_cm = text_cm[s: e]
-        assert segment_cm == ann.spans[0].segment
+        segment_annot = ann.spans[0].segment.strip()
+        try:
+            assert segment_cm == segment_annot
+        except AssertionError as ae:
+            raise AssertionError(str(ae))
         annotations[ann._id] = ann
         annotation_set.append(ann)
     # Get all relations, and make sure we have all ADUs...
