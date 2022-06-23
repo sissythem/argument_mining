@@ -1,0 +1,54 @@
+{
+  "save": {
+    "connect": "key",
+    "https": {
+        "host": "143.233.226.60",
+        "port": 9200,
+        "password": "SRr4TqV9rPjfzxUmYcjR4R92",
+        "username": "debatelab"
+    },
+    "ssh": {
+      "port": 222,
+      "username": "debatelab",
+      "password": "",
+      "key_path": "/home/nik/.ssh/debatelab"
+    }
+  },
+  "retrieve": {
+	  "connect": "password",
+	    "https":
+	    {
+	      "username" : "elastic",
+	    "password": "fafOwgabdow.",
+	    "host": "socialwebobservatory.iit.demokritos.gr",
+	    "port": 9200,
+	    "connect": "password"
+	  },
+	    "ssh":{
+	      "port": 222,
+	      "username": "debatelab",
+	      "password": "SciatnodricacyedweasdabTipeanmye43*@",
+	      "key_path": "/home/nik/.ssh/debatelab"
+    },
+    "retrieval":
+    {
+      "mode": "disk",
+      "search": {
+        "terms": ["Συζήτηση", "βουλή", "επίκαιρες", "πληγέντων"],
+        "field": "title",
+        "delta_days": 100,
+        "error_on_missing": false,
+        "exclude": {},
+        "interactive": false
+      },
+      "disk": {
+        "type": "link",
+        "path": "kasteli_34_urls.txt"
+      }
+
+    }
+    
+
+  }
+
+}

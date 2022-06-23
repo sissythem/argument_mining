@@ -1,0 +1,20 @@
+#/bin/env bash
+# pipeline execution script
+python_exec="/usr/bin/python"
+adu_model=""
+rel_model=""
+stance_model=""
+$python_exec run_pipeline.py  \
+	-adu_model "${adu_model}" \
+	-rel_model "${rel_model}" \
+	-stance_model "${stance_model}" \
+	-elastic_config elastic_config.json \
+	-inputs elastic \
+	--newline_norm  \
+	-topics_config "{\"model\": \"nlpaueb/bert-base-greek-uncased-v1\", \"n_clusters\": 32, \"device\": \"cpu\"}" \
+	-ner_config "{\"endpoint\": \"http://petasis.dyndns.org:7100/predict-ner\"}" \
+  	-cross_doc_clustering_config "{\"n_clusters\":16, \"model_name\": \"nlpaueb/bert-base-greek-uncased-v1\",\"clustering\": \"hdbscan\", \"cluster_selection_method\": \"eom\", \"n_clusters\": 10}" \
+	--run_cross_doc_clustering \
+	--run_ner \
+	--run_topics
+

@@ -1,43 +1,55 @@
 FROM tiangolo/uvicorn-gunicorn-fastapi:python3.8
 
-RUN apt-get update && apt-get install -y build-essential unzip vim git curl wget \
-                                        subversion tcl8.6 tcllib  tcl-tls  tcl-trf \
-                                        tcl-udp tcl-vfs  tdom  tcl-tclex tcl-memchan \
-                                        itcl3 tcl-signal tcl-sugar libpgtcl \
-                                        libsqlite-tcl mysqltcl tcl8.6-tdbc \
-                                        tcl8.6-tdbc-mysql tcl8.6-tdbc-postgres \
-                                        tcl8.6-tdbc-sqlite3 critcl
-
-RUN wget http://ports.ubuntu.com/pool/universe/c/combat/tcl-combat_0.8.1-1_all.deb
-RUN dpkg -i tcl-combat_0.8.1-1_all.deb
-
-# Compile & install rl_json library
-RUN cd && \
-    git clone https://github.com/RubyLane/rl_json.git && \
-    cd rl_json && \
-    ./configure && \
-    make install && \
-    rm -rf ~/rl_json
+# Ellogon
+#########
 
 # Ellogon install (to test run: tclsh /opt/Ellogon/ellogon)
 RUN cd /opt && \
     mkdir Ellogon && \
     chown -R root:root Ellogon && \
     cd /opt && \
-    svn checkout svn://svn.code.sf.net/p/ellogon/code/runtime Ellogon --quiet
+    svn checkout svn://svn.code.sf.net/p/ellogon/code/runtime Ellogon --quiet && cd /opt/Ellogon && svn update
 
-RUN cd /app
 
-# Copy the application
-ARG RELEASE=main
+# add pretrained models
+# models should be added via a mounted volume to /models during runtime
 
-RUN git clone --branch $RELEASE --single-branch https://docker:PGAveGZ3yR7myXwZuZZe@gitlab.com/debatelab/argument-mining.git
-RUN rm -rf /app/argument-mining/.git/
-RUN rm -rf /app/argument-mining/docs/
-RUN python3 -m pip install -r /app/argument-mining/requirements.txt
+# get python 3.7
+RUN cd / && echo "Fetching python3.7" && \
+  wget -q https://www.python.org/ftp/python/3.7.12/Python-3.7.12.tgz && \
+  tar xf Python-3.7.12.tgz &&  cd Python-3.7.12 && ./configure && make && make install
 
-EXPOSE 80
-WORKDIR /app/argument-mining/app
+RUN echo "Using python:" && python --version
 
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "80"]
-# CMD tail -f /dev/null
+# get repo
+RUN ls
+RUN git clone "https://docker:31BTUPDphFu2mE_sAaZ-@gitlab.com/npit/argument-mining-v2.git" /code
+RUN cd /code && git checkout develop
+
+# yoink dependencies
+RUN cd /code && python -m pip install -r requirements.txt
+
+# ellogon python package
+RUN apt-get update && apt-get -y install tcllib
+ENV PYTHON_ELLOGON_PATH="/mnt/python-ellogon"
+ADD python-ellogon /mnt/python-ellogon 
+RUN python -m pip install -e /mnt/python-ellogon
+RUN python -c "from ellogon import tokeniser; tokeniser.tokenise_spans('Ένα δύο, τρία! Τέσσερα; Ναι!')" && echo "Installed ellogon"
+
+# cron
+RUN apt install -y cron
+# TODO move near model addition
+# model config
+
+# debugging stuff
+RUN apt-get install -y vim tmux jq
+RUN echo "set -o vi" >> /root/.bashrc
+
+RUN mkdir /models
+
+#######
+
+# CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+WORKDIR "/code"
+CMD ["bash", "container/entrypoint.sh"]
+# # CMD tail -f /dev/null

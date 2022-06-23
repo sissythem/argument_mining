@@ -1,0 +1,26 @@
+{
+  "run_id": "rest_annotation",
+  "strip_document_extra_info": 1,
+  "adu_model": "/models/models_may2022/adu",
+  "rel_model": "/models/models_may2022/rel",
+  "stance_model": "/models/models_may2022/stance",
+  "embedder_model": "nlpaueb/bert-base-greek-uncased-v1",
+  "elastic_config": "/code/elastic_config.json",
+  "input_type": "instance",
+  "newline_norm": 1,
+  "ner_config": "{\"endpoint\": \"http://petasis.dyndns.org:7100/predict-ner\"}",
+  "topics_config": "{\"n_clusters\": 10, \"model_name\": \"nlpaueb/bert-base-greek-uncased-v1\"}",
+  "cross_doc_clustering_config": "{\"n_clusters\":16, \"model_name\": \"nlpaueb/bert-base-greek-uncased-v1\",\"clustering\": \"similarity\"}",
+  "run_cross_doc_clustering": 0,
+  "save_to_elastic": 0,
+  "disable_rel": 1,
+  "disable_stance": 1,
+  "disable_validation": 1,
+  "run_ner": 0,
+  "run_topics": 0,
+  "device": "cpu"
+
+
+
+
+}
