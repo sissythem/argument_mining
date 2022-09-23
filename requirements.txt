@@ -3,7 +3,7 @@ datasets
 transformers
 seqeval
 pandas
-numpy==1.20
+numpy==1.22.0
 genson
 elasticsearch==7.16.3
 elasticsearch-dsl==7.3.0
